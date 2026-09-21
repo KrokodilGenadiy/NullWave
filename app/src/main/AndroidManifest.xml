@@ -12,9 +12,16 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.NullWave">
+        <!--
+          Instantiatable is a false positive here: MainActivity is constructor-injected, and
+          MetroX's MetroAppComponentFactory (merged in from the metrox-android AAR via
+          android:appComponentFactory) is what constructs it. Lint only knows about the
+          no-arg-constructor path.
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            tools:ignore="Instantiatable"
             android:label="@string/app_name"
             android:theme="@style/Theme.NullWave"
             android:windowSoftInputMode="adjustResize">

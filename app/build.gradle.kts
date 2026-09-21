@@ -52,6 +52,27 @@ sqldelight {
 }
 
 dependencies {
+    // Every feature module must be on :app's COMPILE classpath, not runtimeOnly - Metro resolves
+    // contribution hints in FIR, which only sees the compile classpath. This is the one place a
+    // feature is named; nothing in :app's source imports from them.
+    implementation(projects.core.designsystem)
+    implementation(projects.core.di)
+    implementation(projects.core.navigation)
+    // impl modules must be on the COMPILE classpath (Metro resolves contribution hints in FIR),
+    // so runtimeOnly will not work. This is the only place an impl is named; :app imports from
+    // api modules only.
+    implementation(projects.feature.library.impl)
+    implementation(projects.feature.player.impl)
+    implementation(projects.feature.search.impl)
+    implementation(projects.feature.equalizer.impl)
+    implementation(projects.feature.sleeptimer.impl)
+    implementation(projects.feature.settings.impl)
+    implementation(projects.feature.about.impl)
+
+    // :app names the start destination, so it needs the library feature's contract. The drawer
+    // will add the other api modules as it grows - api only, never impl.
+    implementation(projects.feature.library.api)
+
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
@@ -64,9 +85,13 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.navigation3.ui)
     implementation(libs.kotlinx.coroutines.android)
 
     // Metro contributes its own runtime via the compiler plugin; no explicit dependency needed.
+    // MetroX Android is a separate library, though. Its AAR manifest merges
+    // android:appComponentFactory in for you, so AndroidManifest.xml needs no edit.
+    implementation(libs.metrox.android)
 
     implementation(libs.sqldelight.android.driver)
     implementation(libs.sqldelight.coroutines.extensions)
@@ -81,4 +106,5 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
+
 }
