@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Only what the platform needs before Compose is running: the launch window background.
+  Everything else lives in the Compose token sheet
+  (com.zaus.nullwave.designsystem.theme.NullWaveColors) - do not duplicate it here.
+-->
+<resources>
+    <color name="nullwave_bg">#07090B</color>
+</resources>

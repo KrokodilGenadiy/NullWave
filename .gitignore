@@ -1,0 +1,39 @@
+# Build output
+# **/build/ rather than /build + /app/build, so new :core:* and :feature:* modules
+# are covered without touching this file again.
+**/build/
+.gradle/
+.kotlin/
+.cxx/
+.externalNativeBuild/
+/captures/
+
+# Machine-local config
+local.properties
+
+# Signing material - never commit
+*.jks
+*.keystore
+*.p12
+keystore.properties
+
+# Packaged artifacts
+*.apk
+*.aab
+*.aar
+*.ap_
+
+# IDE
+*.iml
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# NOT ignored, deliberately:
+#   gradle/wrapper/gradle-wrapper.jar     - ./gradlew cannot bootstrap without it
+#   gradle/gradle-daemon-jvm.properties   - pins the daemon JDK for every contributor
+#   app/src/main/res/font/*.ttf           - the design system does not render without them
+#   app/src/main/assets/licenses/*.txt    - OFL requires shipping these alongside the fonts
+#   app/src/main/sqldelight/databases/*.db - verifyMigrations needs the schema snapshots
