@@ -86,6 +86,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation3.runtime)
     implementation(libs.androidx.navigation3.ui)
+    // Uncomment together with the ADAPTIVE LAYOUT block at the foot of MainActivity.kt.
+    // implementation(libs.androidx.compose.material3.windowSizeClass)
     implementation(libs.kotlinx.coroutines.android)
 
     // Metro contributes its own runtime via the compiler plugin; no explicit dependency needed.

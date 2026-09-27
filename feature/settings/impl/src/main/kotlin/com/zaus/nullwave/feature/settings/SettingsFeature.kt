@@ -7,32 +7,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
-import com.zaus.nullwave.core.di.ActivityScope
-import com.zaus.nullwave.core.navigation.EntryProviderInstaller
-import com.zaus.nullwave.feature.settings.api.SettingsKey
 import com.zaus.nullwave.feature.settings.api.SettingsRepository
 import com.zaus.nullwave.feature.settings.api.UserSettings
 import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesBinding
-import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.IntoSet
-import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
 /**
- * Scaffolding, not a settings screen.
+ * Scaffolding, not a settings screen. The design groups it as: Library & scanning, Playback,
+ * Appearance, Audio, About.
  *
- * [SettingsRepository] is bound here and consumed through the interface elsewhere, so nothing
- * outside this module knows the values come from DataStore. The in-memory store below is a stand-in
- * - swap it for `DataStore<Preferences>` (already on this module's classpath) without touching a
- * single caller.
- *
- * The design groups this screen as: Library & scanning, Playback, Appearance, Audio, About.
+ * [InMemorySettingsRepository] stays here rather than in `di/` - it is the implementation itself,
+ * not DI wiring. `@ContributesBinding` only says which interface it satisfies. Swap it for a
+ * DataStore-backed version (already on this module's classpath) without touching a caller.
  */
 @ContributesBinding(AppScope::class)
 @SingleIn(AppScope::class)
@@ -52,17 +43,6 @@ class InMemorySettingsRepository : SettingsRepository {
 
     override suspend fun setShowQualityTier(enabled: Boolean) {
         state.update { it.copy(showQualityTier = enabled) }
-    }
-}
-
-@ContributesTo(ActivityScope::class)
-@BindingContainer
-object SettingsFeatureBindings {
-
-    @Provides
-    @IntoSet
-    fun settingsEntries(): EntryProviderInstaller = {
-        entry<SettingsKey> { SettingsScreen() }
     }
 }
 

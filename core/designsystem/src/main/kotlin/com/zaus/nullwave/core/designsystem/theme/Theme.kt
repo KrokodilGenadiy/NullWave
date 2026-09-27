@@ -1,7 +1,10 @@
 package com.zaus.nullwave.core.designsystem.theme
 
+import androidx.compose.material.ripple.RippleAlpha
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RippleConfiguration
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
@@ -44,6 +47,21 @@ fun NullWaveTheme(
         LocalNullWaveDimens provides dimens,
         LocalNullWaveMotion provides motion,
         LocalContentColor provides colors.textPrimary,
+        // Material's default ripple is white-ish. MaterialTheme sets LocalIndication to ripple(),
+        // and that ripple reads this config, so setting it here recolours every Modifier.clickable
+        // in the app - including the hand-rolled components, which is the point.
+        //
+        // Alphas are well below Material's defaults: primary is a saturated yellow on a near-black
+        // canvas, so the stock values read as a flash rather than a touch response.
+        LocalRippleConfiguration provides RippleConfiguration(
+            color = colors.primary,
+            rippleAlpha = RippleAlpha(
+                draggedAlpha = 0.10f,
+                focusedAlpha = 0.10f,
+                hoveredAlpha = 0.05f,
+                pressedAlpha = 0.12f,
+            ),
+        ),
     ) {
         MaterialTheme(
             colorScheme = colors.toMaterialColorScheme(),

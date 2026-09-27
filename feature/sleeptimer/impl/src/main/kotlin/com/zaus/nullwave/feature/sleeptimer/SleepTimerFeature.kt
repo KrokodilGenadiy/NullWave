@@ -1,4 +1,4 @@
-package com.zaus.nullwave.feature.equalizer
+package com.zaus.nullwave.feature.sleeptimer
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,14 +8,14 @@ import androidx.compose.ui.Modifier
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
 /**
- * Scaffolding, not a screen. The second hero screen: 8 ISO bands as perk-tree octagon nodes,
- * presets, bass boost.
+ * Scaffolding, not a screen. Designed as a sheet; kept as a destination so the drawer can reach it
+ * directly.
  */
 @Composable
-fun EqualizerScreen(modifier: Modifier = Modifier) {
+fun SleepTimerScreen(modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxSize()) {
         Text(
-            text = "EQUALIZER",
+            text = "SLEEP TIMER",
             style = NullWaveTheme.typography.h1,
             color = NullWaveTheme.colors.textPrimary,
         )
