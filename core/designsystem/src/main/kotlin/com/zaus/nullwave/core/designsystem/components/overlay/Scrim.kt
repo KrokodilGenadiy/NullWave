@@ -1,4 +1,4 @@
-package com.zaus.nullwave.core.designsystem.components
+package com.zaus.nullwave.core.designsystem.components.overlay
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween

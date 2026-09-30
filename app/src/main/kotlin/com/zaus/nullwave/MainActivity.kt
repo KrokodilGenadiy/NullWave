@@ -26,11 +26,11 @@ import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
-import com.zaus.nullwave.core.designsystem.components.NullWaveNavigationRail
-import com.zaus.nullwave.core.designsystem.components.NullWaveNavigationRailHeader
-import com.zaus.nullwave.core.designsystem.components.NullWaveNavigationRailItem
-import com.zaus.nullwave.core.designsystem.components.NullWaveScrim
-import com.zaus.nullwave.core.designsystem.components.NullWaveTopBar
+import com.zaus.nullwave.core.designsystem.components.navigation.NullWaveNavigationRail
+import com.zaus.nullwave.core.designsystem.components.navigation.NullWaveNavigationRailHeader
+import com.zaus.nullwave.core.designsystem.components.navigation.NullWaveNavigationRailItem
+import com.zaus.nullwave.core.designsystem.components.overlay.NullWaveScrim
+import com.zaus.nullwave.core.designsystem.components.navigation.NullWaveTopBar
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColors
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.di.ActivityScope

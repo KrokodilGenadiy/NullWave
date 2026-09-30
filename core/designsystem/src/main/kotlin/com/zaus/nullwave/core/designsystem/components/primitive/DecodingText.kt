@@ -1,4 +1,4 @@
-package com.zaus.nullwave.core.designsystem.components
+package com.zaus.nullwave.core.designsystem.components.primitive
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect

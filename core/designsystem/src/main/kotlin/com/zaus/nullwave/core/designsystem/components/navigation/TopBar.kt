@@ -1,9 +1,6 @@
-package com.zaus.nullwave.core.designsystem.components
+package com.zaus.nullwave.core.designsystem.components.navigation
 
-import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
@@ -12,22 +9,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
+import com.zaus.nullwave.core.designsystem.components.control.NullWaveIconButton
+import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveDecodingText
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
 /**
@@ -78,7 +72,7 @@ fun NullWaveTopBar(
             .padding(horizontal = NullWaveTheme.spacing.xxs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TopBarIcon(
+        NullWaveIconButton(
             icon = NullWaveIcons.Menu,
             contentDescription = navigationContentDescription,
             onClick = onNavigationClick,
@@ -97,39 +91,6 @@ fun NullWaveTopBar(
         )
 
         actions()
-    }
-}
-
-/**
- * A 24dp icon centred in a 48dp hit area - the touch-target floor the design sets.
- *
- * Private for now. When the search and overflow actions land it should graduate to a public
- * `NullWaveIconButton`, which is on the design's component list anyway.
- */
-@Composable
-private fun TopBarIcon(
-    @DrawableRes icon: Int,
-    contentDescription: String?,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier
-            .size(NullWaveTheme.dimens.touchTarget)
-            // A Material ripple has no shape of its own - it is a circle clipped to the node's
-            // bounds. So clipping the node to the octagon node shape is what makes the ripple an
-            // octagon. Order matters: clip must come BEFORE clickable, or the indication draws
-            // outside the clip and you get the default square.
-            .clip(NullWaveTheme.shapes.node)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            painter = painterResource(icon),
-            contentDescription = contentDescription,
-            tint = NullWaveTheme.colors.textPrimary,
-            modifier = Modifier.size(NullWaveTheme.dimens.icon),
-        )
     }
 }
 

@@ -1,4 +1,4 @@
-package com.zaus.nullwave.core.designsystem.components
+package com.zaus.nullwave.core.designsystem.components.navigation
 
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
