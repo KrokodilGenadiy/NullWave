@@ -1,4 +1,4 @@
-package com.zaus.nullwave.feature.equalizer.di
+﻿package com.zaus.nullwave.feature.equalizer.di
 
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.di.ActivityScope

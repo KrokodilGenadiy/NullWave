@@ -1,7 +1,6 @@
 package com.zaus.nullwave.core.navigation
 
 import androidx.annotation.DrawableRes
-import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 
 /**
@@ -59,15 +58,3 @@ data class TopLevelDestination(
  */
 fun Collection<TopLevelDestination>.inDisplayOrder(): List<TopLevelDestination> =
     sortedWith(compareBy({ it.section.ordinal }, { it.label }))
-
-/**
- * Switch to a top-level destination.
- *
- * Replaces the stack rather than pushing onto it: tapping Settings, then Equalizer, then Settings
- * again should leave one entry, not three. Detail screens still push normally with `add`.
- */
-fun NavBackStack<NavKey>.switchTopLevel(key: NavKey) {
-    if (lastOrNull() == key && size == 1) return
-    clear()
-    add(key)
-}

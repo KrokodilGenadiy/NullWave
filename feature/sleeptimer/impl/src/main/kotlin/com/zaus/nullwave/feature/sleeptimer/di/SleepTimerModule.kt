@@ -1,4 +1,4 @@
-package com.zaus.nullwave.feature.sleeptimer.di
+﻿package com.zaus.nullwave.feature.sleeptimer.di
 
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.di.ActivityScope

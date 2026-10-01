@@ -1,4 +1,4 @@
-package com.zaus.nullwave.feature.search.di
+﻿package com.zaus.nullwave.feature.search.di
 
 import com.zaus.nullwave.core.di.ActivityScope
 import com.zaus.nullwave.core.navigation.EntryProviderInstaller

@@ -1,4 +1,4 @@
-package com.zaus.nullwave.feature.about.di
+﻿package com.zaus.nullwave.feature.about.di
 
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.di.ActivityScope
