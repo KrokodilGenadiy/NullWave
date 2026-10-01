@@ -2,7 +2,6 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.metro)
-    alias(libs.plugins.sqldelight)
 }
 
 android {
@@ -37,24 +36,19 @@ android {
     }
 }
 
-sqldelight {
-    databases {
-        create("NullWaveDatabase") {
-            // .sq files go in app/src/main/sqldelight/com/zaus/nullwave/data/database/
-            // The NullWaveDatabase class is only generated once at least one .sq file exists.
-            packageName.set("com.zaus.nullwave.data.database")
-            // `./gradlew :app:generateNullWaveDatabaseSchema` writes a .db snapshot here; the
-            // verify task then checks each .sqm migration against it.
-            schemaOutputDirectory.set(file("src/main/sqldelight/databases"))
-            verifyMigrations.set(true)
-        }
-    }
-}
+// The sqldelight { } block and its source set now live in :core:data. They were here, which would have
+// generated NullWaveDatabase into :app — invisible to every feature module, since dependencies run
+// :app -> :feature -> :core. See DATA.md.
 
 dependencies {
     // Every feature module must be on :app's COMPILE classpath, not runtimeOnly - Metro resolves
     // contribution hints in FIR, which only sees the compile classpath. This is the one place a
     // feature is named; nothing in :app's source imports from them.
+    // Both data modules, because Metro resolves contribution hints against the COMPILE classpath and
+    // each contributes a binding container: DatabaseBindings from :core:database, RepositoryBindings
+    // from :core:data. :app is the one module allowed to see the schema; features see only :core:data.
+    implementation(projects.core.database)
+    implementation(projects.core.data)
     implementation(projects.core.designsystem)
     implementation(projects.core.di)
     implementation(projects.core.navigation)
@@ -95,13 +89,12 @@ dependencies {
     // android:appComponentFactory in for you, so AndroidManifest.xml needs no edit.
     implementation(libs.metrox.android)
 
-    implementation(libs.sqldelight.android.driver)
-    implementation(libs.sqldelight.coroutines.extensions)
-    implementation(libs.sqldelight.primitive.adapters)
+    // The sqldelight artifacts moved to :core:data with the schema. :app still gets the Android driver
+    // transitively (it is `api` there), because the DatabaseBindings that construct AndroidSqliteDriver
+    // have to live somewhere the Metro graph can see.
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.sqldelight.sqlite.driver)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)

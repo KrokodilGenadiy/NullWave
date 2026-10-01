@@ -32,6 +32,12 @@ interface AppGraph : MetroAppComponentProviders {
     /** Anything asking for a `Context` gets the application one. */
     val applicationContext: Context
 
+    // No accessors for the data layer on purpose. Metro only generates a provider for a binding some
+    // entry point actually reaches, so until a feature injects TrackRepository there is nothing in the
+    // graph - which is correct, not broken. Verified by adding an accessor temporarily: the whole chain
+    // appeared (provideSqlDriverProvider, provideDatabaseProvider, provideTrackRepositoryProvider), then
+    // it was removed again.
+
     @DependencyGraph.Factory
     fun interface Factory {
         fun create(@Provides application: Application): AppGraph
@@ -43,25 +49,10 @@ interface AppGraph : MetroAppComponentProviders {
 }
 
 /*
- * Once a .sq file exists and NullWaveDatabase is generated, the database wiring looks like this.
- * Add `DatabaseBindings::class` to `@DependencyGraph(bindingContainers = [...])` above to install it.
- *
- * @BindingContainer
- * object DatabaseBindings {
- *
- *     @Provides
- *     @SingleIn(AppScope::class)
- *     fun provideSqlDriver(context: Context): SqlDriver =
- *         AndroidSqliteDriver(
- *             schema = NullWaveDatabase.Schema,
- *             context = context,
- *             name = "nullwave.db",
- *         )
- *
- *     @Provides
- *     @SingleIn(AppScope::class)
- *     fun provideDatabase(driver: SqlDriver): NullWaveDatabase = NullWaveDatabase(driver)
- * }
+ * The database wiring that used to be sketched here now exists for real, as
+ * `com.zaus.nullwave.core.data.di.DatabaseBindings` in :core:data. It is a `@ContributesTo(AppScope)`
+ * binding container, so it self-registers and nothing has to be added above - which is the point. The
+ * old sketch would have had :app naming the data layer, unlike every other module in the project.
  */
 
 /*

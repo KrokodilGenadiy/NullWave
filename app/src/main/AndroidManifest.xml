@@ -2,6 +2,30 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!--
+      Reading the user's audio files. Two spellings, because the permission was split at API 33 and
+      minSdk here is 29:
+
+        * READ_MEDIA_AUDIO     33+
+        * READ_EXTERNAL_STORAGE  <=32, capped by maxSdkVersion so it is not requested on newer
+                                 devices, where it would be denied anyway
+
+      Pick the right one at runtime from SDK_INT - once, next to the scanner in :core:data, not in the
+      UI. The UI asks for "the audio permission" and should not know the API-level split.
+
+      READ_MEDIA_VISUAL_USER_SELECTED is deliberately absent: the 34+ partial-access flow is images and
+      video only. There is no partial grant for audio, so it is all-or-nothing and that permission would
+      do nothing here. Plenty of guides add it anyway.
+
+      Playback will later want FOREGROUND_SERVICE, FOREGROUND_SERVICE_MEDIA_PLAYBACK (34+) and
+      POST_NOTIFICATIONS (33+). Deliberately not declared yet - no service exists, and holding
+      permissions the app does not use is both a review smell and a privacy one.
+    -->
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
     <application
         android:name=".NullWaveApplication"
         android:allowBackup="true"

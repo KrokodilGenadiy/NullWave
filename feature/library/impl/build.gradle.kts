@@ -12,4 +12,7 @@ dependencies {
     // Cross-feature dependencies are always on the OTHER feature's api, never its impl.
     // This is the line that keeps a change to the player's internals from recompiling the library.
     implementation(projects.feature.player.api)
+
+    // The library is the first consumer of the data layer: Songs / Artists / Albums all read from it.
+    implementation(projects.core.data)
 }

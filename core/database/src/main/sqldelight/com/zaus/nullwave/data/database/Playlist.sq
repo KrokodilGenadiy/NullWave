@@ -1,0 +1,99 @@
+-- User-created playlists. The only thing here MediaStore cannot tell us, which is why it is the only
+-- thing with tables of its own - see the note at the top of Track.sq.
+
+CREATE TABLE playlist (
+    id          INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL,
+    created_at  INTEGER NOT NULL,
+    updated_at  INTEGER NOT NULL
+);
+
+-- Ordering is an explicit integer position, and (playlist_id, position) is the primary key - so the
+-- table cannot hold two tracks at the same slot, and reads come back ordered off the index for free.
+--
+-- A drag-to-reorder therefore rewrites every row after the insertion point. At playlist scale that is
+-- genuinely fine, and it must happen inside one transaction or the unique key will trip halfway. Gap or
+-- fractional positions are the alternative if reordering ever feels slow, and they bring their own
+-- rebalancing problem.
+--
+-- ON DELETE CASCADE needs `PRAGMA foreign_keys = ON`, which is OFF by default on every new SQLite
+-- connection. Set it in AndroidSqliteDriver's callback, or these clauses are decoration.
+CREATE TABLE playlist_entry (
+    playlist_id INTEGER NOT NULL REFERENCES playlist(id) ON DELETE CASCADE,
+    track_id    INTEGER NOT NULL REFERENCES track(id) ON DELETE CASCADE,
+    position    INTEGER NOT NULL,
+    PRIMARY KEY (playlist_id, position)
+);
+
+-- The reverse lookup: "which playlists is this track in", and what CASCADE walks on track deletion.
+CREATE INDEX playlist_entry_track ON playlist_entry(track_id);
+
+-- ── Playlists ──────────────────────────────────────────────────────────────────────────────────────
+
+selectAllPlaylists:
+SELECT playlist.id, playlist.name, playlist.created_at, playlist.updated_at,
+       count(playlist_entry.track_id) AS track_count,
+       -- Total runtime, so the list can show "14 tracks - 52 min" without a second query.
+       --
+       -- Two things about this column. SUM over no rows is NULL, not 0, so the generated type is
+       -- nullable - an empty playlist reports null, not zero. And the CAST is not decoration: SQLite's
+       -- SUM may return a float, so SQLDelight infers REAL and hands back a `Double?`. Milliseconds are
+       -- an integer quantity; the cast keeps them one.
+       CAST(SUM(track.duration_ms) AS INTEGER) AS duration_ms
+FROM playlist
+LEFT JOIN playlist_entry ON playlist_entry.playlist_id = playlist.id
+LEFT JOIN track ON track.id = playlist_entry.track_id
+GROUP BY playlist.id
+ORDER BY playlist.name COLLATE NOCASE ASC;
+
+insertPlaylist:
+INSERT INTO playlist(name, created_at, updated_at) VALUES (?, ?, ?);
+
+-- SQLDelight exposes this for reading back the id just inserted. Call it inside the same transaction as
+-- insertPlaylist, or another writer can get in between.
+lastInsertedPlaylistId:
+SELECT last_insert_rowid();
+
+renamePlaylist:
+UPDATE playlist SET name = ?, updated_at = ? WHERE id = ?;
+
+deletePlaylist:
+DELETE FROM playlist WHERE id = ?;
+
+-- ── Entries ────────────────────────────────────────────────────────────────────────────────────────
+
+selectPlaylistTracks:
+SELECT track.*
+FROM playlist_entry
+JOIN track ON track.id = playlist_entry.track_id
+WHERE playlist_entry.playlist_id = ?
+ORDER BY playlist_entry.position ASC;
+
+-- Append. The subquery is why this needs the same transaction as anything else touching the playlist:
+-- two concurrent appends would both read the same MAX and collide on the primary key.
+-- COALESCE because MAX over no rows is NULL.
+appendTrack:
+INSERT INTO playlist_entry(playlist_id, track_id, position)
+VALUES (
+    ?,
+    ?,
+    (SELECT COALESCE(MAX(position), -1) + 1 FROM playlist_entry WHERE playlist_id = ?)
+);
+
+-- Used by reorder, which clears and rewrites positions in one transaction.
+setEntryPosition:
+UPDATE playlist_entry SET position = ? WHERE playlist_id = ? AND track_id = ?;
+
+removeEntryAt:
+DELETE FROM playlist_entry WHERE playlist_id = ? AND position = ?;
+
+deleteAllEntries:
+DELETE FROM playlist_entry WHERE playlist_id = ?;
+
+-- Close the gap left by a removal, so positions stay contiguous.
+shiftPositionsDown:
+UPDATE playlist_entry SET position = position - 1
+WHERE playlist_id = ? AND position > ?;
+
+playlistsContainingTrack:
+SELECT playlist_id FROM playlist_entry WHERE track_id = ?;

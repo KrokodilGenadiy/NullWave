@@ -1,0 +1,221 @@
+-- The library. One row per audio file MediaStore knows about.
+--
+-- Artists, albums and folders are GROUP BY queries over this table rather than tables of their own.
+-- They hold nothing MediaStore has not already told us, and a table per tab would have to be kept in
+-- sync on every rescan. User data (playlists) is the only thing that earns its own table, because it is
+-- the only thing MediaStore cannot tell us - see Playlist.sq.
+--
+-- Columns fall into four groups, and which group a column is in decides who may write it:
+--   * from MediaStore, cheap     - the scan owns these, overwritten on every rescan
+--   * derived at scan time       - bitrate, see below
+--   * probed lazily, nullable    - sample_rate / bit_depth, filled for one track at a time
+--   * ours, never touched by a scan - is_favourite, play_count, last_played_at
+--
+-- `id` is the MediaStore `_ID`, not an autoincrement of our own. It is stable for the life of the file
+-- and it is what `ContentUris.withAppendedId` needs to load artwork or open a stream. Our own key would
+-- mean carrying the MediaStore id as a second column and joining on it for nothing.
+
+CREATE TABLE track (
+    id              INTEGER NOT NULL PRIMARY KEY,
+
+    -- From MediaStore. artist_name and album_name are denormalised on purpose: the Songs tab is then a
+    -- single table scan with no joins, which is what makes a 1,284-row list cheap.
+    title           TEXT NOT NULL,
+    artist_name     TEXT NOT NULL,
+    album_name      TEXT NOT NULL,
+    album_id        INTEGER,
+    artist_id       INTEGER,
+    duration_ms     INTEGER NOT NULL,
+    track_no        INTEGER,
+    disc_no         INTEGER,
+    year            INTEGER,
+    mime_type       TEXT NOT NULL,
+    size_bytes      INTEGER NOT NULL,
+    relative_path   TEXT NOT NULL,
+    display_name    TEXT NOT NULL,
+    date_added      INTEGER NOT NULL,
+    date_modified   INTEGER NOT NULL,
+
+    -- Derived at scan time as size_bytes * 8000 / duration_ms. MediaStore.Audio.Media.BITRATE exists
+    -- only from API 31 and minSdk here is 29, so deriving it removes a version branch entirely. Stored
+    -- rather than computed per row so the quality-tier stripe is a column read.
+    bitrate         INTEGER NOT NULL,
+
+    -- Not in MediaStore at all. The expanded player shows "FLAC - 44.1 kHz / 16 - 1,042 kbps", and the
+    -- first two require MediaExtractor opening the file - far too slow for a whole-library scan. Filled
+    -- on demand for the track being shown, then cached here. Never populate these from the scan.
+    sample_rate     INTEGER,
+    bit_depth       INTEGER,
+
+    -- Ours. A rescan must not touch these, which is why updateScanned below lists columns explicitly
+    -- instead of using INSERT OR REPLACE.
+    -- `kotlin.Boolean`, fully qualified, and the qualification is not optional. Bare `AS Boolean` makes
+    -- SQLDelight emit `import Boolean` - a custom type in the root package - plus a `Track.Adapter`
+    -- demanding a `ColumnAdapter<Boolean, Long>`, and the generated file does not compile. Qualified, it
+    -- is recognised as the built-in and mapped with `cursor.getBoolean(...)`: no adapter, and the DDL is
+    -- still a plain `INTEGER NOT NULL DEFAULT 0`.
+    is_favourite    INTEGER AS kotlin.Boolean NOT NULL DEFAULT 0,
+    play_count      INTEGER NOT NULL DEFAULT 0,
+    last_played_at  INTEGER
+);
+
+-- One index per screen that sorts or filters. COLLATE NOCASE is load-bearing: without it "abba" sorts
+-- after "Zappa", and the fast-scroller's letter buckets disagree with the list the user is looking at.
+-- The collation has to be on the index AND the ORDER BY, or SQLite will not use the index.
+CREATE INDEX track_title ON track(title COLLATE NOCASE);
+CREATE INDEX track_album ON track(album_name COLLATE NOCASE, disc_no, track_no);
+CREATE INDEX track_artist ON track(artist_name COLLATE NOCASE);
+CREATE INDEX track_date_added ON track(date_added DESC);
+CREATE INDEX track_path ON track(relative_path);
+
+-- ── Scan ───────────────────────────────────────────────────────────────────────────────────────────
+-- Two statements rather than one upsert, for two reasons. ON CONFLICT DO UPDATE needs SQLite 3.24 and
+-- Android 10 (minSdk 29) ships 3.22. And INSERT OR REPLACE would be wrong even where available: REPLACE
+-- deletes the row before inserting, so it would reset is_favourite and play_count and cascade the
+-- track's playlist entries away. Run both inside one `transaction { }` - 1,284 rows outside a
+-- transaction is 1,284 commits.
+
+insertIfNew:
+INSERT OR IGNORE INTO track(
+    id, title, artist_name, album_name, album_id, artist_id, duration_ms, track_no, disc_no, year,
+    mime_type, size_bytes, relative_path, display_name, date_added, date_modified, bitrate
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- Only the MediaStore-owned columns. Note what is absent: is_favourite, play_count, last_played_at,
+-- sample_rate, bit_depth.
+updateScanned:
+UPDATE track SET
+    title = ?, artist_name = ?, album_name = ?, album_id = ?, artist_id = ?, duration_ms = ?,
+    track_no = ?, disc_no = ?, year = ?, mime_type = ?, size_bytes = ?, relative_path = ?,
+    display_name = ?, date_modified = ?, bitrate = ?
+WHERE id = ?;
+
+-- What the scan diffs against: ids we hold and when we last saw them changed.
+selectScanState:
+SELECT id, date_modified FROM track;
+
+-- Rows whose file MediaStore no longer reports.
+deleteByIds:
+DELETE FROM track WHERE id IN ?;
+
+-- ── Songs tab ──────────────────────────────────────────────────────────────────────────────────────
+-- One query per sort order rather than a dynamic ORDER BY. SQLDelight cannot parameterise ORDER BY
+-- without a CASE expression that defeats the index, and the design offers exactly three sorts.
+
+selectAllByTitle:
+SELECT * FROM track ORDER BY title COLLATE NOCASE ASC;
+
+selectAllByDateAdded:
+SELECT * FROM track ORDER BY date_added DESC;
+
+selectAllByDuration:
+SELECT * FROM track ORDER BY duration_ms DESC;
+
+countAll:
+SELECT count(*) FROM track;
+
+-- ── Grid and detail screens ────────────────────────────────────────────────────────────────────────
+-- album_id is MIN() rather than a grouping column: every track on an album shares it, and MIN lets us
+-- carry it out of the group without widening GROUP BY and accidentally splitting albums whose tracks
+-- disagree. Same for year, where a compilation can carry several.
+
+-- Grouped by `album_id`, which is MediaStore's own notion of an album, not by (name, artist).
+--
+-- That choice matters because `AlbumDetailKey` carries an `albumId`: grouping by anything else means the
+-- grid and the detail screen disagree about what an album is, and two artists' "Untitled" render as two
+-- tiles that both open the same merged track list. Deferring to the platform's id makes that
+-- inconsistency unrepresentable rather than fixed.
+--
+-- `WHERE album_id IS NOT NULL` excludes untagged files entirely: they are not albums, they are loose
+-- tracks, and they still appear in the Songs tab. It also narrows album_id to non-null in the generated
+-- type, which is exactly the signature the detail query wants.
+--
+-- `MIN(album_name)` rather than a bare column: SQLite permits bare columns in a GROUP BY and picks an
+-- arbitrary row, which is harmless for the name (every track in the group shares it) but wrong for the
+-- artist, where a compilation genuinely differs per track. Hence artist_count - the repository turns
+-- more than one into "Various Artists" rather than showing whichever row SQLite happened to pick.
+albums:
+SELECT album_id,
+       MIN(album_name) AS album_name,
+       MIN(artist_name) AS artist_name,
+       count(DISTINCT artist_name) AS artist_count,
+       MIN(year) AS year,
+       count(*) AS track_count
+FROM track
+WHERE album_id IS NOT NULL
+GROUP BY album_id
+ORDER BY album_name COLLATE NOCASE ASC;
+
+artists:
+SELECT artist_name, MIN(artist_id) AS artist_id, count(DISTINCT album_name) AS album_count,
+       count(*) AS track_count
+FROM track
+GROUP BY artist_name COLLATE NOCASE
+ORDER BY artist_name COLLATE NOCASE ASC;
+
+folders:
+SELECT relative_path, count(*) AS track_count
+FROM track
+GROUP BY relative_path
+ORDER BY relative_path ASC;
+
+-- Album detail, in playing order. disc_no first so a 2-disc release does not interleave.
+--
+-- Keyed on album_id, the same grouping key `albums` uses, so the tile and the screen it opens can never
+-- disagree about which tracks belong to it. Filtering on album_name was the earlier version and was
+-- wrong: it merged same-titled albums by different artists.
+selectByAlbum:
+SELECT * FROM track
+WHERE album_id = ?
+ORDER BY disc_no ASC, track_no ASC, title COLLATE NOCASE ASC;
+
+selectByArtist:
+SELECT * FROM track
+WHERE artist_name = ? COLLATE NOCASE
+ORDER BY album_name COLLATE NOCASE ASC, disc_no ASC, track_no ASC;
+
+selectByFolder:
+SELECT * FROM track WHERE relative_path = ? ORDER BY title COLLATE NOCASE ASC;
+
+selectById:
+SELECT * FROM track WHERE id = ?;
+
+selectByIds:
+SELECT * FROM track WHERE id IN ?;
+
+-- ── Search ─────────────────────────────────────────────────────────────────────────────────────────
+-- LIKE with a leading wildcard cannot use an index, so this is a table scan. At library scale that is
+-- fine; if it ever is not, the answer is an FTS virtual table, not a cleverer LIKE.
+
+search:
+SELECT * FROM track
+WHERE title LIKE '%' || ? || '%' COLLATE NOCASE
+   OR artist_name LIKE '%' || ? || '%' COLLATE NOCASE
+   OR album_name LIKE '%' || ? || '%' COLLATE NOCASE
+ORDER BY title COLLATE NOCASE ASC;
+
+-- ── User state ─────────────────────────────────────────────────────────────────────────────────────
+
+setFavourite:
+UPDATE track SET is_favourite = ? WHERE id = ?;
+
+selectFavourites:
+SELECT * FROM track WHERE is_favourite = 1 ORDER BY title COLLATE NOCASE ASC;
+
+-- Incremented in SQL rather than read-modify-written in Kotlin, so two quick plays cannot race.
+recordPlay:
+UPDATE track SET play_count = play_count + 1, last_played_at = ? WHERE id = ?;
+
+-- `> 0` rather than `IS NOT NULL`, which would mean the same thing for this data (a play timestamp of 0
+-- is 1970) but is not equivalent to SQLDelight: `IS NOT NULL` makes it narrow last_played_at from
+-- `Long?` to `Long`, so the row no longer matches `Track` and it generates a second 22-field type for
+-- this one query. One mapper beats two near-identical ones.
+-- `:limit` rather than `?`: an anonymous bind in a LIMIT generates the parameter name `value_`, which
+-- tells a caller nothing. Named binds are worth it anywhere the position is not self-evident.
+selectRecentlyPlayed:
+SELECT * FROM track WHERE last_played_at > 0 ORDER BY last_played_at DESC LIMIT :limit;
+
+-- Written by the lazy MediaExtractor probe, one track at a time. See sample_rate above.
+setProbedMetadata:
+UPDATE track SET sample_rate = ?, bit_depth = ? WHERE id = ?;

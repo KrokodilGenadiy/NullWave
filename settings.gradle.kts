@@ -32,6 +32,11 @@ rootProject.name = "NullWave"
 
 include(":app")
 
+// The schema and the repositories are separate modules on purpose. :core:data depends on
+// :core:database with `implementation`, which keeps the generated SQLDelight types off every feature's
+// compile classpath - so a feature cannot reach past the domain model even by accident. See DATA.md.
+include(":core:database")
+include(":core:data")
 include(":core:designsystem")
 include(":core:di")
 include(":core:navigation")
