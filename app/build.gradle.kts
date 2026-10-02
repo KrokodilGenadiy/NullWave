@@ -50,6 +50,9 @@ dependencies {
     implementation(projects.core.database)
     implementation(projects.core.data)
     implementation(projects.core.designsystem)
+    // Contributes PreferencesBindings. Named here for the same reason as the two above: Metro resolves
+    // contribution hints against the compile classpath.
+    implementation(projects.core.preferences)
     implementation(projects.core.di)
     implementation(projects.core.navigation)
     // impl modules must be on the COMPILE classpath (Metro resolves contribution hints in FIR),

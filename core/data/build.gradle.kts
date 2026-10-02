@@ -15,6 +15,11 @@ dependencies {
     // Switching this to `api` would silently undo that.
     implementation(projects.core.database)
 
+    // For AudioPermissionState's flag. `api` so a consumer of this module can observe the Flow without
+    // separately declaring DataStore - the flag's type is Boolean, but the module that provides the store
+    // is a transitive the repository's callers should not have to know about.
+    api(projects.core.preferences)
+
     // `.asFlow()` / `.mapToList()` on a generated query, which is what makes repository reads re-emit
     // after a rescan. The sqldelight runtime itself arrives transitively, via :core:database's `api` on
     // the android driver.

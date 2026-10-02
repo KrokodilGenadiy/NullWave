@@ -38,6 +38,10 @@ include(":app")
 include(":core:database")
 include(":core:data")
 include(":core:designsystem")
+// The DataStore mechanism only. Typed accessors live with whoever owns the values - SettingsRepository
+// in :feature:settings, the permission flag in :core:data - so this module never becomes a bag of
+// unrelated keys. See LIBRARY.md §1a.
+include(":core:preferences")
 include(":core:di")
 include(":core:navigation")
 

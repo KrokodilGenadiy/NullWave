@@ -56,18 +56,9 @@ interface AppGraph : MetroAppComponentProviders {
  */
 
 /*
- * Preferences DataStore holds the Settings screen's state - theme variant, reduceMotion, "show
- * quality tier", sleep-timer default, EQ preset. One instance per file, application-scoped: a
- * second DataStore on the same file in the same process throws.
- *
- * @BindingContainer
- * object PreferencesBindings {
- *
- *     @Provides
- *     @SingleIn(AppScope::class)
- *     fun provideSettingsStore(context: Context): DataStore<Preferences> =
- *         PreferenceDataStoreFactory.create(
- *             produceFile = { context.preferencesDataStoreFile("settings") },
- *         )
- * }
+ * The preferences wiring sketched here now exists for real, as
+ * `com.zaus.nullwave.core.preferences.di.PreferencesBindings` in :core:preferences - a
+ * `@ContributesTo(AppScope)` container, so it self-registers and nothing is added above. Typed accessors
+ * live with their owners rather than in that module: `SettingsRepository` in :feature:settings,
+ * `AudioPermissionState` in :core:data beside the scanner that needs it.
  */
