@@ -12,12 +12,19 @@ import kotlinx.coroutines.flow.Flow
 interface LibraryScanner {
 
     /**
-     * Scan once.
+     * Scan once, reporting progress as it goes.
      *
-     * Safe to call when nothing has changed - it diffs, so a no-op scan writes nothing. Does its work
-     * off the main thread.
+     * A **cold** flow: the scan starts when collected and runs once per collection, and the last emission
+     * is always [ScanProgress.Finished]. Concurrent collections serialise rather than racing - see the
+     * `Mutex` note in the implementation.
+     *
+     * Safe to collect when nothing has changed: it diffs, so a no-op scan writes nothing and emits no
+     * [ScanProgress.Writing] at all. Work happens off the main thread.
+     *
+     * The intermediate states exist for the design's scan screen, which the UI shows only once a scan
+     * outlasts a threshold - see [ScanProgress].
      */
-    suspend fun scan(): ScanOutcome
+    fun scan(): Flow<ScanProgress>
 
     /**
      * Emits when MediaStore's audio collection changes, so a rescan can be triggered without a refresh
@@ -51,9 +58,7 @@ sealed interface ScanOutcome {
         val removed: Int,
         val total: Int,
         val elapsedMillis: Long,
-    ) : ScanOutcome {
-        val changed: Boolean get() = inserted > 0 || updated > 0 || removed > 0
-    }
+    ) : ScanOutcome
 
     /** The audio permission is not held. Nothing was read and nothing was written. */
     data object PermissionDenied : ScanOutcome

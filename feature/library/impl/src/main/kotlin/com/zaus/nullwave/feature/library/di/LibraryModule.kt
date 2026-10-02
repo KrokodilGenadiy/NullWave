@@ -1,5 +1,8 @@
 package com.zaus.nullwave.feature.library.di
 
+import com.zaus.nullwave.core.data.AudioPermissionState
+import com.zaus.nullwave.core.data.LibraryScanner
+import com.zaus.nullwave.core.data.TrackRepository
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.di.ActivityScope
 import com.zaus.nullwave.core.navigation.EntryProviderInstaller
@@ -8,7 +11,8 @@ import com.zaus.nullwave.core.navigation.TopLevelDestination
 import com.zaus.nullwave.core.navigation.navigateBack
 import com.zaus.nullwave.core.navigation.navigateTo
 import com.zaus.nullwave.feature.library.AlbumDetailScreen
-import com.zaus.nullwave.feature.library.LibraryScreen
+import com.zaus.nullwave.feature.library.LibraryContent
+import com.zaus.nullwave.feature.library.permission.AudioAccessGate
 import com.zaus.nullwave.feature.library.api.AlbumDetailKey
 import com.zaus.nullwave.feature.library.api.LibraryKey
 import com.zaus.nullwave.feature.player.api.PlayerController
@@ -40,15 +44,28 @@ object LibraryModule {
     @Provides
     fun provideEntryProviderInstaller(
         playerController: PlayerController,
+        permissionState: AudioPermissionState,
+        scanner: LibraryScanner,
+        trackRepository: TrackRepository,
     ): EntryProviderInstaller = {
         entry<LibraryKey> {
-            LibraryScreen(
-                onPlayAll = { playerController.play(emptyList()) },
-                // `navigateTo` resolves here because a NavigationScope is in context. It would not
-                // resolve inside LibraryScreen, which is the point: the screen has to take a lambda.
-                // It also guards the double-tap double-push that raw `add` would allow.
-                onAlbumClick = { albumId -> navigateTo(AlbumDetailKey(albumId)) },
-            )
+            // Three layers, each with one job: the gate decides whether the library may read anything,
+            // LibraryContent decides when to scan, LibraryScreen renders what is there.
+            //
+            // The gate wraps rather than precedes, because artboard 45 keeps the library shell visible
+            // while artboard 41 replaces everything. `onChooseFolders` stays null until the folder-picker
+            // path exists - the button is omitted rather than rendered dead. See NOTES.md.
+            AudioAccessGate(permissionState = permissionState) {
+                LibraryContent(
+                    scanner = scanner,
+                    repository = trackRepository,
+                    onPlayAll = { playerController.play(emptyList()) },
+                    // `navigateTo` resolves here because a NavigationScope is in context. It would not
+                    // resolve inside LibraryScreen, which is the point: the screen has to take a lambda.
+                    // It also guards the double-tap double-push that raw `add` would allow.
+                    onAlbumClick = { albumId -> navigateTo(AlbumDetailKey(albumId)) },
+                )
+            }
         }
         entry<AlbumDetailKey> { key ->
             // `navigateBack`, not `removeLastOrNull`: it refuses to empty the stack. NavDisplay throws

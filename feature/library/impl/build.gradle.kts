@@ -15,4 +15,8 @@ dependencies {
 
     // The library is the first consumer of the data layer: Songs / Artists / Albums all read from it.
     implementation(projects.core.data)
+
+    // For `rememberLauncherForActivityResult` in AudioAccessGate. Only in :app until now - features that
+    // request a runtime permission need it too, and the library is the only one that does.
+    implementation(libs.androidx.activity.compose)
 }

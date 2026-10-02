@@ -1,6 +1,5 @@
 package com.zaus.nullwave.core.data.internal
 
-import android.content.ContentResolver
 import android.content.Context
 import android.content.pm.PackageManager
 import android.database.ContentObserver
@@ -10,6 +9,7 @@ import android.provider.MediaStore
 import com.zaus.nullwave.core.data.AudioPermission
 import com.zaus.nullwave.core.data.LibraryScanner
 import com.zaus.nullwave.core.data.ScanOutcome
+import com.zaus.nullwave.core.data.ScanProgress
 import com.zaus.nullwave.data.database.NullWaveDatabase
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -17,9 +17,10 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 
 /**
  * Reads MediaStore and reconciles it with the database.
@@ -58,42 +59,70 @@ internal class MediaStoreLibraryScanner(
      */
     private val scanLock = Mutex()
 
-    override suspend fun scan(): ScanOutcome = withContext(io) {
-        scanLock.withLock { scanLocked() }
-    }
-
-    private fun scanLocked(): ScanOutcome {
-        if (!hasAudioPermission()) return ScanOutcome.PermissionDenied
-
-        val startedAt = SystemClock.elapsedRealtime()
-        // Null rather than an exception: the permission can be revoked between the check above and the
-        // query, and a crash is precisely what ScanOutcome.PermissionDenied exists to avoid.
-        val scanned = queryMediaStore() ?: return ScanOutcome.PermissionDenied
-        val existing = database.trackQueries.selectScanState()
-            .executeAsList()
-            .associate { it.id to it.date_modified }
-
-        val plan = ScanDiff.of(existing = existing, scanned = scanned)
-
-        if (!plan.isEmpty) {
-            database.transaction {
-                plan.insert.forEach(::insertTrack)
-                plan.update.forEach(::updateTrack)
-                // Chunked because SQLite's bound-parameter ceiling is 999 on older Android, and
-                // `IN ?` binds one parameter per id. A first scan after clearing a card can easily
-                // exceed that.
-                plan.delete.chunked(MaxBoundParameters).forEach(database.trackQueries::deleteByIds)
+    override fun scan(): Flow<ScanProgress> = flow {
+        // The lock wraps the whole collection, so a second collector waits for the first to finish
+        // instead of diffing against a half-written table.
+        scanLock.withLock {
+            if (!hasAudioPermission()) {
+                emit(ScanProgress.Finished(ScanOutcome.PermissionDenied))
+                return@withLock
             }
-        }
 
-        return ScanOutcome.Completed(
-            inserted = plan.insert.size,
-            updated = plan.update.size,
-            removed = plan.delete.size,
-            total = scanned.size,
-            elapsedMillis = SystemClock.elapsedRealtime() - startedAt,
-        )
-    }
+            val startedAt = SystemClock.elapsedRealtime()
+            emit(ScanProgress.Reading)
+
+            // Null rather than an exception: the permission can be revoked between the check above and
+            // the query, and a crash is precisely what ScanOutcome.PermissionDenied exists to avoid.
+            val scanned = queryMediaStore { processed, total, currentFile ->
+                emit(ScanProgress.Indexing(processed, total, currentFile))
+            }
+            if (scanned == null) {
+                emit(ScanProgress.Finished(ScanOutcome.PermissionDenied))
+                return@withLock
+            }
+
+            val existing = database.trackQueries.selectScanState()
+                .executeAsList()
+                .associate { it.id to it.date_modified }
+
+            val plan = ScanDiff.of(existing = existing, scanned = scanned)
+
+            if (!plan.isEmpty) {
+                // Counted before the writes rather than after, so the design's "+ 3 ALBUMS · + 1 ARTIST"
+                // can be shown *during* the phase. Distinct over the insert list only: an updated track
+                // was already on an album we knew about.
+                emit(
+                    ScanProgress.Writing(
+                        inserting = plan.insert.size,
+                        updating = plan.update.size,
+                        removing = plan.delete.size,
+                        newAlbums = plan.insert.mapNotNull { it.albumId }.distinct().size,
+                        newArtists = plan.insert.map { it.artist }.distinct().size,
+                    )
+                )
+                database.transaction {
+                    plan.insert.forEach(::insertTrack)
+                    plan.update.forEach(::updateTrack)
+                    // Chunked because SQLite's bound-parameter ceiling is 999 on older Android, and
+                    // `IN ?` binds one parameter per id. A first scan after clearing a card can easily
+                    // exceed that.
+                    plan.delete.chunked(MaxBoundParameters).forEach(database.trackQueries::deleteByIds)
+                }
+            }
+
+            emit(
+                ScanProgress.Finished(
+                    ScanOutcome.Completed(
+                        inserted = plan.insert.size,
+                        updated = plan.update.size,
+                        removed = plan.delete.size,
+                        total = scanned.size,
+                        elapsedMillis = SystemClock.elapsedRealtime() - startedAt,
+                    )
+                )
+            )
+        }
+    }.flowOn(io)
 
     override fun mediaStoreChanges(): Flow<Unit> = callbackFlow {
         val observer = object : ContentObserver(null) {
@@ -120,7 +149,9 @@ internal class MediaStoreLibraryScanner(
      * says the user deleted their music, the second says we are not allowed to look - and the diff would
      * treat both as "delete everything".
      */
-    private fun queryMediaStore(): List<ScannedTrack>? {
+    private suspend fun queryMediaStore(
+        onProgress: suspend (processed: Int, total: Int, currentFile: String) -> Unit,
+    ): List<ScannedTrack>? {
         val cursor = try {
             context.contentResolver.query(
                 AudioCollection,
@@ -151,7 +182,8 @@ internal class MediaStoreLibraryScanner(
             val dateAdded = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
             val dateModified = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_MODIFIED)
 
-            val rows = ArrayList<ScannedTrack>(c.count)
+            val total = c.count
+            val rows = ArrayList<ScannedTrack>(total)
             while (c.moveToNext()) {
                 val durationMs = c.getLong(duration)
                 val sizeBytes = c.getLong(size)
@@ -180,6 +212,13 @@ internal class MediaStoreLibraryScanner(
                     dateModifiedEpochSeconds = c.getLong(dateModified),
                     bitrate = deriveBitrate(sizeBytes, durationMs),
                 )
+
+                // Throttled: a thousand emissions for a scan that takes a few hundred milliseconds
+                // would cost more than the work being reported. Every 32nd row, plus the last, is
+                // enough to animate a bar smoothly.
+                if (rows.size % ProgressEveryNRows == 0 || rows.size == total) {
+                    onProgress(rows.size, total, rows.last().displayName)
+                }
             }
             rows
         }
@@ -264,6 +303,9 @@ internal class MediaStoreLibraryScanner(
 
         /** SQLite's `SQLITE_MAX_VARIABLE_NUMBER`, which is 999 on the older Android builds in range. */
         const val MaxBoundParameters = 500
+
+        /** Progress emission interval, in cursor rows. See the throttle note at the call site. */
+        const val ProgressEveryNRows = 32
 
         /** MediaStore's own literal for a missing tag, which it hands back verbatim. */
         const val MediaStoreUnknown = "<unknown>"
