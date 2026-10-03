@@ -92,6 +92,12 @@ dependencies {
     // android:appComponentFactory in for you, so AndroidManifest.xml needs no edit.
     implementation(libs.metrox.android)
 
+    // AppGraph implements ViewModelGraph, and NullWaveApp provides the factory and the entry decorator.
+    // :app is the only module that wires them; features just contribute @ViewModelKey bindings.
+    implementation(libs.metrox.viewmodel)
+    implementation(libs.metrox.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.navigation3)
+
     // The sqldelight artifacts moved to :core:data with the schema. :app still gets the Android driver
     // transitively (it is `api` there), because the DatabaseBindings that construct AndroidSqliteDriver
     // have to live somewhere the Metro graph can see.

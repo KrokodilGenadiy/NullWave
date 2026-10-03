@@ -8,6 +8,7 @@ import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metrox.android.MetroAppComponentProviders
+import dev.zacsweers.metrox.viewmodel.ViewModelGraph
 
 /**
  * The application-wide Metro dependency graph.
@@ -22,9 +23,14 @@ import dev.zacsweers.metrox.android.MetroAppComponentProviders
  *
  * Implementing [MetroAppComponentProviders] is what lets MetroX's `MetroAppComponentFactory`
  * construct `MainActivity` with constructor injection.
+ *
+ * Implementing [ViewModelGraph] does the same job for ViewModels: it declares the three multibinding maps
+ * MetroX reads (plain, assisted, manually assisted) and exposes the `MetroViewModelFactory` built from
+ * them. Features contribute with `@ContributesIntoMap(AppScope::class) @ViewModelKey(Foo::class)` and
+ * nothing is named here - the same self-registration as screens and rail entries.
  */
 @DependencyGraph(AppScope::class, additionalScopes = [ActivityScope::class])
-interface AppGraph : MetroAppComponentProviders {
+interface AppGraph : MetroAppComponentProviders, ViewModelGraph {
 
     /** Accessor for the bound-in [Application]. Add one per type a caller needs off the graph. */
     val application: Application

@@ -14,4 +14,9 @@ dependencies {
     "implementation"(libs.findLibrary("androidx-lifecycle-runtime-compose").get())
     "implementation"(libs.findLibrary("androidx-lifecycle-viewmodel-compose").get())
     "implementation"(libs.findLibrary("kotlinx-coroutines-android").get())
+
+    // Every feature declares its ViewModels the same way, so the annotations and the `metroViewModel()`
+    // accessor belong in the convention rather than being re-added per module.
+    "api"(libs.findLibrary("metrox-viewmodel").get())
+    "implementation"(libs.findLibrary("metrox-viewmodel-compose").get())
 }

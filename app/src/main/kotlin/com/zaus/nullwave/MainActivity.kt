@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -24,10 +25,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import com.zaus.nullwave.core.designsystem.components.navigation.NullWaveNavigationRail
 import com.zaus.nullwave.core.designsystem.components.navigation.NullWaveNavigationRailHeader
@@ -47,6 +50,8 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.android.ActivityKey
+import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
+import dev.zacsweers.metrox.viewmodel.MetroViewModelFactory
 
 /**
  * The single Activity host.
@@ -65,6 +70,9 @@ import dev.zacsweers.metrox.android.ActivityKey
 class MainActivity(
     private val entryProviderInstallers: Set<@JvmSuppressWildcards EntryProviderInstaller>,
     private val topLevelDestinations: Set<@JvmSuppressWildcards TopLevelDestination>,
+    // Built by MetroX from the @ViewModelKey multibindings on AppGraph. Injected rather than reached for
+    // off the graph, so this Activity still names no feature and no binding container.
+    private val viewModelFactory: MetroViewModelFactory,
 ) : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -78,10 +86,15 @@ class MainActivity(
         super.onCreate(savedInstanceState)
         setContent {
             NullWaveTheme {
-                NullWaveApp(
-                    destinations = topLevelDestinations,
-                    entryProviderInstallers = entryProviderInstallers,
-                )
+                // Provided once, above everything a screen can be composed inside, so
+                // `metroViewModel<SomeViewModel>()` works in any feature without that feature - or the
+                // composables between here and it - being handed a factory.
+                CompositionLocalProvider(LocalMetroViewModelFactory provides viewModelFactory) {
+                    NullWaveApp(
+                        destinations = topLevelDestinations,
+                        entryProviderInstallers = entryProviderInstallers,
+                    )
+                }
             }
         }
     }
@@ -180,6 +193,16 @@ private fun NullWaveApp(
                 backStack = backStack,
                 onBack = { backStack.removeLastOrNull() },
                 entryProvider = resolveEntry,
+                // `rememberSaveableStateHolderNavEntryDecorator()` is NOT redundant: it is NavDisplay's
+                // own default, and passing this list replaces the default rather than adding to it, so
+                // omitting it would silently break `rememberSaveable` inside every entry.
+                //
+                // The second one scopes a ViewModel to its entry, so it is cleared when that entry is
+                // popped instead of living as long as the Activity and being shared by every screen.
+                entryDecorators = listOf(
+                    rememberSaveableStateHolderNavEntryDecorator(),
+                    rememberViewModelStoreNavEntryDecorator(),
+                ),
                 modifier = Modifier.fillMaxSize(),
             )
 

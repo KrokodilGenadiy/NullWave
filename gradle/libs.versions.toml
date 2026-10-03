@@ -55,6 +55,14 @@ androidx-sqlite = { group = "androidx.sqlite", name = "sqlite", version.ref = "a
 # MetroX Android: constructor injection for Activity/Service/BroadcastReceiver/ContentProvider via
 # AppComponentFactory. A library, not a Gradle plugin. Versioned in lockstep with Metro itself.
 metrox-android = { group = "dev.zacsweers.metro", name = "metrox-android", version.ref = "metro" }
+# MetroX ViewModel: @ViewModelKey multibindings, MetroViewModelFactory, ViewModelGraph. Separate
+# artifacts from metrox-android - checking only that one is what led to the wrong conclusion that
+# MetroX had no ViewModel support at all.
+metrox-viewmodel = { group = "dev.zacsweers.metro", name = "metrox-viewmodel", version.ref = "metro" }
+metrox-viewmodel-compose = { group = "dev.zacsweers.metro", name = "metrox-viewmodel-compose", version.ref = "metro" }
+# Scopes a ViewModel to a NavDisplay entry rather than to the Activity, so it is cleared on pop.
+# Lives outside navigation3-runtime, which is why it looked absent.
+androidx-lifecycle-viewmodel-navigation3 = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-navigation3", version.ref = "lifecycleRuntimeKtx" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 sqldelight-android-driver = { group = "app.cash.sqldelight", name = "android-driver", version.ref = "sqldelight" }
