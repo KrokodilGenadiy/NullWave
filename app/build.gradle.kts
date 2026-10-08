@@ -26,7 +26,10 @@ android {
 }
 
 dependencies {
+    implementation(project(":feature:library:api"))
+    implementation(libs.androidx.navigation3.ui)
     implementation(project(":core:di"))
+    implementation(project(":core:designsystem"))
     implementation(project(":core:navigation"))
     implementation(project(":feature:library:impl"))
     implementation(project(":feature:playlists:impl"))

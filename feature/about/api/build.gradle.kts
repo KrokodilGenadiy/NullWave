@@ -1,5 +1,6 @@
 plugins {
     id("nullwave.android.library")
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -7,5 +8,6 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:navigation"))
+    api(project(":core:navigation"))
+    implementation(libs.kotlinx.serialization.core)
 }

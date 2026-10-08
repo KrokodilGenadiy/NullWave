@@ -1,0 +1,5 @@
+<resources>
+    <string name="about_title">О приложении</string>
+    <string name="about_placeholder">NullWave — музыкальный плеер.</string>
+    <string name="about_action">Назад</string>
+</resources>

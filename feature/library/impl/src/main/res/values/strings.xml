@@ -1,0 +1,5 @@
+<resources>
+    <string name="library_title">Библиотека</string>
+    <string name="library_placeholder">Здесь появится ваша музыка.</string>
+    <string name="library_action">О приложении</string>
+</resources>
