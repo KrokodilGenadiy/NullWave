@@ -1,20 +1,40 @@
+# Android Studio / IntelliJ local project state
+.idea/
 *.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
+*.ipr
+*.iws
+
+# Gradle, Kotlin and Android build outputs (including nested modules)
+.gradle/
+.kotlin/
 **/build/
-/captures
-.externalNativeBuild
-.cxx
+.externalNativeBuild/
+.cxx/
+captures/
+*.apk
+*.aab
+*.ap_
+*.hprof
+
+# Machine-specific paths and local credentials
 local.properties
+keystore.properties
+*.jks
+*.keystore
+.env
+.env.*
+!.env.example
+
+# OS and temporary editor files
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+hs_err_pid*.log
+replay_pid*.log
 
 # Local project documentation is maintained outside version control.
 *.md
 /docs/
-.kotlin/

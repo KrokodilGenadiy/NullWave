@@ -1,0 +1,6 @@
+# Store normalized text in Git and use LF in working copies by default.
+* text=auto eol=lf
+
+# Windows command scripts use CRLF in the working copy, LF in Git.
+*.bat text eol=crlf
+*.cmd text eol=crlf

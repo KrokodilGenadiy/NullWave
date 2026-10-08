@@ -25,6 +25,18 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:di"))
+    implementation(project(":core:navigation"))
+    implementation(project(":feature:library:impl"))
+    implementation(project(":feature:playlists:impl"))
+    implementation(project(":feature:search:impl"))
+    implementation(project(":feature:player:impl"))
+    implementation(project(":feature:lyrics:impl"))
+    implementation(project(":feature:equalizer:impl"))
+    implementation(project(":feature:sleeptimer:impl"))
+    implementation(project(":feature:settings:impl"))
+    implementation(project(":feature:about:impl"))
+
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
