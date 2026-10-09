@@ -10,6 +10,7 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
+import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.navigation.EntryProviderInstaller
 import com.zaus.nullwave.core.navigation.NavigationScope
 import com.zaus.nullwave.core.navigation.navigateBack
@@ -31,7 +32,7 @@ internal fun NullWaveNavigation(entryProviderInstallers: Set<EntryProviderInstal
         }
     }
 
-    Surface(modifier = Modifier.fillMaxSize()) {
+    Surface(modifier = Modifier.fillMaxSize(), color = NullWaveTheme.colors.bg) {
         with(navigation) {
             NavDisplay(
                 backStack = backStack,
