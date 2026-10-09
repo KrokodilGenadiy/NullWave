@@ -1,0 +1,15 @@
+NullWave icon assets
+
+Base design: Material Symbols / Material Design icons by Google.
+Upstream: https://github.com/google/material-design-icons
+License: Apache License 2.0 (material_symbols_APACHE_2_0.txt).
+
+The 48 nw_icon_*.xml vectors were adapted from the Nullwave_old_2 icon
+sheet, whose source comments identify Material Symbols Outlined W300
+as their base. They are NullWave restylings, not unmodified upstream assets.
+The legacy geometry uses stroked paths with butt caps and mitred joins.
+
+Migration changes: resource names prefixed with nw_icon_; Overflow renamed
+More; Confirm renamed Check; Back and Forward now auto-mirror in right-to-left
+layouts. Transport glyphs retain their playback direction.
+The path geometry is unchanged from the legacy files.

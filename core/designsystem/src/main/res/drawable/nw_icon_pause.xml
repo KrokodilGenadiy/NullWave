@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pause - NullWave icon sheet (Material Symbols Outlined W300, restyled). -->
+<!-- Adapted in NullWave from the legacy icon sheet. Apache-2.0; see assets/licenses/material_symbols_*.txt. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M7.5 4.5h3.2v15H7.5zM13.3 4.5h3.2v15h-3.2z"
+        android:fillColor="#FFFFFFFF" />
+</vector>
