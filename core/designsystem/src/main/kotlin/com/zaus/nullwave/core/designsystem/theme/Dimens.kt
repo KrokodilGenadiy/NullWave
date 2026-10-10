@@ -25,6 +25,8 @@ data class NullWaveDimens(
     val touchTarget: Dp = 48.dp,
     val hairline: Dp = 1.dp,
     val icon: Dp = 24.dp,
+    /** Contrasting inset stroke for keyboard focus, independent of press feedback. */
+    val focusBorder: Dp = 2.dp,
 ) {
     companion object { val Default = NullWaveDimens() }
 }
