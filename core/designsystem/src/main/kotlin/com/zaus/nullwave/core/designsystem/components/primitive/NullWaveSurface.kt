@@ -9,6 +9,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import com.zaus.nullwave.core.designsystem.modifier.NullWaveBorderStyle
+import com.zaus.nullwave.core.designsystem.modifier.nullWaveBorder
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
 /**
@@ -26,15 +28,20 @@ fun NullWaveSurface(
         NullWaveTheme.dimens.hairline,
         NullWaveTheme.colors.outline,
     ),
+    borderStyle: NullWaveBorderStyle = NullWaveBorderStyle.Closed,
     content: @Composable () -> Unit,
 ) {
     CompositionLocalProvider(LocalTonalElevationEnabled provides false) {
         Surface(
-            modifier = modifier,
+            modifier = modifier.then(
+                if (border != null && borderStyle == NullWaveBorderStyle.ClippedCorners) {
+                    Modifier.nullWaveBorder(border, shape, borderStyle)
+                } else Modifier,
+            ),
             shape = shape,
             color = color,
             contentColor = contentColor,
-            border = border,
+            border = if (borderStyle == NullWaveBorderStyle.Closed) border else null,
             content = content,
         )
     }

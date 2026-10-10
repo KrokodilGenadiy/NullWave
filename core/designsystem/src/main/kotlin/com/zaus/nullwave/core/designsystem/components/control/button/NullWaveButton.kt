@@ -30,6 +30,8 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.zaus.nullwave.core.designsystem.R
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcon
+import com.zaus.nullwave.core.designsystem.modifier.NullWaveBorderStyle
+import com.zaus.nullwave.core.designsystem.modifier.nullWaveBorder
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
 enum class NullWaveButtonVariant { Primary, Secondary, Neutral, Danger }
@@ -40,6 +42,7 @@ enum class NullWaveButtonVariant { Primary, Secondary, Neutral, Danger }
  * provided [label], [leadingIcon] and parent constraints stay the same.
  * The caller owns the operation and must set loading when it starts; this is not a debounce.
  * A supplied [interactionSource] remains owned by the caller; this button only observes it.
+ * [borderStyle] controls the decorative outline; keyboard focus always uses a closed border.
  */
 @Composable
 fun NullWaveButton(
@@ -51,6 +54,7 @@ fun NullWaveButton(
     loading: Boolean = false,
     @DrawableRes leadingIcon: Int? = null,
     interactionSource: MutableInteractionSource? = null,
+    borderStyle: NullWaveBorderStyle = NullWaveBorderStyle.Closed,
 ) {
     val interactions = interactionSource ?: remember { MutableInteractionSource() }
     val pressed by interactions.collectIsPressedAsState()
@@ -88,6 +92,11 @@ fun NullWaveButton(
         else -> accent
     }
     val loadingDescription = if (loading) stringResource(R.string.nw_button_loading) else null
+    val border = BorderStroke(
+        width = if (focusedHighlighted) NullWaveTheme.dimens.focusBorder else NullWaveTheme.dimens.hairline,
+        color = borderColor,
+    )
+    val clippedBorder = borderStyle == NullWaveBorderStyle.ClippedCorners && !focusedHighlighted
 
     Button(
         // Foundation 1.12.1's direct semantics OnClick action does not check enabled.
@@ -96,6 +105,10 @@ fun NullWaveButton(
             .defaultMinSize(
                 minWidth = NullWaveTheme.dimens.touchTarget,
                 minHeight = NullWaveTheme.dimens.touchTarget,
+            )
+            .then(
+                if (clippedBorder) Modifier.nullWaveBorder(border, NullWaveTheme.shapes.small, borderStyle)
+                else Modifier,
             )
             .semantics {
                 if (loadingDescription != null) {
@@ -113,10 +126,7 @@ fun NullWaveButton(
             disabledContentColor = contentColor,
         ),
         elevation = null,
-        border = BorderStroke(
-            width = if (focusedHighlighted) NullWaveTheme.dimens.focusBorder else NullWaveTheme.dimens.hairline,
-            color = borderColor,
-        ),
+        border = if (clippedBorder) null else border,
         contentPadding = PaddingValues(horizontal = spacing.lg, vertical = spacing.sm),
         interactionSource = interactions,
     ) {

@@ -1,4 +1,4 @@
-package com.zaus.nullwave.core.designsystem.components.control
+package com.zaus.nullwave.core.designsystem.components.control.toggleButton
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.border
