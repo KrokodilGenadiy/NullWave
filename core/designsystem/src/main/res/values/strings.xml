@@ -3,4 +3,8 @@
     <string name="nw_button_loading">In progress</string>
     <string name="nw_switch_on">ON</string>
     <string name="nw_switch_off">OFF</string>
+    <string name="nw_text_field_error">Invalid input</string>
+    <string name="nw_search_label">Search</string>
+    <string name="nw_search_placeholder">Search library</string>
+    <string name="nw_search_clear">Clear search query</string>
 </resources>

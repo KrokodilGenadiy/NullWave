@@ -3,4 +3,8 @@
     <string name="nw_button_loading">Выполняется</string>
     <string name="nw_switch_on">ВКЛ</string>
     <string name="nw_switch_off">ВЫКЛ</string>
+    <string name="nw_text_field_error">Некорректное значение</string>
+    <string name="nw_search_label">Поиск</string>
+    <string name="nw_search_placeholder">Поиск по медиатеке</string>
+    <string name="nw_search_clear">Очистить поисковый запрос</string>
 </resources>
