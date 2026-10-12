@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="nw_loading">Загрузка</string>
     <string name="nw_button_loading">Выполняется</string>
     <string name="nw_switch_on">ВКЛ</string>
     <string name="nw_switch_off">ВЫКЛ</string>

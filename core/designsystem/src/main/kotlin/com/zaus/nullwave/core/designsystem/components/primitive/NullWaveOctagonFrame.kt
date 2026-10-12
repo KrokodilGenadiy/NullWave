@@ -8,11 +8,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.zaus.nullwave.core.designsystem.modifier.NullWaveBorderStyle
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
 /**
  * Centred content clipped to the theme's octagon. Caller supplies size and any inner padding.
  * A decorative frame only: selection, clicks and touch targets belong to the enclosing control.
+ * [NullWaveBorderStyle.ClippedCorners] leaves four straight segments with open diagonals,
+ * matching the frame in the design's No matches state.
  */
 @Composable
 fun NullWaveOctagonFrame(
@@ -23,6 +26,7 @@ fun NullWaveOctagonFrame(
         NullWaveTheme.dimens.hairline,
         NullWaveTheme.colors.outline,
     ),
+    borderStyle: NullWaveBorderStyle = NullWaveBorderStyle.Closed,
     content: @Composable BoxScope.() -> Unit = {},
 ) {
     NullWaveSurface(
@@ -31,6 +35,7 @@ fun NullWaveOctagonFrame(
         color = color,
         contentColor = contentColor,
         border = border,
+        borderStyle = borderStyle,
     ) {
         Box(contentAlignment = Alignment.Center, content = content)
     }
