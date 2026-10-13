@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="nw_track_more">Другие действия: %1$s</string>
+    <string name="nw_track_playing">Воспроизводится</string>
+    <string name="nw_track_selected_playing">Выбрано, воспроизводится</string>
+    <string name="nw_track_unselected_playing">Не выбрано, воспроизводится</string>
+    <string name="nw_track_unavailable">Недоступен</string>
     <string name="nw_selection_close">Выйти из режима выбора</string>
     <string name="nw_selection_count">Выбрано: %1$d</string>
     <string name="nw_sheet_close">Закрыть панель</string>
