@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Run Preview can use a library host without the app's NoActionBar theme. -->
+        <activity
+            android:name="androidx.compose.ui.tooling.PreviewActivity"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+    </application>
+</manifest>

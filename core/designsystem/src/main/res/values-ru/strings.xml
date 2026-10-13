@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="nw_selection_close">Выйти из режима выбора</string>
+    <string name="nw_selection_count">Выбрано: %1$d</string>
     <string name="nw_sheet_close">Закрыть панель</string>
     <string name="nw_message_dismiss">Закрыть сообщение</string>
     <string name="nw_loading">Загрузка</string>
