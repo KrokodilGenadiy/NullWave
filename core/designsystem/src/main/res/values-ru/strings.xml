@@ -17,4 +17,10 @@
     <string name="nw_search_label">Поиск</string>
     <string name="nw_search_placeholder">Поиск по медиатеке</string>
     <string name="nw_search_clear">Очистить поисковый запрос</string>
+    <string name="nw_seek_label">Позиция воспроизведения</string>
+    <string name="nw_seek_position">%1$s из %2$s</string>
+    <string name="nw_seek_unknown">%1$s, длительность неизвестна</string>
+    <string name="nw_time_position">Позиция: %1$s</string>
+    <string name="nw_time_duration">Длительность: %1$s</string>
+    <string name="nw_time_duration_unknown">Длительность неизвестна</string>
 </resources>

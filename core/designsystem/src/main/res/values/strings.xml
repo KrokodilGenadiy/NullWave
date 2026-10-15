@@ -17,4 +17,11 @@
     <string name="nw_search_label">Search</string>
     <string name="nw_search_placeholder">Search library</string>
     <string name="nw_search_clear">Clear search query</string>
+    <string name="nw_seek_label">Playback position</string>
+    <string name="nw_seek_position">%1$s of %2$s</string>
+    <string name="nw_seek_unknown">%1$s, duration unknown</string>
+    <string name="nw_time_position">Position: %1$s</string>
+    <string name="nw_time_duration">Duration: %1$s</string>
+    <string name="nw_time_unknown" translatable="false">--:--</string>
+    <string name="nw_time_duration_unknown">Duration unknown</string>
 </resources>
