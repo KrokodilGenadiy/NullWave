@@ -37,6 +37,7 @@ enum class NullWaveArtworkPlaceholder { Missing, Loading, Error }
  * [contentDescription] describes the whole image/state, or null makes it entirely decorative.
  * No click, loading job, URI, generated catalogue id or hidden image loader lives here.
  * The decorative monogram scales to the actual tile rather than the user's body-text size.
+ * Loading uses a decorative scanner, static with [reduceMotion] or system animations disabled.
  */
 @Composable
 fun NullWaveCoverArt(
@@ -47,6 +48,7 @@ fun NullWaveCoverArt(
     placeholder: NullWaveArtworkPlaceholder = NullWaveArtworkPlaceholder.Missing,
     size: Dp = 48.dp,
     shape: Shape = chamfer((size / 6f).coerceAtMost(22.dp)),
+    reduceMotion: Boolean = false,
 ) {
     require(size.value.isFinite() && size > 0.dp) { "Artwork size must be finite and positive" }
     require(contentDescription == null || contentDescription.isNotBlank()) { "Artwork description must not be blank" }
@@ -63,6 +65,7 @@ fun NullWaveCoverArt(
         val extent = minOf(maxWidth, maxHeight)
         when {
             painter != null -> Image(painter, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            placeholder == NullWaveArtworkPlaceholder.Loading -> ArtworkLoadingScanner(reduceMotion)
             placeholder == NullWaveArtworkPlaceholder.Missing && !monogram.isNullOrBlank() && extent > 0.dp -> {
                 BasicText(
                     monogram,
@@ -79,11 +82,7 @@ fun NullWaveCoverArt(
                 )
             }
             else -> NullWaveIcon(
-                icon = when (placeholder) {
-                    NullWaveArtworkPlaceholder.Missing -> NullWaveIcons.Songs
-                    NullWaveArtworkPlaceholder.Loading -> NullWaveIcons.More
-                    NullWaveArtworkPlaceholder.Error -> NullWaveIcons.Warning
-                },
+                icon = if (placeholder == NullWaveArtworkPlaceholder.Error) NullWaveIcons.Warning else NullWaveIcons.Songs,
                 contentDescription = null,
                 modifier = Modifier.size(extent * 0.5f),
                 tint = if (placeholder == NullWaveArtworkPlaceholder.Missing) colors.bg else colors.textSecondary,
