@@ -24,4 +24,15 @@
     <string name="nw_time_duration">Duration: %1$s</string>
     <string name="nw_time_unknown" translatable="false">--:--</string>
     <string name="nw_time_duration_unknown">Duration unknown</string>
+    <string name="nw_player_play">Play</string>
+    <string name="nw_player_pause">Pause</string>
+    <string name="nw_player_buffering">Buffering</string>
+    <string name="nw_player_previous">Previous track</string>
+    <string name="nw_player_next">Next track</string>
+    <string name="nw_player_shuffle">Shuffle</string>
+    <string name="nw_player_repeat">Repeat</string>
+    <string name="nw_player_repeat_off">Repeat off</string>
+    <string name="nw_player_repeat_all">Repeat all</string>
+    <string name="nw_player_repeat_one">Repeat one</string>
+    <string name="nw_player_expand">Open player</string>
 </resources>

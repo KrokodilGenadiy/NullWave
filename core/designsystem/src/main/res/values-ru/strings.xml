@@ -23,4 +23,15 @@
     <string name="nw_time_position">Позиция: %1$s</string>
     <string name="nw_time_duration">Длительность: %1$s</string>
     <string name="nw_time_duration_unknown">Длительность неизвестна</string>
+    <string name="nw_player_play">Воспроизвести</string>
+    <string name="nw_player_pause">Пауза</string>
+    <string name="nw_player_buffering">Буферизация</string>
+    <string name="nw_player_previous">Предыдущий трек</string>
+    <string name="nw_player_next">Следующий трек</string>
+    <string name="nw_player_shuffle">Случайный порядок</string>
+    <string name="nw_player_repeat">Повтор</string>
+    <string name="nw_player_repeat_off">Повтор выключен</string>
+    <string name="nw_player_repeat_all">Повторять все</string>
+    <string name="nw_player_repeat_one">Повторять один</string>
+    <string name="nw_player_expand">Открыть плеер</string>
 </resources>
