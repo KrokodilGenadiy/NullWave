@@ -48,6 +48,7 @@ val Inter: FontFamily = FontFamily(
 val JetBrainsMono: FontFamily = FontFamily(
     variableFont(R.font.jetbrains_mono_variable, FontWeight.Normal),
     variableFont(R.font.jetbrains_mono_variable, FontWeight.Medium),
+    variableFont(R.font.jetbrains_mono_variable, FontWeight.Bold),
 )
 
 @OptIn(ExperimentalTextApi::class)
