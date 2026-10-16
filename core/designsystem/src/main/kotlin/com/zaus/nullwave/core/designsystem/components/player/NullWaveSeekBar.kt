@@ -1,6 +1,7 @@
 package com.zaus.nullwave.core.designsystem.components.player
 
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.zaus.nullwave.core.designsystem.R
 import com.zaus.nullwave.core.designsystem.components.control.slider.NullWaveSliderControl
-import com.zaus.nullwave.core.designsystem.components.control.slider.NullWaveSliderNode
 import com.zaus.nullwave.core.designsystem.components.control.slider.SliderNodeSize
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
@@ -29,6 +29,14 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
  * should immediately reflect that position in its UI while the engine applies the command.
  * [onScrubPositionChange] receives preview milliseconds, then null at completion/cancellation.
  * [waveform] is an immutable list of normalized peaks, not audio samples. Empty uses a plain track.
+ * The same thin playhead marks the exact position at rest and while scrubbing; no visible thumb
+ * obscures it. [glowEnabled] adds a subtle halo to the played timeline and strengthens the playhead
+ * during scrub. This accent takes over from Play/Pause; disabled timelines never glow.
+ * For one accent across a player, the host observes drag on [interactionSource] and non-null
+ * [onScrubPositionChange] (also keyboard input), suppressing its Play/Pause halo while either is active.
+ * Key the host's drag observer to its source, and reset that source on media/duration/enabled changes.
+ * Give each simultaneously displayed seek control its own interaction source.
+ * Observing drag is visual only; cancellation/commit still use the synchronous session below.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,6 +52,7 @@ fun NullWaveSeekBar(
     waveform: List<Float> = emptyList(),
     onScrubPositionChange: (Long?) -> Unit = {},
     interactionSource: MutableInteractionSource? = null,
+    glowEnabled: Boolean = true,
 ) {
     require(mediaKey.isNotBlank()) { "SeekBar needs a stable media key" }
     require(durationMs == null || durationMs >= 0L) { "Unknown duration must be null, not negative" }
@@ -67,7 +76,9 @@ fun NullWaveSeekBar(
             }
         }
         val seekSource = remember(source, session) { SeekInteractionSource(source, cancel) }
+        val dragged by key(seekSource) { seekSource.collectIsDraggedAsState() }
         DisposableEffect(session) { onDispose { cancel() } }
+        val scrubbing = dragged || session.pendingPositionMs != null
         val position = session.displayedPosition(positionMs, durationMs)
         val fraction = if (durationMs != null && durationMs > 0L) (position.toDouble() / durationMs).toFloat() else 0f
         val positionText = formatTime(position)
@@ -90,12 +101,11 @@ fun NullWaveSeekBar(
                     }
                 },
                 thumb = {
-                    // Fixed slot keeps timeline endpoints stable between resting and scrubbing.
-                    Box(Modifier.size(SliderNodeSize)) {
-                        if (session.pendingPositionMs != null) NullWaveSliderNode(interactive)
-                    }
+                    // Fixed invisible slot preserves Material's endpoints and 48 dp interaction area.
+                    // SeekTrack draws a precise playhead in both states instead of a wide thumb.
+                    Box(Modifier.size(SliderNodeSize))
                 },
-                track = { SeekTrack(it, interactive, peaks, session.pendingPositionMs != null) },
+                track = { SeekTrack(it, interactive, peaks, scrubbing, glowEnabled) },
             )
             NullWaveTimeLabels(positionText, durationText,
                 endDescription = if (durationMs == null) stringResource(R.string.nw_time_duration_unknown)

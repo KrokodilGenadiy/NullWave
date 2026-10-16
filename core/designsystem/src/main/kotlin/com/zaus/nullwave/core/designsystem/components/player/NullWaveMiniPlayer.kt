@@ -23,10 +23,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.MotionDurationScale
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -47,6 +48,9 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
  * fraction, clamped for display; null omits it. The thin strip is decorative, never a seek target.
  * [artwork] fills 40 dp and must be decorative/noninteractive. Long titles marquee; subtitles stay
  * single-line ellipsis. [reduceMotion] or system scale=0 makes the title single-line ellipsis too.
+ * [playPauseGlowEnabled] controls a compact static halo on Play/Pause, not on the whole panel.
+ * [progressGlowEnabled] controls the secondary halo along the known, nonzero progress strip.
+ * The host can suppress it while another visible player surface owns the accent (e.g. seeking).
  */
 @Composable
 fun NullWaveMiniPlayer(
@@ -64,6 +68,8 @@ fun NullWaveMiniPlayer(
     canNext: Boolean = true,
     reduceMotion: Boolean = false,
     expandInteractionSource: MutableInteractionSource? = null,
+    playPauseGlowEnabled: Boolean = true,
+    progressGlowEnabled: Boolean = true,
 ) {
     require(title.isNotBlank()) { "MiniPlayer title must not be blank" }
     require(progress == null || progress.isFinite()) { "Unknown progress must be null, not NaN/Infinity" }
@@ -77,12 +83,24 @@ fun NullWaveMiniPlayer(
     val animateTitle = !reduceMotion && (scope.coroutineContext[MotionDurationScale]?.scaleFactor ?: 1f) > 0f
     Row(
         modifier.fillMaxWidth().defaultMinSize(minHeight = MiniPlayerMinHeight).background(colors.surface)
-            .drawBehind {
-                drawRect(colors.outline, size = Size(size.width, dimens.hairline.toPx()))
-                if (fraction != null) {
-                    val width = size.width * fraction
-                    drawRect(colors.secondary, Offset(if (layoutDirection == LayoutDirection.Ltr) 0f else size.width - width, 0f),
-                        Size(width, MiniProgressHeight.toPx()))
+            .drawWithCache {
+                val glow = PlayerLineGlow(colors.secondary, MiniProgressGlowRadius.toPx(), MiniProgressGlowAlpha)
+                val stroke = MiniProgressHeight.toPx()
+                onDrawBehind {
+                    // The divider is behind the halo, not a dark cut across its upper half.
+                    drawRect(colors.outline, size = Size(size.width, dimens.hairline.toPx()))
+                    val width = size.width * (fraction ?: 0f)
+                    val left = if (layoutDirection == LayoutDirection.Ltr) 0f else size.width - width
+                    if (width > 0f) {
+                        // Round caps belong inside the actual progress length, including tiny values.
+                        val coreWidth = minOf(stroke, width)
+                        val start = Offset(left + coreWidth / 2f, stroke / 2f)
+                        val end = Offset(left + width - coreWidth / 2f, stroke / 2f)
+                        if (playbackEnabled && progressGlowEnabled) {
+                            glow.drawLine(this, start, end, coreWidth)
+                        }
+                        drawLine(colors.secondary, start, end, coreWidth, StrokeCap.Round)
+                    }
                 }
             }
             .padding(horizontal = dimens.gutter, vertical = spacing.xs),
@@ -106,7 +124,7 @@ fun NullWaveMiniPlayer(
             }
         }
         NullWavePlayPauseButton(isPlaying, onPlayPause, buffering = buffering, enabled = playbackEnabled,
-            size = NullWavePlayPauseButtonSize.Compact, reduceMotion = reduceMotion)
+            size = NullWavePlayPauseButtonSize.Compact, reduceMotion = reduceMotion, glowEnabled = playPauseGlowEnabled)
         NullWaveIconButton(NullWaveIcons.Next, stringResource(R.string.nw_player_next), onNext, enabled = playbackEnabled && canNext)
     }
 }
@@ -114,3 +132,5 @@ fun NullWaveMiniPlayer(
 private val MiniPlayerMinHeight = 64.dp
 private val MiniArtworkSize = 40.dp
 private val MiniProgressHeight = 2.dp
+private val MiniProgressGlowRadius = 6.dp
+private const val MiniProgressGlowAlpha = 0.6f

@@ -41,6 +41,7 @@ enum class NullWaveRepeatMode { Off, All, One }
  * Previous/next availability and repeat/shuffle state come from the caller. No queue policy here.
  * Null optional callbacks omit those controls. At narrow widths shuffle/repeat move below the
  * main controls; targets never shrink. Playback glyphs retain their direction in RTL layouts.
+ * [playPauseGlowEnabled] lets the host hand the accent to SeekBar while scrubbing, or disable decor.
  */
 @Composable
 fun NullWaveTransportControls(
@@ -59,6 +60,7 @@ fun NullWaveTransportControls(
     repeatMode: NullWaveRepeatMode = NullWaveRepeatMode.Off,
     onRepeatClick: (() -> Unit)? = null,
     reduceMotion: Boolean = false,
+    playPauseGlowEnabled: Boolean = true,
 ) {
     val spacing = NullWaveTheme.spacing
     val target = NullWaveTheme.dimens.touchTarget
@@ -68,7 +70,8 @@ fun NullWaveTransportControls(
         NullWaveIconButton(NullWaveIcons.Previous, stringResource(R.string.nw_player_previous), onPrevious, enabled = enabled && canPrevious)
     }
     val playPause: @Composable () -> Unit = {
-        NullWavePlayPauseButton(isPlaying, onPlayPause, buffering = buffering, enabled = enabled && canPlayPause, reduceMotion = reduceMotion)
+        NullWavePlayPauseButton(isPlaying, onPlayPause, buffering = buffering, enabled = enabled && canPlayPause,
+            reduceMotion = reduceMotion, glowEnabled = playPauseGlowEnabled)
     }
     val next: @Composable () -> Unit = {
         NullWaveIconButton(NullWaveIcons.Next, stringResource(R.string.nw_player_next), onNext, enabled = enabled && canNext)

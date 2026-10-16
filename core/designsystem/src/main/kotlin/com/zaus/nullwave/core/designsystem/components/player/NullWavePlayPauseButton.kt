@@ -45,6 +45,9 @@ enum class NullWavePlayPauseButtonSize { Compact, Hero }
  * Map an engine's play-when-ready state here, not an is-playing flag that becomes false on buffering.
  * [buffering] adds a decorative scanner and state description; it never disables the action or hides
  * its glyph. [enabled] alone controls availability. Reduced/system-disabled motion freezes the scan.
+ * [glowEnabled] controls the static halo independently of motion. A containing player switches it
+ * off while seeking, handing the visual accent to the seek node. Disabled buttons never glow.
+ * Leave room around the button for the halo; applying a clip outside it will trim the decoration.
  * Parent constraints must allow at least the 48 dp touch target; do not shrink it with [modifier].
  * A supplied [interactionSource] remains owned by the caller.
  */
@@ -58,6 +61,7 @@ fun NullWavePlayPauseButton(
     size: NullWavePlayPauseButtonSize = NullWavePlayPauseButtonSize.Hero,
     reduceMotion: Boolean = false,
     interactionSource: MutableInteractionSource? = null,
+    glowEnabled: Boolean = true,
 ) {
     val colors = NullWaveTheme.colors
     val dimens = NullWaveTheme.dimens
@@ -80,6 +84,12 @@ fun NullWavePlayPauseButton(
         modifier = modifier
             .defaultMinSize(minWidth = dimens.touchTarget, minHeight = dimens.touchTarget)
             .size(edge)
+            .playerGlow(
+                style = if (size == NullWavePlayPauseButtonSize.Hero) PlayerGlow.Hero else PlayerGlow.Compact,
+                shape = shape,
+                color = colors.primary,
+                enabled = enabled && glowEnabled,
+            )
             .border(
                 width = if (focusedHighlighted) dimens.focusBorder else dimens.hairline,
                 color = when {
