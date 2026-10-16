@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nw_stepper_decrease">Decrease %1$s</string>
+    <string name="nw_stepper_increase">Increase %1$s</string>
+</resources>
