@@ -23,7 +23,8 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
  * [contentDescription] must be a non-blank, localized action name supplied by the caller.
  * Parent constraints must allow the minimum target; use [modifier] to enlarge, not shrink it.
  * [tint] should contrast with the surrounding surface; theme text/accent colours are suitable.
- * [pressedTint] must contrast with [tint], which becomes the pressed background. On an accent
+ * [pressedContainerColor] defaults to [tint]. [pressedTint] must contrast with that background;
+ * if the background is transparent, it must contrast with the surrounding surface. On an accent
  * surface with a dark [tint], pass the surface color as [pressedTint]. [disabledTint] can likewise
  * be adapted to that surface; its default retains the neutral disabled treatment on dark surfaces.
  * A supplied [interactionSource] remains owned by the caller. This is not a toggle control.
@@ -39,6 +40,7 @@ fun NullWaveIconButton(
     interactionSource: MutableInteractionSource? = null,
     pressedTint: Color = NullWaveTheme.colors.bg,
     disabledTint: Color = NullWaveTheme.colors.textSecondary,
+    pressedContainerColor: Color = tint,
 ) {
     require(contentDescription.isNotBlank()) { "An icon button needs a non-blank action description." }
     val interactions = interactionSource ?: remember { MutableInteractionSource() }
@@ -57,7 +59,7 @@ fun NullWaveIconButton(
         modifier = modifier
             .defaultMinSize(minWidth = dimens.touchTarget, minHeight = dimens.touchTarget)
             .then(
-                // Border draws inside the shape: pressedTint contrasts with the tint fill.
+                // Border draws inside the shape, using the same contrasting color as the glyph.
                 if (focusedHighlighted) Modifier.border(dimens.focusBorder, contentColor, shape)
                 else Modifier,
             )
@@ -65,7 +67,7 @@ fun NullWaveIconButton(
             .semantics { this.contentDescription = contentDescription },
         enabled = enabled,
         colors = IconButtonDefaults.iconButtonColors(
-            containerColor = if (pressedHighlighted) tint else Color.Transparent,
+            containerColor = if (pressedHighlighted) pressedContainerColor else Color.Transparent,
             contentColor = contentColor,
             disabledContainerColor = Color.Transparent,
             // Disabled intentionally removes accent/danger tint, independent of the caller's tint.

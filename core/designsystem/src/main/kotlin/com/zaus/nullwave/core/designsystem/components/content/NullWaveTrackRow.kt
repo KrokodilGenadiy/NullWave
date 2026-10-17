@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -36,6 +37,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.zaus.nullwave.core.designsystem.R
@@ -84,8 +86,6 @@ fun NullWaveTrackRow(
     val spacing = NullWaveTheme.spacing
     val dimens = NullWaveTheme.dimens
     val source = interactionSource ?: remember { MutableInteractionSource() }
-    // basicMarquee uses a fixed internal duration scale, so gate it explicitly for reduced motion.
-    val animateTitle = !reduceMotion && systemAnimationsEnabled()
     val focused by source.collectIsFocusedAsState()
     val pressed by source.collectIsPressedAsState()
     val choosing = selectionMode || selected
@@ -107,13 +107,13 @@ fun NullWaveTrackRow(
         else -> colors.bg
     }
     BoxWithConstraints(modifier.fillMaxWidth()) {
-        val metadataBelow = maxWidth < InlineMetadataMinWidth || LocalDensity.current.fontScale > InlineMetadataMaxFontScale
+        val metadataBelow = trackMetadataBelow(maxWidth, LocalDensity.current.fontScale)
         Row(
             Modifier.fillMaxWidth().defaultMinSize(minHeight = TrackRowMinHeight)
                 .background(background)
                 .drawBehind {
                     if (selected || playing) {
-                        val width = SpineWidth.toPx().coerceAtMost(size.width)
+                        val width = TrackRowSpineWidth.toPx().coerceAtMost(size.width)
                         drawRect(spine, Offset(if (layoutDirection == LayoutDirection.Ltr) 0f else size.width - width, 0f), Size(width, size.height))
                     }
                 }
@@ -133,40 +133,64 @@ fun NullWaveTrackRow(
             horizontalArrangement = Arrangement.spacedBy(spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.size(ArtworkSize).clearAndSetSemantics {}, contentAlignment = Alignment.Center) {
-                if (choosing) NullWaveCheckbox(selected, onCheckedChange = null, enabled = enabled) else artwork()
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing.xxs)) {
-                Text(
-                    title,
-                    modifier = if (animateTitle) Modifier.basicMarquee(iterations = Int.MAX_VALUE) else Modifier,
-                    maxLines = 1,
-                    overflow = if (animateTitle) TextOverflow.Clip else TextOverflow.Ellipsis,
-                    color = when {
-                        !enabled -> colors.textSecondary
-                        playing -> colors.primary
-                        else -> colors.textPrimary
-                    },
-                    style = NullWaveTheme.typography.bodyEmphasis,
-                )
-                if (!subtitle.isNullOrBlank()) Text(
-                    subtitle,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = colors.textSecondary,
-                    style = NullWaveTheme.typography.caption,
-                )
-                if (metadataBelow) TrackMetadata(durationLabel, playing, enabled)
-            }
-            if (!metadataBelow) TrackMetadata(durationLabel, playing, enabled)
+            NullWaveTrackRowBody(
+                title, subtitle, durationLabel, playing, enabled, metadataBelow, artwork,
+                reduceMotion, choosing, selected,
+            )
             if (onMoreClick != null) NullWaveIconButton(NullWaveIcons.More, moreDescription, onMoreClick, enabled = enabled)
         }
     }
 }
 
+/** Shared visuals only. Track/queue containers retain their own click targets and action policy. */
 @Composable
-private fun TrackMetadata(durationLabel: String?, playing: Boolean, enabled: Boolean) {
-    if (durationLabel.isNullOrBlank() && !playing && enabled) return
+internal fun RowScope.NullWaveTrackRowBody(
+    title: String,
+    subtitle: String?,
+    durationLabel: String?,
+    playing: Boolean,
+    enabled: Boolean,
+    metadataBelow: Boolean,
+    artwork: @Composable () -> Unit,
+    reduceMotion: Boolean,
+    choosing: Boolean = false,
+    selected: Boolean = false,
+    unavailable: Boolean = !enabled,
+) {
+    val colors = NullWaveTheme.colors
+    // basicMarquee uses a fixed internal duration scale, so gate it explicitly for reduced motion.
+    val animateTitle = !reduceMotion && systemAnimationsEnabled()
+    Box(Modifier.size(ArtworkSize).clearAndSetSemantics {}, contentAlignment = Alignment.Center) {
+        if (choosing) NullWaveCheckbox(selected, onCheckedChange = null, enabled = enabled) else artwork()
+    }
+    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.xxs)) {
+        Text(
+            title,
+            modifier = if (animateTitle) Modifier.basicMarquee(iterations = Int.MAX_VALUE) else Modifier,
+            maxLines = 1,
+            overflow = if (animateTitle) TextOverflow.Clip else TextOverflow.Ellipsis,
+            color = when {
+                !enabled -> colors.textSecondary
+                playing -> colors.primary
+                else -> colors.textPrimary
+            },
+            style = NullWaveTheme.typography.bodyEmphasis,
+        )
+        if (!subtitle.isNullOrBlank()) Text(
+            subtitle,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            color = colors.textSecondary,
+            style = NullWaveTheme.typography.caption,
+        )
+        if (metadataBelow) TrackMetadata(durationLabel, playing, enabled, unavailable)
+    }
+    if (!metadataBelow) TrackMetadata(durationLabel, playing, enabled, unavailable)
+}
+
+@Composable
+private fun TrackMetadata(durationLabel: String?, playing: Boolean, enabled: Boolean, unavailable: Boolean) {
+    if (durationLabel.isNullOrBlank() && !playing && !unavailable) return
     Row(horizontalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.xs), verticalAlignment = Alignment.CenterVertically) {
         if (playing) NullWaveIcon(
             NullWaveIcons.Waveform, null, Modifier.size(PlaybackMarkSize),
@@ -174,15 +198,18 @@ private fun TrackMetadata(durationLabel: String?, playing: Boolean, enabled: Boo
         )
         Column {
             if (!durationLabel.isNullOrBlank()) Text(durationLabel, style = NullWaveTheme.typography.mono, color = NullWaveTheme.colors.textSecondary)
-            if (!enabled) Text(stringResource(R.string.nw_track_unavailable), style = NullWaveTheme.typography.caption, color = NullWaveTheme.colors.textSecondary)
+            if (unavailable) Text(stringResource(R.string.nw_track_unavailable), style = NullWaveTheme.typography.caption, color = NullWaveTheme.colors.textSecondary)
         }
     }
 }
 
-private val TrackRowMinHeight = 72.dp
+internal fun trackMetadataBelow(width: Dp, fontScale: Float): Boolean =
+    width < InlineMetadataMinWidth || fontScale > InlineMetadataMaxFontScale
+
+internal val TrackRowMinHeight = 72.dp
+internal val TrackRowSpineWidth = 3.dp
 private val ArtworkSize = 48.dp
 private val PlaybackMarkSize = 16.dp
-private val SpineWidth = 3.dp
 private val InlineMetadataMinWidth = 360.dp
 private const val InlineMetadataMaxFontScale = 1.3f
 private const val SelectedTintAlpha = 0.06f

@@ -5,6 +5,12 @@
     <string name="nw_track_selected_playing">Selected, playing</string>
     <string name="nw_track_unselected_playing">Not selected, playing</string>
     <string name="nw_track_unavailable">Unavailable</string>
+    <string name="nw_queue_actions">Queue actions: %1$s</string>
+    <string name="nw_queue_move_up">Move up</string>
+    <string name="nw_queue_move_down">Move down</string>
+    <string name="nw_queue_remove">Remove from queue</string>
+    <string name="nw_queue_dragging">Reordering</string>
+    <string name="nw_queue_drag_hint">Hold the handle to reorder.</string>
     <string name="nw_selection_close">Exit selection mode</string>
     <string name="nw_selection_count">Selected: %1$d</string>
     <string name="nw_sheet_close">Close panel</string>

@@ -5,6 +5,12 @@
     <string name="nw_track_selected_playing">Выбрано, воспроизводится</string>
     <string name="nw_track_unselected_playing">Не выбрано, воспроизводится</string>
     <string name="nw_track_unavailable">Недоступен</string>
+    <string name="nw_queue_actions">Действия в очереди: %1$s</string>
+    <string name="nw_queue_move_up">Переместить выше</string>
+    <string name="nw_queue_move_down">Переместить ниже</string>
+    <string name="nw_queue_remove">Удалить из очереди</string>
+    <string name="nw_queue_dragging">Перестановка</string>
+    <string name="nw_queue_drag_hint">Удерживайте ручку для перестановки.</string>
     <string name="nw_selection_close">Выйти из режима выбора</string>
     <string name="nw_selection_count">Выбрано: %1$d</string>
     <string name="nw_sheet_close">Закрыть панель</string>
