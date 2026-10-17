@@ -107,7 +107,9 @@ fun NullWaveChip(
             }
             Text(
                 text = label,
-                modifier = Modifier.weight(1f, fill = false).padding(spacing.xs),
+                // Last in the Row: use the remaining bounded width, or natural width in a
+                // horizontal scroller. Weight would restrict an unbounded row to its minimum.
+                modifier = Modifier.padding(spacing.xs),
                 style = NullWaveTheme.typography.mono,
             )
         }

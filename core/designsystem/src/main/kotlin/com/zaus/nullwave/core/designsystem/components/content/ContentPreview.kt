@@ -6,10 +6,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -36,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButton
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveDivider
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
+import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
@@ -76,9 +75,9 @@ private fun ContentSheet(variant: NullWaveColorVariant) {
         val focus = remember { FocusRequester() }
         val inputMode = LocalInputModeManager.current
         val painter = remember { PreviewSleevePainter() }
-        Surface(color = NullWaveTheme.colors.bg) {
+        NullWavePreviewSurface {
             Column(
-                Modifier.fillMaxWidth().safeDrawingPadding().verticalScroll(rememberScrollState()),
+                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.sm),
             ) {
                 NullWaveSectionHeader("CoverArt / ${variant.name}", Modifier.padding(NullWaveTheme.dimens.gutter))

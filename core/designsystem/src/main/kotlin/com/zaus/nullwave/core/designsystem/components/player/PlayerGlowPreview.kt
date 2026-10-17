@@ -7,12 +7,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SliderState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -36,6 +34,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import com.zaus.nullwave.core.designsystem.components.content.NullWaveCoverArt
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButton
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
+import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import kotlinx.coroutines.delay
@@ -107,9 +106,9 @@ private fun PlayerGlowSheet(variant: NullWaveColorVariant) {
         val play: () -> Unit = { playing = !playing; plays++ }
         val changeMedia: () -> Unit = { media++; position = 0L }
 
-        Surface(color = NullWaveTheme.colors.bg, contentColor = NullWaveTheme.colors.textPrimary) {
+        NullWavePreviewSurface {
             Column(
-                Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(vertical = spacing.md),
+                Modifier.verticalScroll(rememberScrollState()).padding(vertical = spacing.md),
                 verticalArrangement = Arrangement.spacedBy(spacing.md),
             ) {
                 Column(Modifier.padding(horizontal = gutter), verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
@@ -255,9 +254,9 @@ private fun PlayerLineGlowComparisonPreview() {
     NullWaveTheme {
         val spacing = NullWaveTheme.spacing
         val peaks = remember { List(96) { 0.15f + abs(sin(it * 0.47f)) * 0.8f } }
-        Surface(color = NullWaveTheme.colors.bg, contentColor = NullWaveTheme.colors.textPrimary) {
+        NullWavePreviewSurface {
             Column(
-                Modifier.safeDrawingPadding().verticalScroll(rememberScrollState())
+                Modifier.verticalScroll(rememberScrollState())
                     .padding(vertical = spacing.lg),
                 verticalArrangement = Arrangement.spacedBy(spacing.lg),
             ) {
@@ -320,9 +319,9 @@ private fun SeekPrecisionSheet() {
     NullWaveTheme {
         val spacing = NullWaveTheme.spacing
         val peaks = remember { List(96) { 0.15f + abs(sin(it * 0.47f)) * 0.8f } }
-        Surface(color = NullWaveTheme.colors.bg, contentColor = NullWaveTheme.colors.textPrimary) {
+        NullWavePreviewSurface {
             Column(
-                Modifier.safeDrawingPadding().verticalScroll(rememberScrollState())
+                Modifier.verticalScroll(rememberScrollState())
                     .padding(horizontal = NullWaveTheme.dimens.gutter, vertical = spacing.md),
                 verticalArrangement = Arrangement.spacedBy(spacing.md),
             ) {

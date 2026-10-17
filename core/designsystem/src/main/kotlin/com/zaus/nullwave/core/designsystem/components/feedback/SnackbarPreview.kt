@@ -11,7 +11,6 @@ import androidx.compose.material3.SnackbarData
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarVisuals
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -28,6 +27,7 @@ import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveBut
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButtonVariant
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
 import com.zaus.nullwave.core.designsystem.modifier.NullWaveBorderStyle
+import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import kotlinx.coroutines.Job
@@ -66,7 +66,7 @@ private fun SnackbarSheet(variant: NullWaveColorVariant) {
         var result by remember { mutableStateOf("Пока нет результата") }
         var queuedJob by remember { mutableStateOf<Job?>(null) }
         val spacing = NullWaveTheme.spacing
-        Surface(color = NullWaveTheme.colors.bg) {
+        NullWavePreviewSurface {
             Column(
                 Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
                     .padding(NullWaveTheme.dimens.gutter),

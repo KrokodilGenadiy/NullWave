@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -28,6 +27,7 @@ import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionH
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcon
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.designsystem.modifier.NullWaveBorderStyle
+import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
@@ -61,7 +61,7 @@ private fun StateSheet(variant: NullWaveColorVariant) {
     NullWaveTheme(variant = variant) {
         var primaryCalls by remember { mutableIntStateOf(0) }
         var secondaryCalls by remember { mutableIntStateOf(0) }
-        Surface(color = NullWaveTheme.colors.bg) {
+        NullWavePreviewSurface {
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
                     .padding(NullWaveTheme.dimens.gutter),

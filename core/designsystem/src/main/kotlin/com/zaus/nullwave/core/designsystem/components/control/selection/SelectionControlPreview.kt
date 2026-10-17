@@ -17,7 +17,6 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
@@ -31,8 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
@@ -47,6 +44,8 @@ import com.zaus.nullwave.core.designsystem.components.control.radioButton.NullWa
 import com.zaus.nullwave.core.designsystem.components.control.rockerSwitch.NullWaveRockerSwitch
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveMicroLabel
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
+import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
+import com.zaus.nullwave.core.designsystem.preview.rememberPreviewFocus
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
@@ -69,8 +68,8 @@ internal fun SelectionControlSheet(
             var rowSelection by remember { mutableIntStateOf(0) }
             var callbacks by remember { mutableIntStateOf(0) }
             var rejected by remember { mutableIntStateOf(0) }
-            val focusRequester = remember { FocusRequester() }
-            Surface(color = NullWaveTheme.colors.bg) {
+            val controlFocus = rememberPreviewFocus()
+            NullWavePreviewSurface {
                 Column(
                     modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
                         .padding(NullWaveTheme.dimens.gutter),
@@ -80,7 +79,7 @@ internal fun SelectionControlSheet(
                     Text("Состояние: $checked · Вызовов: $callbacks", style = NullWaveTheme.typography.body)
                     SelectionPreviewControl(
                         kind, checked, { checked = it; callbacks++ }, enabled,
-                        Modifier.focusRequester(focusRequester).semantics { contentDescription = "Пример выбора" },
+                        controlFocus.modifier.semantics { contentDescription = "Пример выбора" },
                     )
                     NullWaveButton("Изменить извне", { checked = !checked }, variant = NullWaveButtonVariant.Neutral)
                     NullWaveButton(
@@ -88,9 +87,10 @@ internal fun SelectionControlSheet(
                         variant = NullWaveButtonVariant.Neutral,
                     )
                     NullWaveButton(
-                        "Передать фокус", { focusRequester.requestFocus() }, enabled = enabled,
+                        "Передать фокус", controlFocus::requestFocus, enabled = enabled,
                         variant = NullWaveButtonVariant.Secondary,
                     )
+                    NullWaveMicroLabel(controlFocus.status)
                     NullWaveMicroLabel("Radio выбирается повторным кликом, но не снимает выбор. Изменить извне не вызывает callback.")
                     NullWaveSectionHeader("Одна кликабельная строка")
                     Column(modifier = if (kind == PreviewSelectionControl.RadioButton) Modifier.selectableGroup() else Modifier) {

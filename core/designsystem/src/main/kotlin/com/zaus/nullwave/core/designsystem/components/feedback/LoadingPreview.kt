@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -22,6 +21,7 @@ import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveBut
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButtonVariant
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveDivider
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
+import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
@@ -55,7 +55,7 @@ private fun LoadingSheet(variant: NullWaveColorVariant) {
     NullWaveTheme(variant = variant) {
         var percent by remember { mutableIntStateOf(62) }
         val spacing = NullWaveTheme.spacing
-        Surface(color = NullWaveTheme.colors.bg) {
+        NullWavePreviewSurface {
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
                     .padding(NullWaveTheme.dimens.gutter),

@@ -8,7 +8,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -31,6 +30,7 @@ import com.zaus.nullwave.core.designsystem.components.control.iconButton.NullWav
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.designsystem.modifier.NullWaveBorderStyle
+import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
@@ -75,7 +75,7 @@ private fun NavigationSheet(variant: NullWaveColorVariant) {
             listOf("Песни", "Альбомы", "Исполнители", "Плейлисты", "Папки").map(::NullWaveTabItem) +
                 NullWaveTabItem("Недоступный раздел", enabled = false)
         }
-        Surface(color = NullWaveTheme.colors.bg) {
+        NullWavePreviewSurface {
             Column(
                 Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.md),

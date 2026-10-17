@@ -5,10 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -29,6 +27,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButton
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
 import com.zaus.nullwave.core.designsystem.modifier.NullWaveBorderStyle
+import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
@@ -66,9 +65,9 @@ private fun MediaCardSheet(variant: NullWaveColorVariant) {
         val focus = remember { FocusRequester() }
         val inputMode = LocalInputModeManager.current
         val border = if (closedBorder) NullWaveBorderStyle.Closed else NullWaveBorderStyle.ClippedCorners
-        Surface(color = NullWaveTheme.colors.bg, contentColor = NullWaveTheme.colors.textPrimary) {
+        NullWavePreviewSurface {
             Column(
-                Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(NullWaveTheme.dimens.gutter),
+                Modifier.verticalScroll(rememberScrollState()).padding(NullWaveTheme.dimens.gutter),
                 verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.sm),
             ) {
                 Text("Open: $opens · More: $more", style = NullWaveTheme.typography.mono)

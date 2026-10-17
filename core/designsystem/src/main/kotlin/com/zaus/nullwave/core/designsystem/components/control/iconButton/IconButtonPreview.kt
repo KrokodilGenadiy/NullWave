@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -24,8 +23,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -38,6 +35,8 @@ import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveBut
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveMicroLabel
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
+import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
+import com.zaus.nullwave.core.designsystem.preview.rememberPreviewFocus
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
@@ -72,8 +71,8 @@ private fun IconButtonSheet(variant: NullWaveColorVariant) {
         val spacing = NullWaveTheme.spacing
         var clicks by remember { mutableIntStateOf(0) }
         var enabled by remember { mutableStateOf(true) }
-        val focusRequester = remember { FocusRequester() }
-        Surface(color = colors.bg) {
+        val menuFocus = rememberPreviewFocus()
+        NullWavePreviewSurface {
             Column(
                 modifier = Modifier.fillMaxWidth()
                     .verticalScroll(rememberScrollState())
@@ -87,7 +86,7 @@ private fun IconButtonSheet(variant: NullWaveColorVariant) {
                         icon = NullWaveIcons.Menu,
                         contentDescription = "Открыть меню",
                         onClick = { clicks++ },
-                        modifier = Modifier.focusRequester(focusRequester),
+                        modifier = menuFocus.modifier,
                         enabled = enabled,
                     )
                     NullWaveIconButton(NullWaveIcons.Search, "Поиск музыки", { clicks++ }, enabled = enabled)
@@ -101,10 +100,11 @@ private fun IconButtonSheet(variant: NullWaveColorVariant) {
                 )
                 NullWaveButton(
                     label = "Фокус на меню",
-                    onClick = { focusRequester.requestFocus() },
+                    onClick = menuFocus::requestFocus,
                     enabled = enabled,
                     variant = NullWaveButtonVariant.Secondary,
                 )
+                NullWaveMicroLabel(menuFocus.status)
                 for ((title, tint) in listOf("Neutral" to colors.textPrimary, "Primary" to colors.primary, "Danger" to colors.danger)) {
                     NullWaveSectionHeader(title)
                     FlowRow(

@@ -3,15 +3,17 @@ package com.zaus.nullwave.core.designsystem.components.control.chip
 import androidx.compose.foundation.interaction.FocusInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -22,8 +24,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.tooling.preview.Preview
@@ -33,6 +33,8 @@ import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveBut
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveMicroLabel
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
+import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
+import com.zaus.nullwave.core.designsystem.preview.rememberPreviewFocus
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
@@ -69,8 +71,8 @@ private fun ChipSheet(variant: NullWaveColorVariant) {
         var enabled by remember { mutableStateOf(true) }
         var callbacks by remember { mutableIntStateOf(0) }
         var rejectedRequests by remember { mutableIntStateOf(0) }
-        val focusRequester = remember { FocusRequester() }
-        Surface(color = NullWaveTheme.colors.bg) {
+        val presetFocus = rememberPreviewFocus()
+        NullWavePreviewSurface {
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
                     .padding(NullWaveTheme.dimens.gutter),
@@ -90,7 +92,7 @@ private fun ChipSheet(variant: NullWaveColorVariant) {
                             selected = preset == name,
                             onClick = { preset = name; callbacks++ },
                             enabled = enabled,
-                            modifier = if (name == "Ровно") Modifier.focusRequester(focusRequester) else Modifier,
+                            modifier = if (name == "Ровно") presetFocus.modifier else Modifier,
                         )
                     }
                 }
@@ -119,12 +121,39 @@ private fun ChipSheet(variant: NullWaveColorVariant) {
                     variant = NullWaveButtonVariant.Neutral,
                 )
                 NullWaveButton(
-                    "Фокус на Ровно", { focusRequester.requestFocus() }, enabled = enabled,
+                    "Фокус на Ровно", presetFocus::requestFocus, enabled = enabled,
                     variant = NullWaveButtonVariant.Secondary,
                 )
+                NullWaveMicroLabel(presetFocus.status)
                 NullWaveChip("Отклонённый выбор", selected = false, onClick = { rejectedRequests++ })
                 NullWaveMicroLabel("Запросов: $rejectedRequests · состояние не меняется без владельца")
+                NullWaveSectionHeader("Неограниченная ширина / горизонтальный ряд")
+                NullWaveMicroLabel("Частоты сохраняют одну строку; длинный chip с иконкой доступен прокруткой.")
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                ) {
+                    for (frequency in listOf("63", "125", "250", "500")) {
+                        Column(Modifier.widthIn(min = NullWaveTheme.dimens.touchTarget)) {
+                            NullWaveChip(frequency, selected = frequency == "125", onClick = {})
+                        }
+                    }
+                    NullWaveChip(
+                        "Длинный фильтр без потерь / Lossless tracks", selected = false, onClick = {},
+                        leadingIcon = NullWaveIcons.Filter,
+                    )
+                }
                 NullWaveSectionHeader("Длинная подпись / масштаб")
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                    verticalArrangement = Arrangement.spacedBy(spacing.xxs),
+                ) {
+                    NullWaveChip("125", selected = false, onClick = {})
+                    NullWaveChip(
+                        "Длинный фильтр без потерь / Lossless tracks", selected = true, onClick = {},
+                        leadingIcon = NullWaveIcons.Filter,
+                    )
+                }
                 NullWaveChip(
                     "Только композиции без потерь / Lossless tracks", selected = true, onClick = {},
                     leadingIcon = NullWaveIcons.Filter,

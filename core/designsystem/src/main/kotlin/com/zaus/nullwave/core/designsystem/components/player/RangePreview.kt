@@ -4,10 +4,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -31,6 +29,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButton
 import com.zaus.nullwave.core.designsystem.components.control.slider.NullWaveSlider
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
+import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import kotlinx.coroutines.delay
@@ -87,8 +86,8 @@ private fun RangeSheet(variant: NullWaveColorVariant) {
                 position = (position + 1000L).coerceAtMost(duration)
             }
         }
-        Surface(color = NullWaveTheme.colors.bg, contentColor = NullWaveTheme.colors.textPrimary) {
-            Column(Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(NullWaveTheme.dimens.gutter),
+        NullWavePreviewSurface {
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(NullWaveTheme.dimens.gutter),
                 verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.sm)) {
                 NullWaveSectionHeader("Slider / continuous и steps")
                 Text("Завершений: $finishes", style = NullWaveTheme.typography.mono)

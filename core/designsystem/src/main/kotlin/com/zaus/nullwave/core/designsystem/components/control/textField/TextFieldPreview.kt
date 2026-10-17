@@ -10,7 +10,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -34,6 +33,7 @@ import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveMicroLab
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.designsystem.modifier.NullWaveBorderStyle
+import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
@@ -73,7 +73,7 @@ private fun TextFieldSheet(variant: NullWaveColorVariant = NullWaveColorVariant.
         val nextFocus = remember { FocusRequester() }
         val focusManager = LocalFocusManager.current
         val spacing = NullWaveTheme.spacing
-        Surface(color = NullWaveTheme.colors.bg) {
+        NullWavePreviewSurface {
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(NullWaveTheme.dimens.gutter),
                 verticalArrangement = Arrangement.spacedBy(spacing.md),

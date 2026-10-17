@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -25,6 +24,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
 import com.zaus.nullwave.core.designsystem.theme.ChakraPetch
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
@@ -56,7 +56,7 @@ private fun TokenSheet(variant: NullWaveColorVariant) {
         val colors = NullWaveTheme.colors
         val type = NullWaveTheme.typography
         val spacing = NullWaveTheme.spacing
-        Surface(color = colors.bg) {
+        NullWavePreviewSurface {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()

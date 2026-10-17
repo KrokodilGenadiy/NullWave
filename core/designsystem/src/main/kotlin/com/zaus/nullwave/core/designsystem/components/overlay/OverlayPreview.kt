@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -20,8 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
@@ -31,10 +28,13 @@ import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveBut
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButtonVariant
 import com.zaus.nullwave.core.designsystem.components.control.textField.NullWaveTextField
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveDivider
+import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveMicroLabel
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSurface
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.designsystem.modifier.NullWaveBorderStyle
+import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
+import com.zaus.nullwave.core.designsystem.preview.rememberPreviewFocus
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import kotlinx.coroutines.launch
@@ -74,9 +74,9 @@ private fun OverlaySheet(variant: NullWaveColorVariant) {
         var name by remember { mutableStateOf("") }
         var actions by remember { mutableIntStateOf(0) }
         var dismisses by remember { mutableIntStateOf(0) }
-        val menuFocus = remember { FocusRequester() }
+        val menuFocus = rememberPreviewFocus()
         val spacing = NullWaveTheme.spacing
-        Surface(color = NullWaveTheme.colors.bg) {
+        NullWavePreviewSurface {
             Column(
                 Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(NullWaveTheme.dimens.gutter),
                 verticalArrangement = Arrangement.spacedBy(spacing.md),
@@ -107,7 +107,7 @@ private fun OverlaySheet(variant: NullWaveColorVariant) {
                         )
                         NullWaveDivider()
                         NullWaveMenuItem(
-                            "Обычное действие", { actions++ }, Modifier.focusRequester(menuFocus),
+                            "Обычное действие", { actions++ }, menuFocus.modifier,
                             leadingIcon = NullWaveIcons.Play,
                         )
                         NullWaveMenuItem(
@@ -123,7 +123,8 @@ private fun OverlaySheet(variant: NullWaveColorVariant) {
                         NullWaveMenuItem("Опасное, но disabled", { actions++ }, danger = true, enabled = false)
                     }
                 }
-                NullWaveButton("Фокус пункта меню", { menuFocus.requestFocus() })
+                NullWaveButton("Фокус пункта меню", menuFocus::requestFocus)
+                NullWaveMicroLabel(menuFocus.status)
             }
         }
         if (dialogVisible) {

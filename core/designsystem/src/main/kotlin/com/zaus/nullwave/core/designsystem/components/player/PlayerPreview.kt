@@ -5,11 +5,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -32,6 +30,7 @@ import com.zaus.nullwave.core.designsystem.components.content.NullWaveArtworkPla
 import com.zaus.nullwave.core.designsystem.components.content.NullWaveCoverArt
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButton
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
+import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
@@ -88,8 +87,8 @@ private fun PlayerSheet(variant: NullWaveColorVariant) {
             }
             repeatClicks++
         }
-        Surface(color = NullWaveTheme.colors.bg, contentColor = NullWaveTheme.colors.textPrimary) {
-            Column(Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.sm)) {
+        NullWavePreviewSurface {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.sm)) {
                 Column(Modifier.padding(horizontal = NullWaveTheme.dimens.gutter), verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.xs)) {
                     Text("Play: $plays · Prev: $previous · Next: $next\nExpand: $expands · Shuffle: $shuffleClicks · Repeat: $repeatClicks", style = NullWaveTheme.typography.mono)
                     NullWaveButton("Buffering: $buffering", { buffering = !buffering })

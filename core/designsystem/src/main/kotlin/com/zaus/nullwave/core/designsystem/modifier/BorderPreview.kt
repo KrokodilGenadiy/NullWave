@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -22,8 +21,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -37,8 +34,11 @@ import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveBut
 import com.zaus.nullwave.core.designsystem.components.control.chip.NullWaveChip
 import com.zaus.nullwave.core.designsystem.components.control.rockerSwitch.NullWaveRockerSwitch
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
+import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveMicroLabel
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSurface
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
+import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
+import com.zaus.nullwave.core.designsystem.preview.rememberPreviewFocus
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
@@ -72,10 +72,10 @@ private fun BorderSheet(variant: NullWaveColorVariant = NullWaveColorVariant.Cyb
         var selected by remember { mutableStateOf(false) }
         var switchedOn by remember { mutableStateOf(false) }
         val style = if (clipped) NullWaveBorderStyle.ClippedCorners else NullWaveBorderStyle.Closed
-        val buttonFocus = remember { FocusRequester() }
-        val chipFocus = remember { FocusRequester() }
-        val switchFocus = remember { FocusRequester() }
-        Surface(color = NullWaveTheme.colors.bg) {
+        val buttonFocus = rememberPreviewFocus()
+        val chipFocus = rememberPreviewFocus()
+        val switchFocus = rememberPreviewFocus()
+        NullWavePreviewSurface {
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
                     .padding(NullWaveTheme.dimens.gutter),
@@ -84,23 +84,26 @@ private fun BorderSheet(variant: NullWaveColorVariant = NullWaveColorVariant.Cyb
                 NullWaveSectionHeader("Рамки / ${variant.name}")
                 NullWaveButton(
                     "Стиль: ${style.name}", { clipped = !clipped },
-                    modifier = Modifier.focusRequester(buttonFocus),
+                    modifier = buttonFocus.modifier,
                     variant = NullWaveButtonVariant.Secondary, borderStyle = style,
                 )
                 NullWaveChip(
                     "Фильтр с иконкой", selected, { selected = !selected },
-                    modifier = Modifier.focusRequester(chipFocus),
+                    modifier = chipFocus.modifier,
                     leadingIcon = NullWaveIcons.Filter, borderStyle = style,
                 )
-                NullWaveButton("Фокус Button", { buttonFocus.requestFocus() }, variant = NullWaveButtonVariant.Neutral)
-                NullWaveButton("Фокус Chip", { chipFocus.requestFocus() }, variant = NullWaveButtonVariant.Neutral)
+                NullWaveButton("Фокус Button", buttonFocus::requestFocus, variant = NullWaveButtonVariant.Neutral)
+                NullWaveMicroLabel("Button · ${buttonFocus.status}")
+                NullWaveButton("Фокус Chip", chipFocus::requestFocus, variant = NullWaveButtonVariant.Neutral)
+                NullWaveMicroLabel("Chip · ${chipFocus.status}")
                 NullWaveRockerSwitch(
                     checked = switchedOn,
                     onCheckedChange = { switchedOn = it },
-                    modifier = Modifier.focusRequester(switchFocus).semantics { contentDescription = "Пример переключателя" },
+                    modifier = switchFocus.modifier.semantics { contentDescription = "Пример переключателя" },
                     borderStyle = style,
                 )
-                NullWaveButton("Фокус Switch", { switchFocus.requestFocus() }, variant = NullWaveButtonVariant.Neutral)
+                NullWaveButton("Фокус Switch", switchFocus::requestFocus, variant = NullWaveButtonVariant.Neutral)
+                NullWaveMicroLabel("Switch · ${switchFocus.status}")
                 for (borderStyle in NullWaveBorderStyle.entries) {
                     NullWaveSectionHeader(borderStyle.name)
                     FlowRow(

@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -25,6 +24,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcon
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
+import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
@@ -64,7 +64,7 @@ private fun PrimitiveSheet(variant: NullWaveColorVariant) {
     NullWaveTheme(variant = variant) {
         val colors = NullWaveTheme.colors
         val spacing = NullWaveTheme.spacing
-        Surface(color = colors.bg) {
+        NullWavePreviewSurface {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
