@@ -84,6 +84,7 @@ private fun QueueDragSheet(variant: NullWaveColorVariant) {
                 NullWaveSectionHeader("Перенос очереди", supportingText = "Статичные состояния · Reduce motion ON")
                 QueueDragSample("Обычная строка")
                 QueueDragSample("Перенос · акцент и свечение", dragging = true)
+                QueueDragSample("Перенос · локально без свечения", dragging = true, glowEnabled = false)
                 QueueDragSample("Недоступный файл · перенос разрешён", dragging = true, available = false)
                 QueueDragSample("Disabled · свечение отключено", dragging = true, enabled = false)
                 Text("Отключённая строка не подсвечивается даже при dragging = true. " +
@@ -100,6 +101,7 @@ private fun QueueDragSample(
     dragging: Boolean = false,
     available: Boolean = true,
     enabled: Boolean = true,
+    glowEnabled: Boolean = true,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.md)) {
         Text(label, style = NullWaveTheme.typography.mono)
@@ -116,6 +118,7 @@ private fun QueueDragSample(
             available = available,
             enabled = enabled,
             reduceMotion = true,
+            glowEnabled = glowEnabled,
         )
     }
 }

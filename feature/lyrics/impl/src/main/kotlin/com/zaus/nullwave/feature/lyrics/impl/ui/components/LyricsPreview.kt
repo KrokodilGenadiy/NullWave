@@ -9,12 +9,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -32,6 +34,7 @@ import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveBut
 import com.zaus.nullwave.core.designsystem.components.layout.NullWaveScaffold
 import com.zaus.nullwave.core.designsystem.components.navigation.NullWaveTopBar
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
+import com.zaus.nullwave.core.designsystem.theme.NullWaveEffects
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -60,17 +63,40 @@ private fun RtlLyricsPreview() {
     }
 }
 
+@Preview(name = "Lyrics - Glow restrictions", group = "Lyrics", widthDp = 360, heightDp = 600, locale = "ru")
+@Composable
+private fun LyricsGlowRestrictionsPreview() {
+    NullWaveTheme {
+        Surface(Modifier.fillMaxSize(), color = NullWaveTheme.colors.bg) {
+            Column(
+                Modifier.safeDrawingPadding().verticalScroll(rememberScrollState())
+                    .padding(NullWaveTheme.spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.lg),
+            ) {
+                Text("Theme ON · local ON", style = NullWaveTheme.typography.mono)
+                LyricsLine("Я собираю свет по проводам.", emphasis = LyricsLineEmphasis.Current)
+                Text("Theme ON · local OFF", style = NullWaveTheme.typography.mono)
+                LyricsLine("Я собираю свет по проводам.", emphasis = LyricsLineEmphasis.Current, glowEnabled = false)
+                NullWaveTheme(effects = NullWaveEffects(glowEnabled = false)) {
+                    Text("Theme OFF · local ON", style = NullWaveTheme.typography.mono)
+                    LyricsLine("Я собираю свет по проводам.", emphasis = LyricsLineEmphasis.Current, glowEnabled = true)
+                }
+            }
+        }
+    }
+}
+
 /** All lines below are original preview fixtures, not an imported song or parsed lyrics. */
 @Composable
 private fun LyricsSheet(variant: NullWaveColorVariant, arabicFixture: Boolean = false, longLineFirst: Boolean = false) {
-    NullWaveTheme(variant = variant) {
+    var glowEnabled by remember { mutableStateOf(true) }
+    NullWaveTheme(variant = variant, effects = NullWaveEffects(glowEnabled = glowEnabled)) {
         val lines = if (arabicFixture) ArabicLyricsFixture else LyricsFixture
         val firstCurrent = if (longLineFirst) 3 else 2
         var current by remember { mutableIntStateOf(firstCurrent) }
         var synced by remember { mutableStateOf(true) }
         var acceptCurrent by remember { mutableStateOf(true) }
         var followEnabled by remember { mutableStateOf(true) }
-        var glowEnabled by remember { mutableStateOf(true) }
         var currentRequests by remember { mutableIntStateOf(0) }
         var follows by remember { mutableIntStateOf(0) }
         var externalChanges by remember { mutableIntStateOf(0) }
@@ -106,7 +132,7 @@ private fun LyricsSheet(variant: NullWaveColorVariant, arabicFixture: Boolean = 
                         NullWaveButton("Предыдущая", { changeCurrent(current - 1) }, enabled = synced && current > 0)
                         NullWaveButton("Следующая", { changeCurrent(current + 1) }, enabled = synced && current < lines.lastIndex)
                         NullWaveButton("Synced: $synced", { synced = !synced })
-                        NullWaveButton("Glow: $glowEnabled", { glowEnabled = !glowEnabled })
+                        NullWaveButton("Theme glow: $glowEnabled", { glowEnabled = !glowEnabled })
                         NullWaveButton("Принимать current: $acceptCurrent", { acceptCurrent = !acceptCurrent })
                         NullWaveButton("Follow enabled: $followEnabled", { followEnabled = !followEnabled })
                         NullWaveButton("Сменить current извне", {
@@ -138,7 +164,6 @@ private fun LyricsSheet(variant: NullWaveColorVariant, arabicFixture: Boolean = 
                             abs(index - current) == 1 -> LyricsLineEmphasis.Neighbor
                             else -> LyricsLineEmphasis.Distant
                         },
-                        glowEnabled = glowEnabled,
                     )
                 }
             }

@@ -39,8 +39,8 @@ data class NullWaveTabItem(val label: String, val enabled: Boolean = true) {
  * [selectedIndex]; replace the list rather than mutating it. A changed list or motion mode settles
  * immediately, as does first composition. Only an actual selection change starts the effect.
  *
- * [reduceMotion] replaces brackets/split/width changes with a short underline cross-fade. The caller
- * owns this preference; Compose's animator duration scale is also respected (zero settles instantly).
+ * Theme or local [reduceMotion] replaces brackets/split/width changes with a short underline
+ * cross-fade. Compose's animator duration scale is also respected (zero settles instantly).
  * Material owns horizontal scrolling and selectableGroup; each cell owns Role.Tab/selected/disabled.
  * Press/focus feedback follows the label, never the rectangular hit area. Labels are not ellipsized.
  */
@@ -54,9 +54,10 @@ fun NullWaveTabRow(
 ) {
     require(selectedIndex in items.indices) { "Selected index must identify an existing tab" }
     val colors = NullWaveTheme.colors
+    val reducedMotion = NullWaveTheme.effects.withRestrictions(reduceMotion = reduceMotion).reduceMotion
     val animationsEnabled = systemAnimationsEnabled()
-    val animation = remember(items, reduceMotion, animationsEnabled) {
-        TabAnimation(items.size, selectedIndex, reduceMotion)
+    val animation = remember(items, reducedMotion, animationsEnabled) {
+        TabAnimation(items.size, selectedIndex, reducedMotion)
     }
     // Capture widths/opacity before drawing the new selection, avoiding a one-frame completed line
     // before LaunchedEffect resets the clock. Rapid selection changes cancel the previous effect.
@@ -71,7 +72,7 @@ fun NullWaveTabRow(
         animation.pending = false
         animation.progress.animateTo(
             1f,
-            tween(if (reduceMotion) TabMotion.FadeMillis else TabMotion.LockMillis, easing = LinearEasing),
+            tween(if (reducedMotion) TabMotion.FadeMillis else TabMotion.LockMillis, easing = LinearEasing),
         )
     }
     PrimaryScrollableTabRow(
@@ -117,7 +118,7 @@ fun NullWaveTabRow(
                         val progress = animation.frameProgress
                         drawTabDecoration(
                             underline = animation.transition.underline(index, progress),
-                            lockProgress = if (item.enabled && index == selectedIndex && !reduceMotion && animationsEnabled) progress else 1f,
+                            lockProgress = if (item.enabled && index == selectedIndex && !reducedMotion && animationsEnabled) progress else 1f,
                             layout = layout.value,
                             colors = colors,
                             enabled = item.enabled,

@@ -32,6 +32,7 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
  * The same thin playhead marks the exact position at rest and while scrubbing; no visible thumb
  * obscures it. [glowEnabled] adds a subtle halo to the played timeline and strengthens the playhead
  * during scrub. This accent takes over from Play/Pause; disabled timelines never glow.
+ * [glowEnabled] can disable glow locally but cannot re-enable it when [NullWaveTheme.effects] forbids it.
  * For one accent across a player, the host observes drag on [interactionSource] and non-null
  * [onScrubPositionChange] (also keyboard input), suppressing its Play/Pause halo while either is active.
  * Key the host's drag observer to its source, and reset that source on media/duration/enabled changes.
@@ -62,6 +63,7 @@ fun NullWaveSeekBar(
         }
     }
     val interactive = enabled && durationMs != null && durationMs > 0L
+    val effects = NullWaveTheme.effects.withRestrictions(glowEnabled = glowEnabled)
     // Recreate the actual Material gesture node too, so a gesture cannot transfer to another item.
     key(mediaKey, durationMs, enabled) {
         val session = remember { SeekSession() }
@@ -105,7 +107,7 @@ fun NullWaveSeekBar(
                     // SeekTrack draws a precise playhead in both states instead of a wide thumb.
                     Box(Modifier.size(SliderNodeSize))
                 },
-                track = { SeekTrack(it, interactive, peaks, scrubbing, glowEnabled) },
+                track = { SeekTrack(it, interactive, peaks, scrubbing, effects.glowEnabled) },
             )
             NullWaveTimeLabels(positionText, durationText,
                 endDescription = if (durationMs == null) stringResource(R.string.nw_time_duration_unknown)

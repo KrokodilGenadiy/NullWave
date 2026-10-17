@@ -29,6 +29,7 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
  *
  * [active] selects the accent treatment, not an enabled/disabled interaction state. The optional
  * glow is static and follows the accent palette. Caption text wraps with the system font scale.
+ * [glowEnabled] can disable glow locally but cannot re-enable it when [NullWaveTheme.effects] forbids it.
  * The numeric line scales from 56 to 24 sp to fit, preserving system font scaling. Supply a compact
  * single-line [timeLabel] (such as mm:ss or h:mm:ss) and enough width for it at the minimum size;
  * allow the component to grow vertically. Numerals retain their order in RTL.
@@ -49,6 +50,7 @@ fun NullWaveTimeReadout(
     require(contentDescription.isNotBlank()) { "Time readout needs an accessible description" }
     val colors = NullWaveTheme.colors
     val spacing = NullWaveTheme.spacing
+    val effects = NullWaveTheme.effects.withRestrictions(glowEnabled = glowEnabled)
     val glowRadius = with(LocalDensity.current) { ReadoutGlowRadius.toPx() }
     val timeStyle = NullWaveTheme.typography.mono.copy(
         fontSize = ReadoutFontSize,
@@ -56,7 +58,7 @@ fun NullWaveTimeReadout(
         fontWeight = FontWeight.Bold,
         letterSpacing = 0.04.em,
         textDirection = TextDirection.Ltr,
-        shadow = if (active && glowEnabled) Shadow(
+        shadow = if (active && effects.glowEnabled) Shadow(
             color = colors.primary.copy(alpha = ReadoutGlowAlpha),
             blurRadius = glowRadius,
         ) else null,

@@ -45,7 +45,7 @@ import com.zaus.nullwave.core.designsystem.components.control.checkbox.NullWaveC
 import com.zaus.nullwave.core.designsystem.components.control.iconButton.NullWaveIconButton
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcon
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
-import com.zaus.nullwave.core.designsystem.motion.systemAnimationsEnabled
+import com.zaus.nullwave.core.designsystem.motion.decorativeMotionEnabled
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
 /**
@@ -55,7 +55,8 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
  * [artwork] must be decorative, noninteractive content fitting 48 dp. Its semantics are suppressed.
  * [onMoreClick] exposes the extra action as a separate 48 dp target, also disabled by [enabled].
  * Title and subtitle each occupy at most one line; subtitle is static with ellipsis on overflow.
- * Long titles scroll unless [reduceMotion] or system animations are disabled, then use ellipsis.
+ * Long titles scroll unless theme/local [reduceMotion] or system animations disable motion,
+ * then use ellipsis.
  * Full text remains available to accessibility. Height grows from 72 dp with font scale, not tag length.
  * [durationLabel] is preformatted, never computed from media.
  * On narrow windows/large text, metadata moves below the title to preserve readable space.
@@ -159,7 +160,7 @@ internal fun RowScope.NullWaveTrackRowBody(
 ) {
     val colors = NullWaveTheme.colors
     // basicMarquee uses a fixed internal duration scale, so gate it explicitly for reduced motion.
-    val animateTitle = !reduceMotion && systemAnimationsEnabled()
+    val animateTitle = decorativeMotionEnabled(reduceMotion)
     Box(Modifier.size(ArtworkSize).clearAndSetSemantics {}, contentAlignment = Alignment.Center) {
         if (choosing) NullWaveCheckbox(selected, onCheckedChange = null, enabled = enabled) else artwork()
     }

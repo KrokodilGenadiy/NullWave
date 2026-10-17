@@ -8,10 +8,15 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 
-/** Dark only, matching the reference. No wallpaper colours or automatic light palette. */
+/**
+ * Dark only, matching the reference. No wallpaper colours or automatic light palette.
+ * [effects] updates descendants live; nested themes inherit and may only restrict parent effects.
+ * Components additionally respect system animation scale, including zero. Static glow is independent.
+ */
 @Composable
 fun NullWaveTheme(
     variant: NullWaveColorVariant = NullWaveColorVariant.Cyberpunk,
@@ -19,9 +24,11 @@ fun NullWaveTheme(
     shapes: NullWaveShapes = NullWaveShapes.Default,
     spacing: NullWaveSpacing = NullWaveSpacing.Default,
     dimens: NullWaveDimens = NullWaveDimens.Default,
+    effects: NullWaveEffects = NullWaveEffects.Default,
     content: @Composable () -> Unit,
 ) {
     val colors = variant.colors
+    val effectiveEffects = LocalEffects.current.withRestrictions(effects.reduceMotion, effects.glowEnabled)
     val materialColors = remember(colors) { colors.toMaterialColorScheme() }
     val materialTypography = remember(typography) { typography.toMaterialTypography() }
     val materialShapes = remember(shapes) {
@@ -39,6 +46,7 @@ fun NullWaveTheme(
         LocalShapes provides shapes,
         LocalSpacing provides spacing,
         LocalDimens provides dimens,
+        LocalEffects provides effectiveEffects,
         LocalContentColor provides colors.textPrimary,
     ) {
         MaterialTheme(
@@ -61,6 +69,8 @@ object NullWaveTheme {
         @Composable @ReadOnlyComposable get() = LocalSpacing.current
     val dimens: NullWaveDimens
         @Composable @ReadOnlyComposable get() = LocalDimens.current
+    val effects: NullWaveEffects
+        @Composable @ReadOnlyComposable get() = LocalEffects.current
 }
 
 private val LocalColors = staticCompositionLocalOf { NullWaveColors.Cyberpunk }
@@ -68,6 +78,8 @@ private val LocalTypography = staticCompositionLocalOf { NullWaveTypography.Defa
 private val LocalShapes = staticCompositionLocalOf { NullWaveShapes.Default }
 private val LocalSpacing = staticCompositionLocalOf { NullWaveSpacing.Default }
 private val LocalDimens = staticCompositionLocalOf { NullWaveDimens.Default }
+// Preferences change at runtime; invalidate readers rather than every descendant of the theme.
+private val LocalEffects = compositionLocalOf { NullWaveEffects.Default }
 
 private fun NullWaveColors.toMaterialColorScheme() = darkColorScheme(
     primary = primary,

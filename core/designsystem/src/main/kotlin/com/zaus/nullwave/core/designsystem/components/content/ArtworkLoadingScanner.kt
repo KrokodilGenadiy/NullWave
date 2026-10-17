@@ -20,13 +20,13 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
-import com.zaus.nullwave.core.designsystem.motion.systemAnimationsEnabled
+import com.zaus.nullwave.core.designsystem.motion.decorativeMotionEnabled
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
 /** Decorative indeterminate artwork state. Only composed while loading; no percentage or live region. */
 @Composable
 internal fun ArtworkLoadingScanner(reduceMotion: Boolean) {
-    val animate = !reduceMotion && systemAnimationsEnabled()
+    val animate = decorativeMotionEnabled(reduceMotion)
     val phase = if (animate) {
         rememberInfiniteTransition(label = "Artwork scan").animateFloat(
             initialValue = 0f, targetValue = 1f,

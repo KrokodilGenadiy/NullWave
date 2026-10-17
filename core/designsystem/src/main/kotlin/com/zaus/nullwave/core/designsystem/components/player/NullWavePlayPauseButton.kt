@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.zaus.nullwave.core.designsystem.R
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcon
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
-import com.zaus.nullwave.core.designsystem.motion.systemAnimationsEnabled
+import com.zaus.nullwave.core.designsystem.motion.decorativeMotionEnabled
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
 enum class NullWavePlayPauseButtonSize { Compact, Hero }
@@ -46,6 +46,7 @@ enum class NullWavePlayPauseButtonSize { Compact, Hero }
  * its glyph. [enabled] alone controls availability. Reduced/system-disabled motion freezes the scan.
  * [glowEnabled] controls the static halo independently of motion. A containing player switches it
  * off while seeking, handing the visual accent to the seek node. Disabled buttons never glow.
+ * Local motion/glow flags only restrict [NullWaveTheme.effects]; they cannot re-enable its effects.
  * Leave room around the button for the halo; applying a clip outside it will trim the decoration.
  * Parent constraints must allow at least the 48 dp touch target; do not shrink it with [modifier].
  * A supplied [interactionSource] remains owned by the caller.
@@ -65,6 +66,7 @@ fun NullWavePlayPauseButton(
     val colors = NullWaveTheme.colors
     val dimens = NullWaveTheme.dimens
     val shape = NullWaveTheme.shapes.node
+    val effects = NullWaveTheme.effects.withRestrictions(glowEnabled = glowEnabled)
     val interactions = interactionSource ?: remember { MutableInteractionSource() }
     val pressed by interactions.collectIsPressedAsState()
     val focused by interactions.collectIsFocusedAsState()
@@ -87,7 +89,7 @@ fun NullWavePlayPauseButton(
                 style = if (size == NullWavePlayPauseButtonSize.Hero) PlayerGlow.Hero else PlayerGlow.Compact,
                 shape = shape,
                 color = colors.primary,
-                enabled = enabled && glowEnabled,
+                enabled = enabled && effects.glowEnabled,
             )
             .border(
                 width = if (focusedHighlighted) dimens.focusBorder else dimens.hairline,
@@ -131,7 +133,7 @@ fun NullWavePlayPauseButton(
 /** Small lower rail leaves the centre glyph unobscured; neither a percentage nor a separate target. */
 @Composable
 private fun PlaybackBufferingScan(tint: Color, reduceMotion: Boolean) {
-    val animate = !reduceMotion && systemAnimationsEnabled()
+    val animate = decorativeMotionEnabled(reduceMotion)
     val phase = if (animate) {
         rememberInfiniteTransition(label = "Playback buffering").animateFloat(
             initialValue = 0f,

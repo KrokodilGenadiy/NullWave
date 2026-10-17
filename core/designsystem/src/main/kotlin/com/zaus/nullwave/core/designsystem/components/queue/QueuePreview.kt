@@ -39,9 +39,10 @@ import com.zaus.nullwave.core.designsystem.components.layout.NullWaveScaffold
 import com.zaus.nullwave.core.designsystem.components.navigation.NullWaveTopBar
 import com.zaus.nullwave.core.designsystem.components.player.NullWaveMiniPlayer
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
-import com.zaus.nullwave.core.designsystem.motion.systemAnimationsEnabled
+import com.zaus.nullwave.core.designsystem.motion.decorativeMotionEnabled
 import com.zaus.nullwave.core.designsystem.preview.rememberPreviewFocus
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
+import com.zaus.nullwave.core.designsystem.theme.NullWaveEffects
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import kotlinx.coroutines.delay
 
@@ -72,13 +73,14 @@ private fun RtlQueuePreview() {
 /** Local demo policy only: locked current entry and independent manual/automatic sections. */
 @Composable
 private fun QueueSheet(variant: NullWaveColorVariant, startAtManual: Boolean = false) {
-    NullWaveTheme(variant = variant) {
+    var reduceMotion by remember { mutableStateOf(false) }
+    var glowEnabled by remember { mutableStateOf(true) }
+    NullWaveTheme(variant = variant, effects = NullWaveEffects(reduceMotion = reduceMotion, glowEnabled = glowEnabled)) {
         var entries by remember { mutableStateOf(QueueEntries) }
         var enabled by remember { mutableStateOf(true) }
         var acceptChanges by remember { mutableStateOf(true) }
         var showControls by remember { mutableStateOf(false) }
         var interruptDrag by remember { mutableStateOf(false) }
-        var reduceMotion by remember { mutableStateOf(false) }
         var externalRevision by remember { mutableIntStateOf(0) }
         var playing by remember { mutableStateOf(true) }
         var rowClicks by remember { mutableIntStateOf(0) }
@@ -92,7 +94,7 @@ private fun QueueSheet(variant: NullWaveColorVariant, startAtManual: Boolean = f
         var lastEvent by remember { mutableStateOf("—") }
         var drag by remember { mutableStateOf<QueuePreviewDragSession?>(null) }
         var drop by remember { mutableStateOf<QueueDropAnimation?>(null) }
-        val animateDrop = !reduceMotion && systemAnimationsEnabled()
+        val animateDrop = decorativeMotionEnabled()
         val targetId by remember { derivedStateOf { drag?.targetId } }
         val insertAfter by remember { derivedStateOf { drag?.insertAfter ?: false } }
         val listState = rememberLazyListState(initialFirstVisibleItemIndex = if (startAtManual) 3 else 0)
@@ -173,7 +175,6 @@ private fun QueueSheet(variant: NullWaveColorVariant, startAtManual: Boolean = f
                     subtitle = "Сигналы утра · demo",
                     artwork = { NullWaveCoverArt(monogram = "ТМ") },
                     progress = 0.38f,
-                    reduceMotion = reduceMotion,
                 )
             },
         ) { padding ->
@@ -196,6 +197,7 @@ private fun QueueSheet(variant: NullWaveColorVariant, startAtManual: Boolean = f
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(spacing.xs), verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
                                 NullWaveButton("Принимать: $acceptChanges", { acceptChanges = !acceptChanges })
                                 NullWaveButton("Reduce motion: $reduceMotion", { reduceMotion = !reduceMotion })
+                                NullWaveButton("Glow: $glowEnabled", { glowEnabled = !glowEnabled })
                                 NullWaveButton("Queue enabled: $enabled", {
                                     cancelDrag(); enabled = !enabled
                                 })
@@ -212,7 +214,7 @@ private fun QueueSheet(variant: NullWaveColorVariant, startAtManual: Boolean = f
                                 "Удерживай ручку для переноса; обычный тап открывает действия. " +
                                 "В этой витрине drag ограничен целиком видимыми строками своей секции, без автопрокрутки. " +
                                 "Для остальных позиций используй «Выше» / «Ниже». " +
-                                "Drop плавно освобождает место; Reduce motion отключает это движение, сохраняя glow. " +
+                                "Настройки темы действуют на всю витрину и MiniPlayer: Reduce motion останавливает движение, Glow отдельно управляет свечением. " +
                                 "Прервать drag: через 1,2 с внешний порядок отменяет жест. " +
                                 "Reject отклоняет move/remove. Записи 20/21 — один трек дважды; файлы не меняются.\n" + handleFocus.status,
                                 style = NullWaveTheme.typography.caption)
@@ -296,7 +298,6 @@ private fun QueueSheet(variant: NullWaveColorVariant, startAtManual: Boolean = f
                                             }
                                         },
                                     ),
-                                    reduceMotion = reduceMotion,
                                 )
                             }
                         }

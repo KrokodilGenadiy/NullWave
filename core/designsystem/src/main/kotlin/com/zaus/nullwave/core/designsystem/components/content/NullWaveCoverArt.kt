@@ -37,7 +37,7 @@ enum class NullWaveArtworkPlaceholder { Missing, Loading, Error }
  * [contentDescription] describes the whole image/state, or null makes it entirely decorative.
  * No click, loading job, URI, generated catalogue id or hidden image loader lives here.
  * The decorative monogram scales to the actual tile rather than the user's body-text size.
- * Loading uses a decorative scanner, static with [reduceMotion] or system animations disabled.
+ * Loading uses a decorative scanner, static with theme/local [reduceMotion] or system animations disabled.
  */
 @Composable
 fun NullWaveCoverArt(

@@ -36,7 +36,7 @@ import com.zaus.nullwave.core.designsystem.R
 import com.zaus.nullwave.core.designsystem.components.content.NullWaveCoverArt
 import com.zaus.nullwave.core.designsystem.components.control.iconButton.NullWaveIconButton
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
-import com.zaus.nullwave.core.designsystem.motion.systemAnimationsEnabled
+import com.zaus.nullwave.core.designsystem.motion.decorativeMotionEnabled
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
 /**
@@ -50,6 +50,7 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
  * [playPauseGlowEnabled] controls a compact static halo on Play/Pause, not on the whole panel.
  * [progressGlowEnabled] controls the secondary halo along the known, nonzero progress strip.
  * The host can suppress it while another visible player surface owns the accent (e.g. seeking).
+ * Local motion/glow flags only restrict [NullWaveTheme.effects]; artwork slots inherit that policy.
  */
 @Composable
 fun NullWaveMiniPlayer(
@@ -76,9 +77,10 @@ fun NullWaveMiniPlayer(
     val colors = NullWaveTheme.colors
     val dimens = NullWaveTheme.dimens
     val spacing = NullWaveTheme.spacing
+    val progressGlow = NullWaveTheme.effects.withRestrictions(glowEnabled = progressGlowEnabled).glowEnabled
     val source = expandInteractionSource ?: remember { MutableInteractionSource() }
     val focused by source.collectIsFocusedAsState()
-    val animateTitle = !reduceMotion && systemAnimationsEnabled()
+    val animateTitle = decorativeMotionEnabled(reduceMotion)
     Row(
         modifier.fillMaxWidth().defaultMinSize(minHeight = MiniPlayerMinHeight).background(colors.surface)
             .drawWithCache {
@@ -94,7 +96,7 @@ fun NullWaveMiniPlayer(
                         val coreWidth = minOf(stroke, width)
                         val start = Offset(left + coreWidth / 2f, stroke / 2f)
                         val end = Offset(left + width - coreWidth / 2f, stroke / 2f)
-                        if (playbackEnabled && progressGlowEnabled) {
+                        if (playbackEnabled && progressGlow) {
                             glow.drawLine(this, start, end, coreWidth)
                         }
                         drawLine(colors.secondary, start, end, coreWidth, StrokeCap.Round)

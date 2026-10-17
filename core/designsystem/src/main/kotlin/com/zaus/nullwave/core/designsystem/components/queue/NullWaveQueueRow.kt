@@ -58,7 +58,8 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
  * those same actions directly. Supplying [dragCallbacks] additionally enables handle-only long-
  * press dragging. Supply movement alternatives whenever the host permits a move. [dragging] is
  * controlled by the host; playback/menu actions pause during the drag without disabling its handle.
- * Enabled dragging adds a static primary halo, including with reduced motion. A clipping ancestor
+ * Enabled dragging adds a static primary halo when theme and local [glowEnabled] permit it,
+ * including with reduced motion. A clipping ancestor
  * can trim it; the host should leave space around the lifted row and draw it above its neighbours.
  * [artwork] is decorative and noninteractive; [interactionSource] belongs to the playback target.
  */
@@ -80,11 +81,13 @@ fun NullWaveQueueRow(
     dragCallbacks: NullWaveDragCallbacks? = null,
     interactionSource: MutableInteractionSource? = null,
     reduceMotion: Boolean = false,
+    glowEnabled: Boolean = true,
 ) {
     require(title.isNotBlank()) { "Queue entry title must not be blank" }
     val colors = NullWaveTheme.colors
     val spacing = NullWaveTheme.spacing
     val dimens = NullWaveTheme.dimens
+    val effects = NullWaveTheme.effects.withRestrictions(glowEnabled = glowEnabled)
     val source = interactionSource ?: remember { MutableInteractionSource() }
     val focused by source.collectIsFocusedAsState()
     val pressed by source.collectIsPressedAsState()
@@ -121,7 +124,7 @@ fun NullWaveQueueRow(
         Row(
             Modifier.fillMaxWidth().defaultMinSize(minHeight = TrackRowMinHeight)
                 .then(
-                    if (enabled && dragging) Modifier.dropShadow(
+                    if (enabled && dragging && effects.glowEnabled) Modifier.dropShadow(
                         shape = RectangleShape,
                         shadow = Shadow(radius = DragGlowRadius, color = colors.primary, alpha = DragGlowAlpha),
                     ) else Modifier,

@@ -28,8 +28,8 @@ internal enum class LyricsLineEmphasis { Current, Neighbor, Distant }
  * It is not a live region: changing the current line must not interrupt TalkBack repeatedly.
  * Allow height to grow with text/font scale. Emphasis changes can change the measured height;
  * the future scrolling owner must account for that when positioning the current line.
- * [glowEnabled] adds a static accent halo only to Current, without changing text measurement
- * or semantics. Leave space around the text; a clipping ancestor can trim the halo.
+ * Theme and local [glowEnabled] together permit a static accent halo only on Current, without
+ * changing text measurement or semantics. Leave space around the text; a clipping ancestor can trim it.
  */
 @Composable
 internal fun LyricsLine(
@@ -41,6 +41,7 @@ internal fun LyricsLine(
     require(text.isNotBlank()) { "Lyrics line must contain text" }
     val colors = NullWaveTheme.colors
     val current = emphasis == LyricsLineEmphasis.Current
+    val effects = NullWaveTheme.effects.withRestrictions(glowEnabled = glowEnabled)
     val glowRadius = with(LocalDensity.current) { CurrentLineGlowRadius.toPx() }
     val currentDescription = if (current) stringResource(R.string.lyrics_current_line) else null
     val fontSize = when (emphasis) {
@@ -60,7 +61,7 @@ internal fun LyricsLine(
             lineHeight = 1.25.em,
             fontWeight = if (current) FontWeight.SemiBold else FontWeight.Medium,
             letterSpacing = 0.em,
-            shadow = if (current && glowEnabled) Shadow(
+            shadow = if (current && effects.glowEnabled) Shadow(
                 color = colors.primary.copy(alpha = CurrentLineGlowAlpha),
                 blurRadius = glowRadius,
             ) else null,
