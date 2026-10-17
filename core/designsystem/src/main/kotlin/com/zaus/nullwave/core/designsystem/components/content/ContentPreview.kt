@@ -17,16 +17,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.input.InputMode
-import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
@@ -35,6 +31,7 @@ import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveBut
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveDivider
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
 import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
+import com.zaus.nullwave.core.designsystem.preview.rememberPreviewFocus
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
@@ -71,9 +68,7 @@ private fun ContentSheet(variant: NullWaveColorVariant) {
         var selected by remember { mutableStateOf(false) }
         var artworkStep by remember { mutableIntStateOf(0) }
         var reduceTitleMotion by remember { mutableStateOf(false) }
-        var focusResult by remember { mutableStateOf("Фокус не запрошен") }
-        val focus = remember { FocusRequester() }
-        val inputMode = LocalInputModeManager.current
+        val focus = rememberPreviewFocus()
         val painter = remember { PreviewSleevePainter() }
         NullWavePreviewSurface {
             Column(
@@ -101,7 +96,7 @@ private fun ContentSheet(variant: NullWaveColorVariant) {
                 NullWaveSectionHeader("TrackRow", Modifier.padding(horizontal = NullWaveTheme.dimens.gutter))
                 Text("Click: $clicks · More: $more · Long: $longClicks", Modifier.padding(horizontal = NullWaveTheme.dimens.gutter), style = NullWaveTheme.typography.mono)
                 NullWaveTrackRow(
-                    "Deadzone Chorus", { clicks++ }, Modifier.focusRequester(focus),
+                    "Deadzone Chorus", { clicks++ }, focus.modifier,
                     subtitle = "Static Pilgrim · Nullwave EP", durationLabel = "3:41",
                     artwork = { NullWaveCoverArt(painter = painter) },
                     onMoreClick = { more++ }, onLongClick = { longClicks++ }, longClickLabel = "Выбрать трек",
@@ -135,10 +130,8 @@ private fun ContentSheet(variant: NullWaveColorVariant) {
                         )
                     })
                 NullWaveButton("Обложка: missing → loading → image → error", { artworkStep = (artworkStep + 1) % 4 }, Modifier.padding(horizontal = NullWaveTheme.dimens.gutter))
-                NullWaveButton("Фокус на первый трек", {
-                    focusResult = if (inputMode.requestInputMode(InputMode.Keyboard) && focus.requestFocus()) "Запрос принят" else "Запрос отклонён"
-                }, Modifier.padding(horizontal = NullWaveTheme.dimens.gutter))
-                Text(focusResult, Modifier.padding(NullWaveTheme.dimens.gutter), style = NullWaveTheme.typography.mono)
+                NullWaveButton("Фокус на первый трек", focus::requestFocus, Modifier.padding(horizontal = NullWaveTheme.dimens.gutter))
+                Text(focus.status, Modifier.padding(NullWaveTheme.dimens.gutter), style = NullWaveTheme.typography.mono)
             }
         }
     }

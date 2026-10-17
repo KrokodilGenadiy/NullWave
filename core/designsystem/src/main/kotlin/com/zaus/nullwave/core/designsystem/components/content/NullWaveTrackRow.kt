@@ -21,10 +21,8 @@ import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -45,6 +43,7 @@ import com.zaus.nullwave.core.designsystem.components.control.checkbox.NullWaveC
 import com.zaus.nullwave.core.designsystem.components.control.iconButton.NullWaveIconButton
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcon
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
+import com.zaus.nullwave.core.designsystem.motion.systemAnimationsEnabled
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
 /**
@@ -85,9 +84,8 @@ fun NullWaveTrackRow(
     val spacing = NullWaveTheme.spacing
     val dimens = NullWaveTheme.dimens
     val source = interactionSource ?: remember { MutableInteractionSource() }
-    val scope = rememberCoroutineScope()
     // basicMarquee uses a fixed internal duration scale, so gate it explicitly for reduced motion.
-    val animateTitle = !reduceMotion && (scope.coroutineContext[MotionDurationScale]?.scaleFactor ?: 1f) > 0f
+    val animateTitle = !reduceMotion && systemAnimationsEnabled()
     val focused by source.collectIsFocusedAsState()
     val pressed by source.collectIsPressedAsState()
     val choosing = selectionMode || selected

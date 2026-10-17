@@ -25,12 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -44,6 +39,7 @@ import com.zaus.nullwave.core.designsystem.components.control.stepper.NullWaveSt
 import com.zaus.nullwave.core.designsystem.components.layout.NullWaveScaffold
 import com.zaus.nullwave.core.designsystem.components.navigation.NullWaveTopBar
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
+import com.zaus.nullwave.core.designsystem.preview.rememberPreviewFocus
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import kotlin.math.roundToInt
@@ -79,9 +75,9 @@ private fun EqualizerControlsSheet(variant: NullWaveColorVariant) {
         val bands = remember { listOf("63", "125", "250", "500", "1k", "2k", "4k", "8k") }
         val bandLabels = remember { listOf("63 Гц", "125 Гц", "250 Гц", "500 Гц", "1 кГц", "2 кГц", "4 кГц", "8 кГц") }
         val gains = remember { mutableStateListOf(3.5f, 5.3f, 0f, -2.8f, -0.9f, 1.9f, 4f, 1.1f) }
-        val focus = remember { List(bands.size) { FocusRequester() } }
+        val focus = bands.map { rememberPreviewFocus() }
         var selected by remember { mutableIntStateOf(0) }
-        var focused by remember { mutableStateOf<Int?>(null) }
+        val focused = focus.indexOfFirst { it.isFocused }.takeIf { it >= 0 }
         var enabled by remember { mutableStateOf(true) }
         var acceptUpdates by remember { mutableStateOf(true) }
         var updates by remember { mutableIntStateOf(0) }
@@ -89,8 +85,7 @@ private fun EqualizerControlsSheet(variant: NullWaveColorVariant) {
         var externalChanges by remember { mutableIntStateOf(0) }
         var disabledCalls by remember { mutableIntStateOf(0) }
         var discrete by remember { mutableFloatStateOf(-6f) }
-        var focusResult by remember { mutableStateOf("—") }
-        val inputMode = LocalInputModeManager.current
+        var requestedBand by remember { mutableStateOf<Int?>(null) }
         val locale = LocalConfiguration.current.locales[0]
         val formatGain = remember(locale) {
             { value: Float ->
@@ -127,9 +122,7 @@ private fun EqualizerControlsSheet(variant: NullWaveColorVariant) {
                                 value = gains[index],
                                 onValueChange = { update(index, it) },
                                 label = "Усиление ${bandLabels[index]}",
-                                modifier = Modifier.focusRequester(focus[index]).onFocusChanged {
-                                    if (it.isFocused) focused = index else if (focused == index) focused = null
-                                },
+                                modifier = focus[index].modifier,
                                 enabled = enabled,
                                 valueRange = -12f..12f,
                                 steps = 239,
@@ -159,14 +152,15 @@ private fun EqualizerControlsSheet(variant: NullWaveColorVariant) {
                         onValueChangeFinished = { finishes++ },
                     )
                     Text("Updates: $updates · Finished: $finishes · External: $externalChanges\n" +
-                        "Focus: ${focused?.let { bandLabels[it] } ?: "—"} · запрос: $focusResult",
+                        "Focus: ${focused?.let { bandLabels[it] } ?: "—"}\n" +
+                        (requestedBand?.let { "${bandLabels[it]} · ${focus[it].status}" } ?: "Запрос: —"),
                         style = NullWaveTheme.typography.mono)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(spacing.xs), verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
                         NullWaveButton("Enabled: $enabled", { enabled = !enabled })
                         NullWaveButton("Принимать: $acceptUpdates", { acceptUpdates = !acceptUpdates })
                         NullWaveButton("Фокус на выбранную", {
-                            focusResult = if (inputMode.requestInputMode(InputMode.Keyboard) && focus[selected].requestFocus())
-                                "принят" else "отклонён"
+                            requestedBand = selected
+                            focus[selected].requestFocus()
                         })
                         listOf("Min" to -12f, "Zero" to 0f, "Max" to 12f).forEach { (label, value) ->
                             NullWaveButton(label, { gains[selected] = value; externalChanges++ })

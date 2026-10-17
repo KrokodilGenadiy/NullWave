@@ -1,9 +1,6 @@
 package com.zaus.nullwave.core.designsystem.modifier
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.interaction.FocusInteraction
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -15,13 +12,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
@@ -38,6 +33,7 @@ import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveMicroLab
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSurface
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
+import com.zaus.nullwave.core.designsystem.preview.PreviewInteractionSample
 import com.zaus.nullwave.core.designsystem.preview.rememberPreviewFocus
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
@@ -143,13 +139,13 @@ private fun BorderSheet(variant: NullWaveColorVariant = NullWaveColorVariant.Cyb
                         Triple("Press", false, true), Triple("Focus", true, false), Triple("Focus + press", true, true),
                     )) {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                            BorderInteractionSample(focused, pressed) { source ->
+                            PreviewInteractionSample(focused = focused, pressed = pressed) { source ->
                                 NullWaveButton(label, {}, variant = NullWaveButtonVariant.Secondary, interactionSource = source, borderStyle = borderStyle)
                             }
-                            BorderInteractionSample(focused, pressed) { source ->
+                            PreviewInteractionSample(focused = focused, pressed = pressed) { source ->
                                 NullWaveChip(label, true, {}, interactionSource = source, borderStyle = borderStyle)
                             }
-                            BorderInteractionSample(focused, pressed) { source ->
+                            PreviewInteractionSample(focused = focused, pressed = pressed) { source ->
                                 NullWaveRockerSwitch(
                                     checked = true, onCheckedChange = {},
                                     modifier = Modifier.semantics { contentDescription = label },
@@ -178,19 +174,5 @@ private fun BorderSheet(variant: NullWaveColorVariant = NullWaveColorVariant.Cyb
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun BorderInteractionSample(
-    focused: Boolean,
-    pressed: Boolean,
-    content: @Composable (MutableInteractionSource) -> Unit,
-) {
-    val source = remember { MutableInteractionSource() }
-    content(source)
-    LaunchedEffect(source, focused, pressed) {
-        if (focused) source.emit(FocusInteraction.Focus())
-        if (pressed) source.emit(PressInteraction.Press(Offset.Zero))
     }
 }

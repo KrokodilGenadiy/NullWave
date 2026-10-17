@@ -18,10 +18,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.InputMode
-import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
@@ -31,6 +27,7 @@ import com.zaus.nullwave.core.designsystem.components.content.NullWaveCoverArt
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButton
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
 import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
+import com.zaus.nullwave.core.designsystem.preview.rememberPreviewFocus
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
@@ -75,9 +72,7 @@ private fun PlayerSheet(variant: NullWaveColorVariant) {
         var expands by remember { mutableIntStateOf(0) }
         var shuffleClicks by remember { mutableIntStateOf(0) }
         var repeatClicks by remember { mutableIntStateOf(0) }
-        var focusResult by remember { mutableStateOf("Фокус не запрошен") }
-        val focus = remember { FocusRequester() }
-        val inputMode = LocalInputModeManager.current
+        val focus = rememberPreviewFocus()
         val play: () -> Unit = { playing = !playing; plays++ }
         val cycleRepeat: () -> Unit = {
             repeat = when (repeat) {
@@ -96,14 +91,12 @@ private fun PlayerSheet(variant: NullWaveColorVariant) {
                     NullWaveButton("Previous / Next: $canSkip", { canSkip = !canSkip })
                     NullWaveButton("Reduce motion: $reduced", { reduced = !reduced })
                     NullWaveButton("Progress: ${progress?.let { "${(it * 100).toInt()}%" } ?: "unknown"}", { progressStep = (progressStep + 1) % 6 })
-                    NullWaveButton("Фокус на Hero", {
-                        focusResult = if (inputMode.requestInputMode(InputMode.Keyboard) && focus.requestFocus()) "Запрос принят" else "Запрос отклонён"
-                    })
-                    Text(focusResult, style = NullWaveTheme.typography.mono)
+                    NullWaveButton("Фокус на Hero", focus::requestFocus)
+                    Text(focus.status, style = NullWaveTheme.typography.mono)
                     NullWaveSectionHeader("PlayPause / Hero, Compact, disabled")
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.md), verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.sm),
                         itemVerticalAlignment = Alignment.CenterVertically) {
-                        NullWavePlayPauseButton(playing, play, Modifier.focusRequester(focus), buffering, enabled, reduceMotion = reduced)
+                        NullWavePlayPauseButton(playing, play, focus.modifier, buffering, enabled, reduceMotion = reduced)
                         NullWavePlayPauseButton(playing, play, buffering = buffering, enabled = enabled, size = NullWavePlayPauseButtonSize.Compact, reduceMotion = reduced)
                         NullWavePlayPauseButton(true, { plays++ }, buffering = true, enabled = false, reduceMotion = reduced)
                     }

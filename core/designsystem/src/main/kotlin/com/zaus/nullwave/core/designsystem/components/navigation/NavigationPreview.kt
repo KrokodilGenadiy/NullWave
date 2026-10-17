@@ -17,11 +17,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.input.InputMode
-import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
@@ -31,6 +26,7 @@ import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionH
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.designsystem.modifier.NullWaveBorderStyle
 import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
+import com.zaus.nullwave.core.designsystem.preview.rememberPreviewFocus
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
@@ -67,10 +63,7 @@ private fun NavigationSheet(variant: NullWaveColorVariant) {
         var selectionVisible by remember { mutableStateOf(true) }
         var tab by remember { mutableIntStateOf(0) }
         var drawer by remember { mutableIntStateOf(0) }
-        val drawerFocus = remember { FocusRequester() }
-        val inputModeManager = LocalInputModeManager.current
-        var drawerFocused by remember { mutableStateOf(false) }
-        var focusRequestStatus by remember { mutableStateOf("Ещё не запрошен") }
+        val drawerFocus = rememberPreviewFocus()
         val tabs = remember {
             listOf("Песни", "Альбомы", "Исполнители", "Плейлисты", "Папки").map(::NullWaveTabItem) +
                 NullWaveTabItem("Недоступный раздел", enabled = false)
@@ -119,7 +112,7 @@ private fun NavigationSheet(variant: NullWaveColorVariant) {
                         Text("128", style = NullWaveTheme.typography.mono)
                     })
                     NullWaveDrawerItem("Мои длинные названия плейлистов / Playlists", drawer == 1, { drawer = 1 },
-                        modifier = Modifier.focusRequester(drawerFocus).onFocusChanged { drawerFocused = it.isFocused },
+                        modifier = drawerFocus.modifier,
                         icon = NullWaveIcons.Playlists,
                         borderStyle = NullWaveBorderStyle.ClippedCorners)
                     NullWaveDrawerItem("Настройки", drawer == 2, { drawer = 2 }, icon = NullWaveIcons.Settings)
@@ -129,19 +122,11 @@ private fun NavigationSheet(variant: NullWaveColorVariant) {
                     Modifier.padding(horizontal = NullWaveTheme.dimens.gutter), icon = NullWaveIcons.Albums, enabled = false)
                 NullWaveButton(
                     "Фокус на плейлисты",
-                    {
-                        // Demo only: selectable uses SystemDefined focusability and rejects focus
-                        // in touch mode. Production controls retain the platform's input policy.
-                        focusRequestStatus = when {
-                            !inputModeManager.requestInputMode(InputMode.Keyboard) -> "Preview не разрешил режим клавиатуры"
-                            drawerFocus.requestFocus() -> "Запрос принят"
-                            else -> "Запрос фокуса отклонён"
-                        }
-                    },
+                    drawerFocus::requestFocus,
                     Modifier.padding(horizontal = NullWaveTheme.dimens.gutter),
                 )
                 Text(
-                    "Фокус плейлистов: ${if (drawerFocused) "да" else "нет"} · $focusRequestStatus",
+                    "Плейлисты · ${drawerFocus.status}",
                     Modifier.padding(NullWaveTheme.dimens.gutter),
                     style = NullWaveTheme.typography.mono,
                 )

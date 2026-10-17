@@ -17,11 +17,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.input.InputMode
-import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
@@ -31,6 +26,7 @@ import com.zaus.nullwave.core.designsystem.components.navigation.NullWaveTopBar
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.designsystem.modifier.NullWaveBorderStyle
+import com.zaus.nullwave.core.designsystem.preview.rememberPreviewFocus
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
@@ -74,10 +70,7 @@ private fun SettingsRowsSheet(variant: NullWaveColorVariant) {
         var disabledCalls by remember { mutableIntStateOf(0) }
         var externalChanges by remember { mutableIntStateOf(0) }
         var focusRequests by remember { mutableIntStateOf(0) }
-        var focused by remember { mutableStateOf(false) }
-        var focusResult by remember { mutableStateOf("—") }
-        val focus = remember { FocusRequester() }
-        val inputMode = LocalInputModeManager.current
+        val focus = rememberPreviewFocus()
         val border = if (clipped) NullWaveBorderStyle.ClippedCorners else NullWaveBorderStyle.Closed
         val spacing = NullWaveTheme.spacing
         val gutter = NullWaveTheme.dimens.gutter
@@ -105,11 +98,10 @@ private fun SettingsRowsSheet(variant: NullWaveColorVariant) {
                         NullWaveButton("Сменить Gapless извне", { gapless = !gapless; externalChanges++ })
                         NullWaveButton("Фокус на Gapless", {
                             focusRequests++
-                            focusResult = if (inputMode.requestInputMode(InputMode.Keyboard) && focus.requestFocus())
-                                "принят" else "отклонён"
+                            focus.requestFocus()
                         })
                     }
-                    Text("Focus: $focused · запросов: $focusRequests · $focusResult\n" +
+                    Text("${focus.status} · запросов: $focusRequests\n" +
                         "Нажатие на текст или переключатель даёт один callback. Внешняя смена Gapless не увеличивает Switch.",
                         style = NullWaveTheme.typography.caption)
                 }
@@ -118,7 +110,7 @@ private fun SettingsRowsSheet(variant: NullWaveColorVariant) {
                     label = "Воспроизведение без пауз",
                     checked = gapless,
                     onCheckedChange = { gapless = it; switches++ },
-                    modifier = Modifier.focusRequester(focus).onFocusChanged { focused = it.isFocused },
+                    modifier = focus.modifier,
                     supportingText = "Gapless: непрерывные переходы между треками альбома",
                     leadingIcon = NullWaveIcons.Play,
                     enabled = enabled,

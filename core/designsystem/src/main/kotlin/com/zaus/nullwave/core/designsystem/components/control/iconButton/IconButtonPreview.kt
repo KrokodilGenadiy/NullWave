@@ -1,8 +1,5 @@
 package com.zaus.nullwave.core.designsystem.components.control.iconButton
 
-import androidx.compose.foundation.interaction.FocusInteraction
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -15,7 +12,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -23,7 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextAlign
@@ -36,6 +31,7 @@ import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveMicroLab
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
+import com.zaus.nullwave.core.designsystem.preview.PreviewInteractionSample
 import com.zaus.nullwave.core.designsystem.preview.rememberPreviewFocus
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
@@ -136,7 +132,6 @@ private fun IconButtonSheet(variant: NullWaveColorVariant) {
     }
 }
 
-/** Static comparison via the real interaction API; no fake state parameters in the component. */
 @Composable
 private fun IconButtonSample(
     label: String,
@@ -145,20 +140,17 @@ private fun IconButtonSample(
     pressed: Boolean = false,
     focused: Boolean = false,
 ) {
-    val source = remember { MutableInteractionSource() }
     Column(modifier = Modifier.width(88.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        NullWaveIconButton(
-            icon = NullWaveIcons.More,
-            contentDescription = "Другие действия",
-            onClick = {},
-            enabled = enabled,
-            tint = tint,
-            interactionSource = source,
-        )
+        PreviewInteractionSample(pressed = pressed, focused = focused) { source ->
+            NullWaveIconButton(
+                icon = NullWaveIcons.More,
+                contentDescription = "Другие действия",
+                onClick = {},
+                enabled = enabled,
+                tint = tint,
+                interactionSource = source,
+            )
+        }
         Text(label, style = NullWaveTheme.typography.caption, textAlign = TextAlign.Center)
-    }
-    LaunchedEffect(source, pressed, focused) {
-        if (pressed) source.emit(PressInteraction.Press(Offset.Zero))
-        if (focused) source.emit(FocusInteraction.Focus())
     }
 }

@@ -16,11 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
@@ -28,6 +24,7 @@ import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveBut
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
 import com.zaus.nullwave.core.designsystem.modifier.NullWaveBorderStyle
 import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
+import com.zaus.nullwave.core.designsystem.preview.rememberPreviewFocus
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
@@ -61,9 +58,7 @@ private fun MediaCardSheet(variant: NullWaveColorVariant) {
         var closedBorder by remember { mutableStateOf(false) }
         var enabled by remember { mutableStateOf(true) }
         var reduceMotion by remember { mutableStateOf(false) }
-        var focusResult by remember { mutableStateOf("Фокус не запрошен") }
-        val focus = remember { FocusRequester() }
-        val inputMode = LocalInputModeManager.current
+        val focus = rememberPreviewFocus()
         val border = if (closedBorder) NullWaveBorderStyle.Closed else NullWaveBorderStyle.ClippedCorners
         NullWavePreviewSurface {
             Column(
@@ -74,10 +69,8 @@ private fun MediaCardSheet(variant: NullWaveColorVariant) {
                 NullWaveButton("Контур: ${if (closedBorder) "замкнут" else "срезан"}", { closedBorder = !closedBorder })
                 NullWaveButton("Карточки: ${if (enabled) "enabled" else "disabled"}", { enabled = !enabled })
                 NullWaveButton("Reduce motion: ${if (reduceMotion) "ON" else "OFF"}", { reduceMotion = !reduceMotion })
-                NullWaveButton("Фокус на первый альбом", {
-                    focusResult = if (inputMode.requestInputMode(InputMode.Keyboard) && focus.requestFocus()) "Запрос принят" else "Запрос отклонён"
-                })
-                Text(focusResult, style = NullWaveTheme.typography.mono)
+                NullWaveButton("Фокус на первый альбом", focus::requestFocus)
+                Text(focus.status, style = NullWaveTheme.typography.mono)
                 NullWaveSectionHeader("Grid / альбомы и плейлисты")
                 FlowRow(
                     Modifier.fillMaxWidth(), maxItemsInEachRow = if (LocalDensity.current.fontScale > 1.3f) 1 else 2,
@@ -85,7 +78,7 @@ private fun MediaCardSheet(variant: NullWaveColorVariant) {
                     verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.sm),
                 ) {
                     NullWaveMediaGridCard(
-                        "Nullwave EP", { opens++ }, Modifier.weight(1f).focusRequester(focus), supportingText = "Static Pilgrim",
+                        "Nullwave EP", { opens++ }, Modifier.weight(1f).then(focus.modifier), supportingText = "Static Pilgrim",
                         artwork = { NullWaveCoverArt(monogram = "NW") }, enabled = enabled, borderStyle = border,
                     )
                     NullWaveMediaGridCard(

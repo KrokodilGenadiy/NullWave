@@ -20,11 +20,9 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -35,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.zaus.nullwave.core.designsystem.R
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcon
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
+import com.zaus.nullwave.core.designsystem.motion.systemAnimationsEnabled
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
 enum class NullWavePlayPauseButtonSize { Compact, Hero }
@@ -75,7 +74,7 @@ fun NullWavePlayPauseButton(
     val content = if (highlighted) colors.primary else colors.onPrimary
     val description = stringResource(if (isPlaying) R.string.nw_player_pause else R.string.nw_player_play)
     val bufferingDescription = if (buffering) stringResource(R.string.nw_player_buffering) else null
-    val edge = if (size == NullWavePlayPauseButtonSize.Hero) HeroSize else dimens.touchTarget
+    val edge = if (size == NullWavePlayPauseButtonSize.Hero) HeroPlayPauseSize else dimens.touchTarget
     val glyph = if (size == NullWavePlayPauseButtonSize.Hero) HeroGlyphSize else dimens.icon
 
     IconButton(
@@ -132,8 +131,7 @@ fun NullWavePlayPauseButton(
 /** Small lower rail leaves the centre glyph unobscured; neither a percentage nor a separate target. */
 @Composable
 private fun PlaybackBufferingScan(tint: Color, reduceMotion: Boolean) {
-    val scope = rememberCoroutineScope()
-    val animate = !reduceMotion && (scope.coroutineContext[MotionDurationScale]?.scaleFactor ?: 1f) > 0f
+    val animate = !reduceMotion && systemAnimationsEnabled()
     val phase = if (animate) {
         rememberInfiniteTransition(label = "Playback buffering").animateFloat(
             initialValue = 0f,
@@ -156,7 +154,8 @@ private fun PlaybackBufferingScan(tint: Color, reduceMotion: Boolean) {
     }
 }
 
-private val HeroSize = 76.dp
+/** Also used by the transport group's breakpoint so it matches the actual button. */
+internal val HeroPlayPauseSize = 76.dp
 private val HeroGlyphSize = 36.dp
 private const val BufferingPassMillis = 900
 private const val RailStartFraction = 0.32f

@@ -22,7 +22,8 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 /**
  * Static, decorative placeholder: cover, two text blocks and optional trailing metadata.
  * The enclosing region supplies one loading announcement. This row has no actions or fake text.
- * Text slots follow theme line heights/font scale; reconcile geometry when TrackRow is introduced.
+ * Text slots follow theme line heights/font scale. This generic placeholder should be aligned
+ * with its consuming TrackRow layout when a real loading list is connected.
  */
 @Composable
 fun NullWaveSkeletonRow(

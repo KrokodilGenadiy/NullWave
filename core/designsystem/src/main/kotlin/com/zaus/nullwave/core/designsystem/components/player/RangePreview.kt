@@ -19,10 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.InputMode
-import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
@@ -30,6 +26,7 @@ import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveBut
 import com.zaus.nullwave.core.designsystem.components.control.slider.NullWaveSlider
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
 import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
+import com.zaus.nullwave.core.designsystem.preview.rememberPreviewFocus
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import kotlinx.coroutines.delay
@@ -74,9 +71,7 @@ private fun RangeSheet(variant: NullWaveColorVariant) {
         var enabled by remember { mutableStateOf(true) }
         var ticking by remember { mutableStateOf(false) }
         var scrub by remember { mutableStateOf<Long?>(null) }
-        var focusResult by remember { mutableStateOf("Фокус не запрошен") }
-        val focus = remember { FocusRequester() }
-        val inputMode = LocalInputModeManager.current
+        val focus = rememberPreviewFocus()
         val scope = rememberCoroutineScope()
         // Synthetic fixture belongs only to the preview; production takes caller-provided peaks.
         val peaks = remember { List(96) { 0.15f + abs(sin(it * 0.47f)) * 0.8f } }
@@ -91,12 +86,10 @@ private fun RangeSheet(variant: NullWaveColorVariant) {
                 verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.sm)) {
                 NullWaveSectionHeader("Slider / continuous и steps")
                 Text("Завершений: $finishes", style = NullWaveTheme.typography.mono)
-                NullWaveButton("Фокус на громкость", {
-                    focusResult = if (inputMode.requestInputMode(InputMode.Keyboard) && focus.requestFocus()) "Запрос принят" else "Запрос отклонён"
-                })
-                Text(focusResult, style = NullWaveTheme.typography.mono)
+                NullWaveButton("Фокус на громкость", focus::requestFocus)
+                Text(focus.status, style = NullWaveTheme.typography.mono)
                 Text("Громкость: ${(volume * 100).roundToInt()}%")
-                NullWaveSlider(volume, { volume = it }, "Громкость", Modifier.fillMaxWidth().focusRequester(focus),
+                NullWaveSlider(volume, { volume = it }, "Громкость", Modifier.fillMaxWidth().then(focus.modifier),
                     valueDescription = "${(volume * 100).roundToInt()}%", onValueChangeFinished = { finishes++ })
                 Text("Шаг 3 дБ: $stepped")
                 NullWaveSlider(stepped, { stepped = it }, "Усиление", Modifier.fillMaxWidth(), valueRange = -12f..12f, steps = 7,

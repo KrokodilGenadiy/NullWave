@@ -19,10 +19,8 @@ import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -38,6 +36,7 @@ import com.zaus.nullwave.core.designsystem.R
 import com.zaus.nullwave.core.designsystem.components.content.NullWaveCoverArt
 import com.zaus.nullwave.core.designsystem.components.control.iconButton.NullWaveIconButton
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
+import com.zaus.nullwave.core.designsystem.motion.systemAnimationsEnabled
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
 /**
@@ -79,8 +78,7 @@ fun NullWaveMiniPlayer(
     val spacing = NullWaveTheme.spacing
     val source = expandInteractionSource ?: remember { MutableInteractionSource() }
     val focused by source.collectIsFocusedAsState()
-    val scope = rememberCoroutineScope()
-    val animateTitle = !reduceMotion && (scope.coroutineContext[MotionDurationScale]?.scaleFactor ?: 1f) > 0f
+    val animateTitle = !reduceMotion && systemAnimationsEnabled()
     Row(
         modifier.fillMaxWidth().defaultMinSize(minHeight = MiniPlayerMinHeight).background(colors.surface)
             .drawWithCache {

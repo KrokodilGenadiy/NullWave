@@ -24,10 +24,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.InputMode
-import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
@@ -35,6 +31,7 @@ import com.zaus.nullwave.core.designsystem.components.content.NullWaveCoverArt
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButton
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
 import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
+import com.zaus.nullwave.core.designsystem.preview.rememberPreviewFocus
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import kotlinx.coroutines.delay
@@ -85,7 +82,6 @@ private fun PlayerGlowSheet(variant: NullWaveColorVariant) {
         var shuffled by remember { mutableStateOf(false) }
         var repeat by remember { mutableStateOf(NullWaveRepeatMode.Off) }
         var changeScheduled by remember { mutableStateOf(false) }
-        var focusResult by remember { mutableStateOf("Фокус не запрошен") }
         val duration = if (durationKnown) 241_000L else null
         // Match SeekBar's gesture lifetime: a new item, duration or availability cancels the old one.
         val source = remember(media, duration, enabled) { MutableInteractionSource() }
@@ -97,8 +93,7 @@ private fun PlayerGlowSheet(variant: NullWaveColorVariant) {
         val displayPosition = scrub ?: position
         val progress = duration?.let { (displayPosition.toDouble() / it).toFloat().coerceIn(0f, 1f) }
         val scope = rememberCoroutineScope()
-        val focus = remember { FocusRequester() }
-        val inputMode = LocalInputModeManager.current
+        val focus = rememberPreviewFocus()
         val spacing = NullWaveTheme.spacing
         val gutter = NullWaveTheme.dimens.gutter
         // Synthetic peaks are a preview fixture, never a substitute for real audio analysis.
@@ -222,7 +217,7 @@ private fun PlayerGlowSheet(variant: NullWaveColorVariant) {
                         itemVerticalAlignment = Alignment.CenterVertically,
                     ) {
                         NullWavePlayPauseButton(
-                            isPlaying = playing, onClick = play, modifier = Modifier.focusRequester(focus),
+                            isPlaying = playing, onClick = play, modifier = focus.modifier,
                             buffering = buffering, enabled = enabled, reduceMotion = reduced, glowEnabled = playGlow,
                         )
                         NullWavePlayPauseButton(
@@ -234,11 +229,8 @@ private fun PlayerGlowSheet(variant: NullWaveColorVariant) {
                             buffering = true, enabled = false, reduceMotion = reduced, glowEnabled = true,
                         )
                     }
-                    NullWaveButton("Фокус на Hero в сравнении", {
-                        focusResult = if (inputMode.requestInputMode(InputMode.Keyboard) && focus.requestFocus())
-                            "Запрос принят" else "Запрос отклонён"
-                    })
-                    Text(focusResult, style = NullWaveTheme.typography.mono)
+                    NullWaveButton("Фокус на Hero в сравнении", focus::requestFocus)
+                    Text(focus.status, style = NullWaveTheme.typography.mono)
                     Text("Glow статичен: Reduce motion останавливает scanner буферизации, а свечение остаётся. " +
                         "Выключение Glow не убирает focus border и тонкий playhead.",
                         style = NullWaveTheme.typography.caption)

@@ -34,11 +34,13 @@ internal class PlayerLineGlow(color: Color, radiusPx: Float, opacity: Float) {
 
     fun drawPath(scope: DrawScope, path: Path) = with(scope) {
         layers.forEach { layer ->
-            drawPath(path, layer.color, style = Stroke(layer.width, join = StrokeJoin.Round))
+            drawPath(path, layer.color, style = layer.stroke)
         }
     }
 
-    private data class Layer(val color: Color, val width: Float)
+    private class Layer(val color: Color, val width: Float) {
+        val stroke = Stroke(width, join = StrokeJoin.Round)
+    }
 }
 
 private const val HaloLayers = 12

@@ -1,9 +1,7 @@
 package com.zaus.nullwave.core.designsystem.components.control.selection
 
 import androidx.compose.foundation.border
-import androidx.compose.foundation.interaction.FocusInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,7 +19,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -30,7 +27,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -45,6 +41,7 @@ import com.zaus.nullwave.core.designsystem.components.control.rockerSwitch.NullW
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveMicroLabel
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
 import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
+import com.zaus.nullwave.core.designsystem.preview.PreviewInteractionSample
 import com.zaus.nullwave.core.designsystem.preview.rememberPreviewFocus
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
@@ -196,16 +193,13 @@ private fun SelectionSample(
     pressed: Boolean = false,
     focused: Boolean = false,
 ) {
-    val source = remember { MutableInteractionSource() }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        SelectionPreviewControl(
-            kind, checked, {}, enabled,
-            Modifier.semantics { contentDescription = label }, source,
-        )
+        PreviewInteractionSample(pressed = pressed, focused = focused) { source ->
+            SelectionPreviewControl(
+                kind, checked, {}, enabled,
+                Modifier.semantics { contentDescription = label }, source,
+            )
+        }
         Text(label, style = NullWaveTheme.typography.caption)
-    }
-    LaunchedEffect(source, pressed, focused) {
-        if (pressed) source.emit(PressInteraction.Press(Offset.Zero))
-        if (focused) source.emit(FocusInteraction.Focus())
     }
 }

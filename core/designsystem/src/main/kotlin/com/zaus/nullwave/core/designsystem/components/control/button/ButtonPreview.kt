@@ -1,8 +1,5 @@
 package com.zaus.nullwave.core.designsystem.components.control.button
 
-import androidx.compose.foundation.interaction.FocusInteraction
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -13,14 +10,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
@@ -28,6 +23,7 @@ import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveMicroLab
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
+import com.zaus.nullwave.core.designsystem.preview.PreviewInteractionSample
 import com.zaus.nullwave.core.designsystem.preview.rememberPreviewFocus
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
@@ -138,22 +134,18 @@ private fun ButtonSheet(variant: NullWaveColorVariant) {
     }
 }
 
-/** Emits through the real interaction API; no forced visual-state flags in production code. */
 @Composable
 private fun InteractionSample(variant: NullWaveButtonVariant, focused: Boolean, pressed: Boolean) {
-    val source = remember { MutableInteractionSource() }
-    NullWaveButton(
-        label = when {
-            focused && pressed -> "Focus + press"
-            focused -> "Focused"
-            else -> "Pressed"
-        },
-        onClick = {},
-        variant = variant,
-        interactionSource = source,
-    )
-    LaunchedEffect(source, focused, pressed) {
-        if (focused) source.emit(FocusInteraction.Focus())
-        if (pressed) source.emit(PressInteraction.Press(Offset.Zero))
+    PreviewInteractionSample(pressed = pressed, focused = focused) { source ->
+        NullWaveButton(
+            label = when {
+                focused && pressed -> "Focus + press"
+                focused -> "Focused"
+                else -> "Pressed"
+            },
+            onClick = {},
+            variant = variant,
+            interactionSource = source,
+        )
     }
 }

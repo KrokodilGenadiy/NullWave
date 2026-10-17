@@ -1,7 +1,5 @@
 package com.zaus.nullwave.core.designsystem.components.control.textField
 
-import androidx.compose.foundation.interaction.FocusInteraction
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,7 +11,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +31,7 @@ import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionH
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.designsystem.modifier.NullWaveBorderStyle
 import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
+import com.zaus.nullwave.core.designsystem.preview.PreviewInteractionSample
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColorVariant
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
@@ -116,9 +114,9 @@ private fun TextFieldSheet(variant: NullWaveColorVariant = NullWaveColorVariant.
                 NullWaveTextField("Ошибка", {}, "Error", isError = true, supportingText = "Такое имя уже существует")
                 NullWaveTextField("Ошибка без пояснения", {}, "Error / fallback", isError = true)
                 for (style in NullWaveBorderStyle.entries) {
-                    val source = remember(style) { MutableInteractionSource() }
-                    NullWaveTextField("Focused", {}, "${style.name} / focus", interactionSource = source, borderStyle = style)
-                    LaunchedEffect(source) { source.emit(FocusInteraction.Focus()) }
+                    PreviewInteractionSample(focused = true) { source ->
+                        NullWaveTextField("Focused", {}, "${style.name} / focus", interactionSource = source, borderStyle = style)
+                    }
                 }
                 NullWaveMicroLabel("Конец витрины · IME и выделение проверить вручную")
             }

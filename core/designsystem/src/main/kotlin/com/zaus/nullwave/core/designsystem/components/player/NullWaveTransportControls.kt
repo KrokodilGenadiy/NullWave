@@ -86,7 +86,7 @@ fun NullWaveTransportControls(
         if (onRepeatClick != null) RepeatButton(repeatMode, onRepeatClick, enabled) else Spacer(Modifier.size(target))
     }
     BoxWithConstraints(modifier.fillMaxWidth()) {
-        val wide = hasModes && maxWidth >= HeroTransportSize + target * 4 + spacing.xxs * 4
+        val wide = hasModes && maxWidth >= HeroPlayPauseSize + target * 4 + spacing.xxs * 4
         if (wide) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 shuffleControl(); previous(); playPause(); next(); repeatControl()
@@ -139,7 +139,6 @@ private fun Modifier.modeMarker(active: Boolean, tint: Color): Modifier = if (!a
         Offset(center.x + ModeMarkerWidth.toPx() / 2f, size.height - ModeMarkerInset.toPx()), ModeMarkerStroke.toPx())
 }
 
-private val HeroTransportSize = 76.dp
 private val RepeatOneSize = 10.dp
 private val ModeMarkerWidth = 8.dp
 private val ModeMarkerInset = 5.dp

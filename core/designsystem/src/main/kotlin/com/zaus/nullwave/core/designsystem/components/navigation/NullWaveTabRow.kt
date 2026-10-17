@@ -19,15 +19,14 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextLayoutResult
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveDivider
+import com.zaus.nullwave.core.designsystem.motion.systemAnimationsEnabled
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
 @Immutable
@@ -55,8 +54,7 @@ fun NullWaveTabRow(
 ) {
     require(selectedIndex in items.indices) { "Selected index must identify an existing tab" }
     val colors = NullWaveTheme.colors
-    val scope = rememberCoroutineScope()
-    val animationsEnabled = (scope.coroutineContext[MotionDurationScale]?.scaleFactor ?: 1f) > 0f
+    val animationsEnabled = systemAnimationsEnabled()
     val animation = remember(items, reduceMotion, animationsEnabled) {
         TabAnimation(items.size, selectedIndex, reduceMotion)
     }

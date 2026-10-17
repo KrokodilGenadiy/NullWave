@@ -6,25 +6,27 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.MotionDurationScale
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.translate
+import com.zaus.nullwave.core.designsystem.motion.systemAnimationsEnabled
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
 /** Decorative indeterminate artwork state. Only composed while loading; no percentage or live region. */
 @Composable
 internal fun ArtworkLoadingScanner(reduceMotion: Boolean) {
-    val scope = rememberCoroutineScope()
-    val animate = !reduceMotion && (scope.coroutineContext[MotionDurationScale]?.scaleFactor ?: 1f) > 0f
+    val animate = !reduceMotion && systemAnimationsEnabled()
     val phase = if (animate) {
         rememberInfiniteTransition(label = "Artwork scan").animateFloat(
             initialValue = 0f, targetValue = 1f,
@@ -34,9 +36,9 @@ internal fun ArtworkLoadingScanner(reduceMotion: Boolean) {
     } else rememberUpdatedState(0.5f)
     val colors = NullWaveTheme.colors
     val stroke = NullWaveTheme.dimens.hairline
-    Canvas(Modifier.fillMaxSize()) {
+    Spacer(Modifier.fillMaxSize().drawWithCache {
         val extent = size.minDimension
-        if (extent <= 0f) return@Canvas
+        if (extent <= 0f) return@drawWithCache onDrawBehind {}
         val edge = extent * FrameFraction
         val left = (size.width - edge) / 2f
         val top = (size.height - edge) / 2f
@@ -44,13 +46,20 @@ internal fun ArtworkLoadingScanner(reduceMotion: Boolean) {
         val bottom = top + edge
         val width = stroke.toPx().coerceAtLeast(1f).coerceAtMost(edge / 12f)
         val corner = edge * CornerFraction
-        // Open corner brackets stay still; only the central scan moves.
-        for (x in listOf(left, right)) {
-            for (y in listOf(top, bottom)) {
-                val dx = if (x == left) corner else -corner
-                val dy = if (y == top) corner else -corner
-                drawLine(colors.textSecondary, Offset(x, y), Offset(x + dx, y), width)
-                drawLine(colors.textSecondary, Offset(x, y), Offset(x, y + dy), width)
+        val lineStyle = Stroke(width)
+        val corners = Path().apply {
+            for (horizontal in 0..1) {
+                val x = if (horizontal == 0) left else right
+                val dx = if (horizontal == 0) corner else -corner
+                for (vertical in 0..1) {
+                    val y = if (vertical == 0) top else bottom
+                    val dy = if (vertical == 0) corner else -corner
+                    // Separate arms preserve the original butt-capped lines at each corner.
+                    moveTo(x, y)
+                    lineTo(x + dx, y)
+                    moveTo(x, y)
+                    lineTo(x, y + dy)
+                }
             }
         }
         val inset = edge * ScanInsetFraction
@@ -58,21 +67,34 @@ internal fun ArtworkLoadingScanner(reduceMotion: Boolean) {
         val scanRight = right - inset
         val scanTop = top + inset
         val scanBottom = bottom - inset
-        clipRect(scanLeft, scanTop, scanRight, scanBottom) {
+        val grid = Path().apply {
             for (index in 1..GridLines) {
                 val y = scanTop + (scanBottom - scanTop) * index / (GridLines + 1)
-                drawLine(colors.outline, Offset(scanLeft, y), Offset(scanRight, y), width)
+                moveTo(scanLeft, y)
+                lineTo(scanRight, y)
             }
-            // Read animation state in draw, keeping the surrounding card out of per-frame recomposition.
-            val y = scanTop + width + (scanBottom - scanTop - 2f * width) * phase.value
-            val band = edge * BandFraction
-            drawRect(
-                Brush.verticalGradient(listOf(Color.Transparent, colors.primary.copy(alpha = BandAlpha), Color.Transparent), y - band, y + band),
-                Offset(scanLeft, y - band), Size(scanRight - scanLeft, band * 2f),
-            )
-            drawLine(colors.primary, Offset(scanLeft, y), Offset(scanRight, y), width)
         }
-    }
+        val band = edge * BandFraction
+        val beam = Brush.verticalGradient(
+            listOf(Color.Transparent, colors.primary.copy(alpha = BandAlpha), Color.Transparent),
+            startY = -band,
+            endY = band,
+        )
+        val beamSize = Size(scanRight - scanLeft, band * 2f)
+        onDrawBehind {
+            // Open corner brackets stay still; only the central scan moves.
+            drawPath(corners, colors.textSecondary, style = lineStyle)
+            clipRect(scanLeft, scanTop, scanRight, scanBottom) {
+                drawPath(grid, colors.outline, style = lineStyle)
+                // Read only during drawing; the cached brush moves with the scan line.
+                val y = scanTop + width + (scanBottom - scanTop - 2f * width) * phase.value
+                translate(top = y) {
+                    drawRect(beam, Offset(scanLeft, -band), beamSize)
+                    drawLine(colors.primary, Offset(scanLeft, 0f), Offset(scanRight, 0f), width)
+                }
+            }
+        }
+    })
 }
 
 private const val ScanPassMillis = 1400
