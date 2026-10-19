@@ -1,8 +1,10 @@
 package com.zaus.nullwave.di
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
+import androidx.test.platform.app.InstrumentationRegistry
 import com.zaus.nullwave.core.mvi.BaseMviViewModel
 import com.zaus.nullwave.core.mvi.UiEffect
 import com.zaus.nullwave.core.mvi.UiIntent
@@ -15,7 +17,9 @@ import dev.zacsweers.metro.AssistedFactory
 import dev.zacsweers.metro.AssistedInject
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.DependencyGraph
+import dev.zacsweers.metro.ForScope
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactory
 import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactoryKey
@@ -27,6 +31,12 @@ import kotlinx.coroutines.awaitCancellation
 internal interface RestorationGraph : ViewModelGraph {
     val dependency: RestorationDependency
     val entryProviderInstallers: Set<EntryProviderInstaller>
+
+    // AppScope also aggregates real feature factories, which now require platform bindings.
+    @Provides
+    @ForScope(AppScope::class)
+    fun applicationContext(): Context =
+        InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
 }
 
 @Inject
