@@ -18,4 +18,5 @@ dependencies {
     implementation(project(":core:navigation"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:mvi"))
+    implementation(libs.androidx.lifecycle.viewmodel.savedstate)
 }

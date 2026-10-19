@@ -1,0 +1,4 @@
+<resources>
+    <string name="library_load_failed">Не удалось загрузить аудиотеку. Попробуйте ещё раз.</string>
+    <string name="library_refresh_failed">Не удалось обновить библиотеку. Показаны предыдущие результаты.</string>
+</resources>
