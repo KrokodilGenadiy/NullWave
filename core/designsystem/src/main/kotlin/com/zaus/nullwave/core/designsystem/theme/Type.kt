@@ -13,8 +13,8 @@ import androidx.compose.ui.unit.sp
 import com.zaus.nullwave.core.designsystem.R
 
 /**
- * Chakra Petch — Latin branding only (for example, NULLWAVE).
- * Localized interface text uses Exo 2, whose glyph coverage includes Cyrillic and Latin.
+ * Original Chakra Petch family for Latin branding (for example, NULLWAVE).
+ * Interface headings use [NullWaveHeading], which adds an explicit Exo 2 glyph fallback.
  */
 val ChakraPetch: FontFamily = FontFamily(
     Font(R.font.chakra_petch_regular, FontWeight.Normal),
@@ -23,7 +23,7 @@ val ChakraPetch: FontFamily = FontFamily(
     Font(R.font.chakra_petch_bold, FontWeight.Bold),
 )
 
-/** Shared heading family for Cyrillic, Latin and mixed-language titles. */
+/** Exo 2 reference family. Its glyphs supply Cyrillic in [NullWaveHeading]. */
 val Exo2: FontFamily = FontFamily(
     variableFont(R.font.exo2_variable, FontWeight.Medium),
     variableFont(R.font.exo2_variable, FontWeight.SemiBold),
@@ -67,11 +67,11 @@ private fun variableFont(resId: Int, weight: FontWeight) = Font(
  */
 @Immutable
 data class NullWaveTypography(
-    /** Display 28/32 — Exo 2 700. Expanded player title, empty-state headlines. */
+    /** Display 28/32 — Chakra Petch / Exo 2 700. Expanded player title, empty-state headlines. */
     val display: TextStyle,
-    /** H1 22/28 — Exo 2 600. Screen headers, album and artist names on detail screens. */
+    /** H1 22/28 — Chakra Petch / Exo 2 600. Screen headers and detail titles. */
     val h1: TextStyle,
-    /** H2 18/24 — Exo 2 500. Top app bar title, dialog titles, section headers. */
+    /** H2 18/24 — Chakra Petch / Exo 2 500. Top app bar, dialog and section titles. */
     val h2: TextStyle,
     /** Body 15/22 — Inter 400. Track titles and list content. */
     val body: TextStyle,
@@ -83,29 +83,29 @@ data class NullWaveTypography(
     val micro: TextStyle,
     /** Tabular mono 12/16 — elapsed/remaining, dB readouts, bitrates, file sizes. */
     val mono: TextStyle,
-    /** Button label 14 — Exo 2 700, 0.08em, uppercase at the call site. */
+    /** Button label 14 — Chakra Petch / Exo 2 700, 0.08em, uppercase at the call site. */
     val button: TextStyle,
-    /** Tab label 13 — Exo 2 600, 0.14em, uppercase at the call site. */
+    /** Tab label 13 — Chakra Petch / Exo 2 600, 0.14em, uppercase at the call site. */
     val tab: TextStyle,
 ) {
     companion object {
         val Default: NullWaveTypography = NullWaveTypography(
             display = TextStyle(
-                fontFamily = Exo2,
+                fontFamily = NullWaveHeading,
                 fontWeight = FontWeight.Bold,
                 fontSize = 28.sp,
                 lineHeight = 32.sp,
                 letterSpacing = 0.04.em,
             ),
             h1 = TextStyle(
-                fontFamily = Exo2,
+                fontFamily = NullWaveHeading,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 22.sp,
                 lineHeight = 28.sp,
                 letterSpacing = 0.06.em,
             ),
             h2 = TextStyle(
-                fontFamily = Exo2,
+                fontFamily = NullWaveHeading,
                 fontWeight = FontWeight.Medium,
                 fontSize = 18.sp,
                 lineHeight = 24.sp,
@@ -144,7 +144,7 @@ data class NullWaveTypography(
                 fontFeatureSettings = "tnum",
             ),
             button = TextStyle(
-                fontFamily = Exo2,
+                fontFamily = NullWaveHeading,
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp,
                 lineHeight = 18.sp,
@@ -152,7 +152,7 @@ data class NullWaveTypography(
                 textAlign = TextAlign.Center,
             ),
             tab = TextStyle(
-                fontFamily = Exo2,
+                fontFamily = NullWaveHeading,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp,
                 lineHeight = 18.sp,
