@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveMicroLabel
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
+import com.zaus.nullwave.core.designsystem.modifier.NullWaveBorderStyle
 import com.zaus.nullwave.core.designsystem.preview.NullWavePreviewSurface
 import com.zaus.nullwave.core.designsystem.preview.PreviewInteractionSample
 import com.zaus.nullwave.core.designsystem.preview.rememberPreviewFocus
@@ -88,12 +89,14 @@ private fun ButtonSheet(variant: NullWaveColorVariant) {
                 )
                 NullWaveMicroLabel(startFocus.status)
                 NullWaveMicroLabel("Start меняет размер только при изменении самой подписи. Загрузка не увеличивает счётчик повторно.")
-                NullWaveSectionHeader("Compact / 48 dp")
+                NullWaveSectionHeader("Compact / body 28 · touch 48 dp")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
                     NullWaveButton("СОРТ. · А–Я ▲", { clicks++ },
-                        variant = NullWaveButtonVariant.Neutral, size = NullWaveButtonSize.Compact)
+                        variant = NullWaveButtonVariant.Neutral, size = NullWaveButtonSize.Compact,
+                        borderStyle = NullWaveBorderStyle.ClippedCorners)
                     NullWaveButton("ФИЛЬТР", { clicks++ },
-                        variant = NullWaveButtonVariant.Neutral, size = NullWaveButtonSize.Compact)
+                        variant = NullWaveButtonVariant.Secondary, size = NullWaveButtonSize.Compact,
+                        borderStyle = NullWaveBorderStyle.ClippedCorners)
                 }
                 NullWaveButton(
                     label = "Короткая / Short",

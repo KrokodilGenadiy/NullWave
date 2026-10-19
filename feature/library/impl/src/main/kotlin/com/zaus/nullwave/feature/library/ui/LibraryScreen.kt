@@ -92,7 +92,7 @@ internal fun LibraryScreen(
 ) {
     val spacing = NullWaveTheme.spacing
     val ready = state.body as? LibraryBody.Ready
-    var sortVisible by rememberSaveable { mutableStateOf(false) }
+    var filtersVisible by rememberSaveable { mutableStateOf(false) }
     NullWaveScaffold(
         modifier = Modifier.fillMaxSize().testTag("library_screen"),
         topBar = {
@@ -149,7 +149,7 @@ internal fun LibraryScreen(
                         ) {
                             NullWaveSectionHeader(stringResource(R.string.library_tracks),
                                 supportingText = pluralStringResource(R.plurals.library_track_count, body.tracks.size, body.tracks.size))
-                            LibrarySortButton(state.query, onClick = { sortVisible = true })
+                            LibraryFiltersButton(state.query, onClick = { filtersVisible = true })
                         }
                     }
                     when (val refresh = body.refresh) {
@@ -180,7 +180,7 @@ internal fun LibraryScreen(
             }
         }
     }
-    if (sortVisible) LibrarySortDialog(state.query, onIntent, onDismiss = { sortVisible = false })
+    if (filtersVisible) LibraryFiltersDialog(state.query, onIntent, onDismiss = { filtersVisible = false })
 }
 
 @Composable

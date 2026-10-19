@@ -16,12 +16,11 @@
     <string name="library_empty_title">No audio found</string>
     <string name="library_empty_body">Access is granted, but the device media catalog has no audio. Add audio files, then refresh the library.</string>
     <string name="library_unknown_artist">Unknown artist</string>
-    <string name="library_sort">Sort tracks</string>
-    <string name="library_sort_current">SORT · %1$s %2$s</string>
-    <string name="library_sort_selection">%1$s, %2$s</string>
-    <string name="library_sort_title_short">A–Z</string>
-    <string name="library_sort_artist_short">ARTIST</string>
-    <string name="library_sort_added_short">ADDED</string>
+    <string name="library_filters">Filters</string>
+    <string name="library_filters_action">FILTER</string>
+    <string name="library_sort">Sort by</string>
+    <string name="library_sort_direction">Order</string>
+    <string name="library_sort_selection">Sort: %1$s, %2$s</string>
     <string name="library_sort_title">Title</string>
     <string name="library_sort_artist">Artist</string>
     <string name="library_sort_added">Date added</string>

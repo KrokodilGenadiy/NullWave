@@ -12,6 +12,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButton
 import com.zaus.nullwave.core.designsystem.components.control.radioButton.NullWaveRadioButton
 import com.zaus.nullwave.core.designsystem.components.overlay.NullWaveDialog
@@ -31,12 +33,14 @@ internal fun LibrarySort.label(): Int = when (this) {
 }
 
 @Composable
-internal fun LibrarySortDialog(query: LibraryQuery, onIntent: (LibraryIntent) -> Unit, onDismiss: () -> Unit) {
+internal fun LibraryFiltersDialog(query: LibraryQuery, onIntent: (LibraryIntent) -> Unit, onDismiss: () -> Unit) {
     NullWaveDialog(
-        title = stringResource(R.string.library_sort),
+        title = stringResource(R.string.library_filters),
         onDismissRequest = onDismiss,
         actions = { NullWaveButton(stringResource(R.string.library_done), onDismiss) },
     ) {
+        Text(stringResource(R.string.library_sort), Modifier.semantics { heading() },
+            style = NullWaveTheme.typography.micro)
         Column(Modifier.selectableGroup()) {
             LibrarySort.entries.forEach { sort ->
                 SortOption(stringResource(sort.label()), query.sort == sort) {
@@ -45,6 +49,8 @@ internal fun LibrarySortDialog(query: LibraryQuery, onIntent: (LibraryIntent) ->
             }
         }
         NullWaveDivider()
+        Text(stringResource(R.string.library_sort_direction), Modifier.semantics { heading() },
+            style = NullWaveTheme.typography.micro)
         Column(Modifier.selectableGroup()) {
             SortDirection.entries.forEach { direction ->
                 SortOption(stringResource(if (direction == SortDirection.Ascending) R.string.library_ascending

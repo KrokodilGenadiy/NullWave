@@ -57,11 +57,11 @@ private fun LibraryLargeTextPreview() {
     }
 }
 
-@Preview(name = "Library sort - RU", widthDp = 360, heightDp = 640, locale = "ru")
-@Preview(name = "Library sort - EN", widthDp = 360, heightDp = 640, locale = "en")
-@Preview(name = "Library sort - Large text", widthDp = 320, heightDp = 640, fontScale = 2f, locale = "ru")
+@Preview(name = "Library filters - RU", widthDp = 360, heightDp = 640, locale = "ru")
+@Preview(name = "Library filters - EN", widthDp = 360, heightDp = 640, locale = "en")
+@Preview(name = "Library filters - Large text", widthDp = 320, heightDp = 640, fontScale = 2f, locale = "ru")
 @Composable
-private fun LibrarySortPreview() {
+private fun LibraryFiltersPreview() {
     var query by remember { mutableStateOf(LibraryQuery("ru")) }
     NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
         LibraryScreen(

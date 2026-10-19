@@ -11,6 +11,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertTouchHeightIsEqualTo
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -113,13 +114,19 @@ class LibraryScreenInstrumentedTest {
     }
 
     @Test
-    fun sortDialogUsesCurrentQueryAndSendsBothArguments() {
+    fun filtersContainSortAndKeepSelectionWhenReopened() {
         robot.show(LibraryBody.Ready(listOf(track)))
-        compose.onNodeWithTag("library_sort").assertHeightIsAtLeast(48.dp)
+        compose.onNodeWithTag("library_sort").assertDoesNotExist()
+        compose.onNodeWithText(robot.text(R.string.library_filters_action)).assertIsDisplayed()
+        compose.onNodeWithTag("library_filters").assertHeightIsAtLeast(28.dp)
+            .assertTouchHeightIsEqualTo(48.dp)
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,
                 robot.text(R.string.library_sort_selection, robot.text(R.string.library_sort_title),
                     robot.text(R.string.library_ascending))))
-        compose.onNodeWithTag("library_sort").performClick()
+        compose.onNodeWithTag("library_filters").performClick()
+        compose.onNodeWithText(robot.text(R.string.library_filters)).assertIsDisplayed()
+        compose.onNodeWithText(robot.text(R.string.library_sort)).assertIsDisplayed()
+        compose.onNodeWithText(robot.text(R.string.library_sort_direction)).assertIsDisplayed()
         compose.onNodeWithText(robot.text(R.string.library_sort_artist)).performClick()
         compose.onNodeWithText(robot.text(R.string.library_sort_artist)).assertIsSelected()
         compose.onNodeWithText(robot.text(R.string.library_descending)).performClick()
@@ -128,12 +135,15 @@ class LibraryScreenInstrumentedTest {
         }
         compose.onNodeWithText(robot.text(R.string.library_done)).performClick()
         compose.onNodeWithText(robot.text(R.string.library_descending)).assertDoesNotExist()
-        compose.onNodeWithTag("library_sort").assert(SemanticsMatcher.expectValue(
+        compose.onNodeWithTag("library_filters").assert(SemanticsMatcher.expectValue(
             SemanticsProperties.StateDescription,
             robot.text(R.string.library_sort_selection, robot.text(R.string.library_sort_artist),
                 robot.text(R.string.library_descending))))
-        compose.onNodeWithText(robot.text(R.string.library_sort_current,
-            robot.text(R.string.library_sort_artist_short), "▼")).assertIsDisplayed()
+        compose.onNodeWithText(robot.text(R.string.library_filters_action)).assertIsDisplayed()
+        compose.onNodeWithTag("library_filters").performClick()
+        compose.onNodeWithText(robot.text(R.string.library_sort_artist)).assertIsSelected()
+        compose.onNodeWithText(robot.text(R.string.library_descending)).assertIsSelected()
+        compose.onNodeWithText(robot.text(R.string.library_done)).performClick()
     }
 
     @Test

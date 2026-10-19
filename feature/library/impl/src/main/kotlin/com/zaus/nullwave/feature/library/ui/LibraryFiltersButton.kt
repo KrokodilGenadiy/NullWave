@@ -10,31 +10,27 @@ import androidx.compose.ui.semantics.stateDescription
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButton
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButtonSize
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButtonVariant
+import com.zaus.nullwave.core.designsystem.modifier.NullWaveBorderStyle
 import com.zaus.nullwave.feature.library.api.model.LibraryQuery
-import com.zaus.nullwave.feature.library.api.model.LibrarySort
 import com.zaus.nullwave.feature.library.api.model.SortDirection
 import com.zaus.nullwave.feature.library.impl.R
 
 @Composable
-internal fun LibrarySortButton(query: LibraryQuery, onClick: () -> Unit) {
+internal fun LibraryFiltersButton(query: LibraryQuery, onClick: () -> Unit) {
     val ascending = query.direction == SortDirection.Ascending
-    val sortLabel = stringResource(when (query.sort) {
-        LibrarySort.Title -> R.string.library_sort_title_short
-        LibrarySort.Artist -> R.string.library_sort_artist_short
-        LibrarySort.RecentlyAdded -> R.string.library_sort_added_short
-    })
-    val actionDescription = stringResource(R.string.library_sort)
+    val actionDescription = stringResource(R.string.library_filters)
     val selectionDescription = stringResource(R.string.library_sort_selection,
         stringResource(query.sort.label()),
         stringResource(if (ascending) R.string.library_ascending else R.string.library_descending))
     NullWaveButton(
-        label = stringResource(R.string.library_sort_current, sortLabel, if (ascending) "▲" else "▼"),
+        label = stringResource(R.string.library_filters_action),
         onClick = onClick,
-        modifier = Modifier.testTag("library_sort").semantics {
+        modifier = Modifier.testTag("library_filters").semantics {
             contentDescription = actionDescription
             stateDescription = selectionDescription
         },
-        variant = NullWaveButtonVariant.Neutral,
+        variant = NullWaveButtonVariant.Secondary,
+        borderStyle = NullWaveBorderStyle.ClippedCorners,
         size = NullWaveButtonSize.Compact,
     )
 }
