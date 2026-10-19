@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mvi_test_text_format">%1$s · %2$d · %3$.1f</string>
+    <string name="mvi_test_text_nested">Tracks</string>
+    <string name="mvi_test_text_percent" formatted="false">100%</string>
+    <string name="mvi_test_text_wrapped">Value: %1$s</string>
+</resources>
