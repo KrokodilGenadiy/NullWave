@@ -1,4 +1,40 @@
 <resources>
+    <string name="library_title">Библиотека</string>
+    <string name="library_action">О приложении</string>
     <string name="library_load_failed">Не удалось загрузить аудиотеку. Попробуйте ещё раз.</string>
     <string name="library_refresh_failed">Не удалось обновить библиотеку. Показаны предыдущие результаты.</string>
+    <string name="library_tracks">Треки</string>
+    <plurals name="library_track_count">
+        <item quantity="one">%d трек</item>
+        <item quantity="few">%d трека</item>
+        <item quantity="many">%d треков</item>
+        <item quantity="other">%d трека</item>
+    </plurals>
+    <string name="library_loading">Читаем аудиотеку…</string>
+    <string name="library_refreshing">Обновляем библиотеку…</string>
+    <string name="library_refresh">Обновить библиотеку</string>
+    <string name="library_retry">Повторить</string>
+    <string name="library_error_title">Не удалось загрузить библиотеку</string>
+    <string name="library_empty_title">Аудиофайлы не найдены</string>
+    <string name="library_empty_body">Доступ разрешён, но в медиакаталоге устройства нет аудио. Добавьте аудиофайлы и обновите библиотеку.</string>
+    <string name="library_unknown_artist">Неизвестный исполнитель</string>
+    <string name="library_sort">Сортировка треков</string>
+    <string name="library_sort_current">Порядок: %1$s</string>
+    <string name="library_sort_title">Название</string>
+    <string name="library_sort_artist">Исполнитель</string>
+    <string name="library_sort_added">Дата добавления</string>
+    <string name="library_ascending">По возрастанию</string>
+    <string name="library_descending">По убыванию</string>
+    <string name="library_done">Готово</string>
+    <string name="library_access_title">Доступ к аудио</string>
+    <string name="library_access_body">Разрешите доступ к аудио на устройстве, чтобы увидеть библиотеку. Ваши файлы не будут изменены. Остальные разделы приложения доступны и без разрешения.</string>
+    <string name="library_access_rationale">NullWave нужен доступ к аудио для отображения треков из медиакаталога устройства. Разрешение необязательно, его можно отозвать в настройках Android.</string>
+    <string name="library_access_settings_body">Доступ к аудио не предоставлен. Его можно включить в настройках приложения в Android или попробовать запросить ещё раз.</string>
+    <string name="library_grant_access">Разрешить доступ к аудио</string>
+    <string name="library_check_access">Проверить доступ</string>
+    <string name="library_open_settings">Открыть настройки приложения</string>
+    <string name="library_ask_again">Запросить снова</string>
+    <string name="library_continue">Продолжить</string>
+    <string name="library_cancel">Не сейчас</string>
+    <string name="library_access_launch_failed">Не удалось открыть системный диалог. Попробуйте ещё раз или измените доступ к аудио в настройках Android.</string>
 </resources>

@@ -1,7 +1,38 @@
 <resources>
-    <string name="library_title">Библиотека</string>
-    <string name="library_placeholder">Здесь появится ваша музыка.</string>
-    <string name="library_action">О приложении</string>
+    <string name="library_title">Library</string>
+    <string name="library_action">About</string>
     <string name="library_load_failed">Could not load your audio library. Try again.</string>
     <string name="library_refresh_failed">Could not refresh your library. Showing the previous results.</string>
+    <string name="library_tracks">Tracks</string>
+    <plurals name="library_track_count">
+        <item quantity="one">%d track</item>
+        <item quantity="other">%d tracks</item>
+    </plurals>
+    <string name="library_loading">Reading your audio library…</string>
+    <string name="library_refreshing">Refreshing library…</string>
+    <string name="library_refresh">Refresh library</string>
+    <string name="library_retry">Try again</string>
+    <string name="library_error_title">Could not load the library</string>
+    <string name="library_empty_title">No audio found</string>
+    <string name="library_empty_body">Access is granted, but the device media catalog has no audio. Add audio files, then refresh the library.</string>
+    <string name="library_unknown_artist">Unknown artist</string>
+    <string name="library_sort">Sort tracks</string>
+    <string name="library_sort_current">Sort: %1$s</string>
+    <string name="library_sort_title">Title</string>
+    <string name="library_sort_artist">Artist</string>
+    <string name="library_sort_added">Date added</string>
+    <string name="library_ascending">Ascending</string>
+    <string name="library_descending">Descending</string>
+    <string name="library_done">Done</string>
+    <string name="library_access_title">Audio access</string>
+    <string name="library_access_body">Allow access to audio on this device to see your library. Your files will not be changed. You can still use other parts of the app without granting access.</string>
+    <string name="library_access_rationale">NullWave needs audio access to list tracks from the device media catalog. Granting access is optional, and you can revoke it in Android settings.</string>
+    <string name="library_access_settings_body">Audio access has not been granted. You can enable it in Android app settings or try requesting it again.</string>
+    <string name="library_grant_access">Allow audio access</string>
+    <string name="library_check_access">Check access</string>
+    <string name="library_open_settings">Open app settings</string>
+    <string name="library_ask_again">Ask again</string>
+    <string name="library_continue">Continue</string>
+    <string name="library_cancel">Not now</string>
+    <string name="library_access_launch_failed">Could not open the system dialog. Try again, or change audio access in Android settings.</string>
 </resources>

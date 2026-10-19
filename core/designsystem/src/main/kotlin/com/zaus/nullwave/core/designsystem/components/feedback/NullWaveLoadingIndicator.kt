@@ -20,13 +20,15 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
 /**
  * Indeterminate status with a visible label and a static three-bar busy mark.
- * Deliberately motion-free until the shared motion policy is implemented. No fake percentage.
+ * Deliberately motion-free. No fake percentage. Compact slots may hide the visible label while
+ * retaining it in accessibility semantics.
  * Show one indicator for a loading region, rather than labelling every skeleton row.
  */
 @Composable
 fun NullWaveLoadingIndicator(
     modifier: Modifier = Modifier,
     label: String = stringResource(R.string.nw_loading),
+    showLabel: Boolean = true,
 ) {
     require(label.isNotBlank()) { "Loading label must not be blank" }
     val colors = NullWaveTheme.colors
@@ -51,7 +53,7 @@ fun NullWaveLoadingIndicator(
                 )
             }
         }
-        Text(
+        if (showLabel) Text(
             text = label,
             modifier = Modifier.weight(1f, fill = false).clearAndSetSemantics {},
             color = colors.textSecondary,

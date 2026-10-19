@@ -1,0 +1,81 @@
+package com.zaus.nullwave.feature.library.ui
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.PreviewParameter
+import androidx.compose.ui.tooling.preview.PreviewParameterProvider
+import com.zaus.nullwave.core.designsystem.theme.NullWaveEffects
+import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
+import com.zaus.nullwave.core.mvi.ui.UiText
+import com.zaus.nullwave.feature.library.api.model.LibraryQuery
+import com.zaus.nullwave.feature.library.api.model.LibraryTrack
+import com.zaus.nullwave.feature.library.api.model.TrackId
+import com.zaus.nullwave.feature.library.impl.R
+import com.zaus.nullwave.feature.library.presentation.AccessAction
+import com.zaus.nullwave.feature.library.presentation.LibraryBody
+import com.zaus.nullwave.feature.library.presentation.LibraryState
+import com.zaus.nullwave.feature.library.presentation.LibraryIntent
+import com.zaus.nullwave.feature.library.presentation.RefreshState
+import kotlinx.coroutines.delay
+
+private val previewTracks = listOf(
+    LibraryTrack(TrackId("preview:1"), "Low Orbit", "Nullwave", "Transmission", 203_000),
+    LibraryTrack(TrackId("preview:2"), "Очень длинное название трека на дальней орбите", "Необычайно длинное имя исполнителя", null, 4_021_000),
+    LibraryTrack(TrackId("preview:3"), "Untitled recording", null, null, null),
+)
+
+internal class LibraryPreviewStates : PreviewParameterProvider<LibraryState> {
+    override val values = sequenceOf(
+        LibraryBody.Ready(previewTracks), LibraryBody.Loading,
+        LibraryBody.AccessRequired(AccessAction.Request),
+        LibraryBody.AccessRequired(AccessAction.SettingsSuggested),
+        LibraryBody.Ready(emptyList()),
+        LibraryBody.Failed(UiText.Resource(R.string.library_load_failed)),
+        LibraryBody.Ready(previewTracks, RefreshState.Running),
+        LibraryBody.Ready(previewTracks, RefreshState.Failed(UiText.Resource(R.string.library_refresh_failed))),
+    ).map { LibraryState(LibraryQuery("ru"), it) }
+}
+
+@Preview(name = "Library states", widthDp = 360, heightDp = 800, locale = "ru")
+@Composable
+private fun LibraryPreview(@PreviewParameter(LibraryPreviewStates::class) state: LibraryState) {
+    NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
+        LibraryScreen(state, onIntent = {}, onAboutClick = {})
+    }
+}
+
+@Preview(name = "Library large text", widthDp = 320, heightDp = 640, fontScale = 2f, locale = "ru")
+@Composable
+private fun LibraryLargeTextPreview() {
+    NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
+        LibraryScreen(LibraryState(LibraryQuery("ru"), LibraryBody.Ready(previewTracks)), {}, {})
+    }
+}
+
+/** Interactive-only delay lets the reviewer inspect refresh without a real MediaStore query. */
+@Preview(name = "Library refresh without jumps", widthDp = 360, heightDp = 800, locale = "ru")
+@Composable
+private fun LibraryRefreshPreview() {
+    var refreshing by remember { mutableStateOf(false) }
+    val tracks = remember {
+        (1..40).map { previewTracks[it % previewTracks.size].copy(id = TrackId("preview:$it")) }
+    }
+    LaunchedEffect(refreshing) {
+        if (refreshing) {
+            delay(1_500)
+            refreshing = false
+        }
+    }
+    NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
+        LibraryScreen(
+            LibraryState(LibraryQuery("ru"), LibraryBody.Ready(tracks,
+                if (refreshing) RefreshState.Running else RefreshState.Idle)),
+            onIntent = { if (it == LibraryIntent.Refresh) refreshing = true }, onAboutClick = {},
+        )
+    }
+}

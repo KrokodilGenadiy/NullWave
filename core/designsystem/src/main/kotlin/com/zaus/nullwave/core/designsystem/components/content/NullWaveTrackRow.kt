@@ -59,12 +59,14 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
  * then use ellipsis.
  * Full text remains available to accessibility. Height grows from 72 dp with font scale, not tag length.
  * [durationLabel] is preformatted, never computed from media.
+ * With a null [onClick], the row is informational: normal colours, no button role or click action.
+ * Selection and long click require an interactive row; a separate more action remains optional.
  * On narrow windows/large text, metadata moves below the title to preserve readable space.
  */
 @Composable
 fun NullWaveTrackRow(
     title: String,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     durationLabel: String? = null,
@@ -83,6 +85,9 @@ fun NullWaveTrackRow(
     require(title.isNotBlank()) { "Track title must not be blank" }
     require(onMoreClick == null || moreDescription.isNotBlank()) { "More action needs a description" }
     require(onLongClick == null || !longClickLabel.isNullOrBlank()) { "Long click needs an action label" }
+    require(onClick != null || (!selectionMode && !selected && onLongClick == null)) {
+        "Selection and long click require a row click action"
+    }
     val colors = NullWaveTheme.colors
     val spacing = NullWaveTheme.spacing
     val dimens = NullWaveTheme.dimens
@@ -119,17 +124,17 @@ fun NullWaveTrackRow(
                     }
                 }
                 .then(if (enabled && focused) Modifier.border(dimens.focusBorder, colors.textPrimary, RectangleShape) else Modifier)
-                .semantics {
+                .semantics(mergeDescendants = onClick == null) {
                     if (choosing) toggleableState = if (selected) ToggleableState.On else ToggleableState.Off
                     if (playingDescription != null) stateDescription = playingDescription
                 }
-                .combinedClickable(
+                .then(if (onClick != null) Modifier.combinedClickable(
                     interactionSource = source, indication = ripple(), enabled = enabled,
                     role = if (choosing) Role.Checkbox else Role.Button,
                     onClick = { if (enabled) onClick() },
                     onLongClick = onLongClick?.let { action -> { if (enabled) action() } },
                     onLongClickLabel = longClickLabel,
-                )
+                ) else Modifier)
                 .padding(horizontal = dimens.gutter, vertical = spacing.sm),
             horizontalArrangement = Arrangement.spacedBy(spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
