@@ -17,5 +17,6 @@ class AppGraphInstrumentedTest {
         assertSame(graph, application.appGraph)
         assertSame(application, graph.application)
         assertSame(application, graph.applicationContext)
+        assertSame(graph.metroViewModelFactory, graph.metroViewModelFactory)
     }
 }

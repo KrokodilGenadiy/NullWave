@@ -14,11 +14,10 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
-        val entryProviderInstallers = (application as NullWaveApplication)
-            .appGraph.entryProviderInstallers
+        val graph = (application as NullWaveApplication).appGraph
         setContent {
             NullWaveTheme {
-                NullWaveNavigation(entryProviderInstallers)
+                NullWaveNavigation(graph.entryProviderInstallers, graph.metroViewModelFactory)
             }
         }
     }

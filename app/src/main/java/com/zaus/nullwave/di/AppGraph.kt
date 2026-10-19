@@ -8,9 +8,10 @@ import dev.zacsweers.metro.Binds
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.ForScope
 import dev.zacsweers.metro.Provides
+import dev.zacsweers.metrox.viewmodel.ViewModelGraph
 
 @DependencyGraph(AppScope::class)
-interface AppGraph {
+interface AppGraph : ViewModelGraph {
     val entryProviderInstallers: Set<EntryProviderInstaller>
 
     val application: Application

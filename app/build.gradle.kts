@@ -28,6 +28,7 @@ android {
 dependencies {
     implementation(project(":feature:library:api"))
     implementation(libs.androidx.navigation3.ui)
+    implementation(libs.androidx.lifecycle.viewmodel.navigation3)
     implementation(project(":core:di"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:navigation"))
@@ -54,6 +55,8 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(project(":core:mvi"))
+    androidTestImplementation(project(":feature:about:api"))
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

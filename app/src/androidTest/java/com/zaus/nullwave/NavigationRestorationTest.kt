@@ -21,7 +21,10 @@ class NavigationRestorationTest {
         val restoration = StateRestorationTester(compose)
         restoration.setContent {
             NullWaveTheme {
-                NullWaveNavigation(application.appGraph.entryProviderInstallers)
+                NullWaveNavigation(
+                    application.appGraph.entryProviderInstallers,
+                    application.appGraph.metroViewModelFactory,
+                )
             }
         }
 
