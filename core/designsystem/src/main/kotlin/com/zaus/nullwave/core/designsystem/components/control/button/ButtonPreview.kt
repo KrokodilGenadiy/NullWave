@@ -88,6 +88,13 @@ private fun ButtonSheet(variant: NullWaveColorVariant) {
                 )
                 NullWaveMicroLabel(startFocus.status)
                 NullWaveMicroLabel("Start меняет размер только при изменении самой подписи. Загрузка не увеличивает счётчик повторно.")
+                NullWaveSectionHeader("Compact / 48 dp")
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                    NullWaveButton("СОРТ. · А–Я ▲", { clicks++ },
+                        variant = NullWaveButtonVariant.Neutral, size = NullWaveButtonSize.Compact)
+                    NullWaveButton("ФИЛЬТР", { clicks++ },
+                        variant = NullWaveButtonVariant.Neutral, size = NullWaveButtonSize.Compact)
+                }
                 NullWaveButton(
                     label = "Короткая / Short",
                     onClick = { clicks++ },

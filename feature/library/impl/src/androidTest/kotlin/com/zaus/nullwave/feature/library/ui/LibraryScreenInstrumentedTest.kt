@@ -7,6 +7,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -111,6 +115,10 @@ class LibraryScreenInstrumentedTest {
     @Test
     fun sortDialogUsesCurrentQueryAndSendsBothArguments() {
         robot.show(LibraryBody.Ready(listOf(track)))
+        compose.onNodeWithTag("library_sort").assertHeightIsAtLeast(48.dp)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,
+                robot.text(R.string.library_sort_selection, robot.text(R.string.library_sort_title),
+                    robot.text(R.string.library_ascending))))
         compose.onNodeWithTag("library_sort").performClick()
         compose.onNodeWithText(robot.text(R.string.library_sort_artist)).performClick()
         compose.onNodeWithText(robot.text(R.string.library_sort_artist)).assertIsSelected()
@@ -120,6 +128,12 @@ class LibraryScreenInstrumentedTest {
         }
         compose.onNodeWithText(robot.text(R.string.library_done)).performClick()
         compose.onNodeWithText(robot.text(R.string.library_descending)).assertDoesNotExist()
+        compose.onNodeWithTag("library_sort").assert(SemanticsMatcher.expectValue(
+            SemanticsProperties.StateDescription,
+            robot.text(R.string.library_sort_selection, robot.text(R.string.library_sort_artist),
+                robot.text(R.string.library_descending))))
+        compose.onNodeWithText(robot.text(R.string.library_sort_current,
+            robot.text(R.string.library_sort_artist_short), "▼")).assertIsDisplayed()
     }
 
     @Test
@@ -136,7 +150,7 @@ private class LibraryScreenRobot(private val compose: ComposeContentTestRule) {
     val intents = mutableListOf<LibraryIntent>()
     private val state = mutableStateOf(LibraryState(LibraryQuery("en")))
     var aboutClicks = 0
-    fun text(id: Int) = InstrumentationRegistry.getInstrumentation().targetContext.getString(id)
+    fun text(id: Int, vararg args: Any) = InstrumentationRegistry.getInstrumentation().targetContext.getString(id, *args)
 
     fun show(body: LibraryBody, access: LibraryAccessUi = LibraryAccessUi(),
              fontScale: Float = 1f, direction: LayoutDirection = LayoutDirection.Ltr) = apply {

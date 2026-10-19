@@ -149,11 +149,7 @@ internal fun LibraryScreen(
                         ) {
                             NullWaveSectionHeader(stringResource(R.string.library_tracks),
                                 supportingText = pluralStringResource(R.plurals.library_track_count, body.tracks.size, body.tracks.size))
-                            NullWaveButton(
-                                stringResource(R.string.library_sort_current, stringResource(state.query.sort.label())),
-                                { sortVisible = true }, variant = NullWaveButtonVariant.Neutral,
-                                leadingIcon = NullWaveIcons.Sort, modifier = Modifier.testTag("library_sort"),
-                            )
+                            LibrarySortButton(state.query, onClick = { sortVisible = true })
                         }
                     }
                     when (val refresh = body.refresh) {

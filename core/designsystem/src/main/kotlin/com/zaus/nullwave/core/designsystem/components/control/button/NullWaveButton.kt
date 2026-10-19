@@ -36,6 +36,9 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
 enum class NullWaveButtonVariant { Primary, Secondary, Neutral, Danger }
 
+/** Compact uses a mono label and smaller padding, while retaining a minimum 48 dp target. */
+enum class NullWaveButtonSize { Regular, Compact }
+
 /**
  * Labelled action with a decorative leading icon. Preserves label casing and allows wrapping.
  * [loading] blocks clicks and keeps the original content measured, so its size stays unchanged
@@ -55,6 +58,7 @@ fun NullWaveButton(
     @DrawableRes leadingIcon: Int? = null,
     interactionSource: MutableInteractionSource? = null,
     borderStyle: NullWaveBorderStyle = NullWaveBorderStyle.Closed,
+    size: NullWaveButtonSize = NullWaveButtonSize.Regular,
 ) {
     val interactions = interactionSource ?: remember { MutableInteractionSource() }
     val pressed by interactions.collectIsPressedAsState()
@@ -127,7 +131,10 @@ fun NullWaveButton(
         ),
         elevation = null,
         border = if (clippedBorder) null else border,
-        contentPadding = PaddingValues(horizontal = spacing.lg, vertical = spacing.sm),
+        contentPadding = when (size) {
+            NullWaveButtonSize.Regular -> PaddingValues(horizontal = spacing.lg, vertical = spacing.sm)
+            NullWaveButtonSize.Compact -> PaddingValues(horizontal = spacing.xs, vertical = spacing.xs)
+        },
         interactionSource = interactions,
     ) {
         Box(contentAlignment = Alignment.Center) {
@@ -143,7 +150,10 @@ fun NullWaveButton(
                     text = label,
                     // Wrap within the space left by the icon without stretching short labels.
                     modifier = Modifier.weight(1f, fill = false),
-                    style = NullWaveTheme.typography.button,
+                    style = when (size) {
+                        NullWaveButtonSize.Regular -> NullWaveTheme.typography.button
+                        NullWaveButtonSize.Compact -> NullWaveTheme.typography.mono
+                    },
                 )
             }
             if (loading) {

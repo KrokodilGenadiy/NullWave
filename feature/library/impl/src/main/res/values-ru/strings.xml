@@ -19,7 +19,11 @@
     <string name="library_empty_body">Доступ разрешён, но в медиакаталоге устройства нет аудио. Добавьте аудиофайлы и обновите библиотеку.</string>
     <string name="library_unknown_artist">Неизвестный исполнитель</string>
     <string name="library_sort">Сортировка треков</string>
-    <string name="library_sort_current">Порядок: %1$s</string>
+    <string name="library_sort_current">СОРТ. · %1$s %2$s</string>
+    <string name="library_sort_selection">%1$s, %2$s</string>
+    <string name="library_sort_title_short">А–Я</string>
+    <string name="library_sort_artist_short">АРТИСТ</string>
+    <string name="library_sort_added_short">ДАТА</string>
     <string name="library_sort_title">Название</string>
     <string name="library_sort_artist">Исполнитель</string>
     <string name="library_sort_added">Дата добавления</string>

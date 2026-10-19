@@ -8,6 +8,7 @@ android {
 }
 
 dependencies {
+    api(libs.kotlinx.coroutines.core)
     api(libs.metrox.viewmodel)
     api(libs.metrox.viewmodel.compose)
     api(libs.androidx.lifecycle.viewmodel.savedstate)

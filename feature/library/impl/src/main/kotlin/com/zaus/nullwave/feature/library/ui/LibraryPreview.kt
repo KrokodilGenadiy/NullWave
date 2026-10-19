@@ -57,6 +57,25 @@ private fun LibraryLargeTextPreview() {
     }
 }
 
+@Preview(name = "Library sort - RU", widthDp = 360, heightDp = 640, locale = "ru")
+@Preview(name = "Library sort - EN", widthDp = 360, heightDp = 640, locale = "en")
+@Preview(name = "Library sort - Large text", widthDp = 320, heightDp = 640, fontScale = 2f, locale = "ru")
+@Composable
+private fun LibrarySortPreview() {
+    var query by remember { mutableStateOf(LibraryQuery("ru")) }
+    NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
+        LibraryScreen(
+            LibraryState(query, LibraryBody.Ready(previewTracks)),
+            onIntent = { intent ->
+                if (intent is LibraryIntent.SortChanged) {
+                    query = query.copy(sort = intent.sort, direction = intent.direction)
+                }
+            },
+            onAboutClick = {},
+        )
+    }
+}
+
 /** Interactive-only delay lets the reviewer inspect refresh without a real MediaStore query. */
 @Preview(name = "Library refresh without jumps", widthDp = 360, heightDp = 800, locale = "ru")
 @Composable
