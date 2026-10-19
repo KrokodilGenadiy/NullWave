@@ -31,6 +31,7 @@ include(
     ":core:navigation",
     ":core:designsystem",
     ":core:mvi",
+    ":core:result",
     ":feature:library:api",
     ":feature:library:impl",
     ":feature:playlists:api",

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mvi_error_access_denied">Нет доступа. Проверьте разрешения приложения.</string>
+    <string name="mvi_error_not_found">Запрашиваемый объект не найден.</string>
+    <string name="mvi_error_storage_full">Недостаточно свободного места.</string>
+    <string name="mvi_error_io">Не удалось прочитать или сохранить данные. Попробуйте ещё раз.</string>
+</resources>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mvi_error_access_denied">Access is not allowed. Check the app permissions.</string>
+    <string name="mvi_error_not_found">The requested item could not be found.</string>
+    <string name="mvi_error_storage_full">There is not enough free storage.</string>
+    <string name="mvi_error_io">Could not read or save the data. Try again.</string>
+</resources>

@@ -1,0 +1,152 @@
+package com.zaus.nullwave.core.mvi.runtime
+
+import com.zaus.nullwave.core.mvi.UiEffect
+import com.zaus.nullwave.core.mvi.UiState
+import com.zaus.nullwave.core.mvi.runtime.effect.EffectEpoch
+import com.zaus.nullwave.core.mvi.runtime.effect.EffectMailbox
+import com.zaus.nullwave.core.mvi.runtime.operation.MviOperation
+import com.zaus.nullwave.core.mvi.runtime.operation.OperationRunner
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingCommand
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+/** The shared, Main-confined engine behind the public definition-based contract. */
+internal class MviRuntime<S : UiState, E : UiEffect>(
+    initialState: S,
+    private val scope: CoroutineScope,
+    sourceStopTimeoutMillis: Long = 5_000,
+    observeSources: suspend () -> Unit,
+) : AutoCloseable {
+    private val mutableState = MutableStateFlow(initialState)
+    private val intentIngress = MainIntentIngress(scope)
+    val state: StateFlow<S> = mutableState.asStateFlow()
+    private val activeUiBindings = MutableStateFlow(0)
+    var sourceGeneration: Any = Any()
+        private set
+    private val sourceRestarts = MutableStateFlow(sourceGeneration)
+    private val effectMailbox = EffectMailbox<E>()
+    private var closed = false
+    val isOpen: Boolean get() = !closed && scope.isActive
+    private val operations = OperationRunner<S>(scope, ::update)
+
+    /** Prepare input invalidation before publication; notify source collectors afterwards. */
+    var prepareStateChange: ((S, String?) -> (() -> Unit))? = null
+
+    suspend fun collectEffects(handler: suspend (E) -> Unit) = effectMailbox.collect(handler)
+
+    private val sourceSharing = SharingStarted.WhileSubscribed(stopTimeoutMillis = sourceStopTimeoutMillis)
+    private val sourceController = scope.launch {
+        sourceSharing.command(activeUiBindings).collectLatest { command ->
+            if (command == SharingCommand.START) {
+                sourceRestarts.collectLatest { generation ->
+                    // A newer restart can arrive while collectLatest joins old cleanup.
+                    if (generation === sourceGeneration) coroutineScope { observeSources() }
+                }
+            }
+        }
+    }
+
+    fun update(reducer: S.() -> S) {
+        publish(sourceName = null, reducer)
+    }
+
+    /** Source output may update data, but cannot feed back into any declared source input. */
+    fun updateFromSource(sourceName: String, reducer: S.() -> S) {
+        publish(sourceName, reducer)
+    }
+
+    private fun publish(sourceName: String?, reducer: S.() -> S) {
+        MviAccess.checkMutationAllowed(this)
+        val next = MviAccess.reducing(this) { reducer(mutableState.value) }
+        val notify = MviAccess.reducing(this) { prepareStateChange?.invoke(next, sourceName) }
+        MviAccess.publishing(this) {
+            mutableState.value = next
+            notify?.invoke()
+        }
+    }
+
+    /** Main is immediate only when no earlier caller is waiting in the shared ingress queue. */
+    fun dispatch(block: () -> Unit) {
+        intentIngress.dispatch(block)
+    }
+
+    /** Keep cleanup-triggered intents outside the current cancellation's state and job snapshot. */
+    fun <T> deferIntents(block: () -> T): T = intentIngress.deferDispatch(block)
+
+    suspend fun withUiBinding(block: suspend () -> Unit) = withContext(Dispatchers.Main.immediate) {
+        currentCoroutineContext().ensureActive()
+        if (!isOpen) return@withContext
+        activeUiBindings.value += 1
+        try {
+            block()
+        } finally {
+            activeUiBindings.value -= 1
+        }
+    }
+
+    fun latestOperation(): MviOperation<S> = operations.latestOperation()
+
+    fun queuedOperation(maxPending: Int = 16): MviOperation<S> = operations.queuedOperation(maxPending)
+
+    fun idleOperation(): MviOperation<S> = operations.idleOperation()
+
+    fun restartSources() {
+        if (isOpen) {
+            sourceGeneration = Any()
+            sourceRestarts.value = sourceGeneration
+        }
+    }
+
+    suspend fun sendEffect(
+        effect: E,
+        epoch: EffectEpoch? = null,
+        isCurrent: () -> Boolean = { true },
+    ): Boolean {
+        currentCoroutineContext().ensureActive()
+        return offerEffect(effect, epoch, isCurrent)
+    }
+
+    fun offerEffect(
+        effect: E,
+        epoch: EffectEpoch? = null,
+        isCurrent: () -> Boolean = { true },
+    ): Boolean {
+        if (!isOpen || !isCurrent()) return false
+        return MviAccess.publishing(this) {
+            effectMailbox.offer(effect, epoch) { isOpen && isCurrent() }
+        }
+    }
+
+    fun revokeEffects(epoch: EffectEpoch) = MviAccess.publishing(this) { effectMailbox.revoke(epoch) }
+
+    override fun close() {
+        intentIngress.close()
+        val main = Dispatchers.Main.immediate
+        if (main.isDispatchNeeded(scope.coroutineContext)) {
+            // VM clear has already cancelled its scope; cleanup must still be dispatched to Main.
+            CoroutineScope(main).launch { closeNow() }
+        } else {
+            closeNow()
+        }
+    }
+
+    private fun closeNow() {
+        if (closed) return
+        closed = true
+        prepareStateChange = null
+        sourceController.cancel()
+        operations.close()
+        effectMailbox.close()
+    }
+}
