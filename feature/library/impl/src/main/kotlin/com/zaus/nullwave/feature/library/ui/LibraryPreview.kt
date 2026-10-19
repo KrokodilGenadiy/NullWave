@@ -24,14 +24,16 @@ import com.zaus.nullwave.feature.library.presentation.RefreshState
 import kotlinx.coroutines.delay
 
 private val previewTracks = listOf(
-    LibraryTrack(TrackId("preview:1"), "Low Orbit", "Nullwave", "Transmission", 203_000),
-    LibraryTrack(TrackId("preview:2"), "Очень длинное название трека на дальней орбите", "Необычайно длинное имя исполнителя", null, 4_021_000),
-    LibraryTrack(TrackId("preview:3"), "Untitled recording", null, null, null),
+    LibraryTrack(TrackId("preview:1"), "Low Orbit", "Nullwave", "Transmission", 203_000, sizeBytes = 32_000_000),
+    LibraryTrack(TrackId("preview:2"), "Очень длинное название трека на дальней орбите", "Необычайно длинное имя исполнителя", "Ночной город", 4_021_000, sizeBytes = 68_000_000),
+    LibraryTrack(TrackId("preview:3"), "Untitled recording", null, null, null, sizeBytes = 1_250_000),
+    LibraryTrack(TrackId("preview:4"), "Unknown artist", null, "Off-Grid", 281_000, sizeBytes = 27_000_000),
 )
 
 internal class LibraryPreviewStates : PreviewParameterProvider<LibraryState> {
     override val values = sequenceOf(
         LibraryBody.Ready(previewTracks), LibraryBody.Loading,
+        LibraryBody.Ready(previewTracks.map { it.copy(sizeBytes = null) }),
         LibraryBody.AccessRequired(AccessAction.Request),
         LibraryBody.AccessRequired(AccessAction.SettingsSuggested),
         LibraryBody.Ready(emptyList()),

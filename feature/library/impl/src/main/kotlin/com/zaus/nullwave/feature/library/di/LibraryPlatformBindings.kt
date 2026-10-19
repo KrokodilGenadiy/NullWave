@@ -1,6 +1,8 @@
 package com.zaus.nullwave.feature.library.di
 
 import android.content.Context
+import coil3.ImageLoader
+import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
 import com.zaus.nullwave.core.di.dispatchers.IoDispatcher
 import com.zaus.nullwave.feature.library.api.repository.LibraryRepository
 import com.zaus.nullwave.feature.library.data.AndroidMediaStoreAudioSource
@@ -21,6 +23,19 @@ annotation class LibraryInitialLocale
 @BindingContainer
 @ContributesTo(AppScope::class)
 object LibraryPlatformBindings {
+    @Provides
+    @SingleIn(AppScope::class)
+    fun artworkLoader(
+        @ForScope(AppScope::class) context: Context,
+        @IoDispatcher io: CoroutineDispatcher,
+    ): LibraryArtworkLoader = LibraryArtworkLoader(
+        ImageLoader.Builder(context)
+            .fetcherCoroutineContext(io)
+            .decoderCoroutineContext(io)
+            .diskCache(null)
+            .build(),
+    )
+
     // The app graph can access this provider without exposing the implementation or raw rows.
     @Provides
     @SingleIn(AppScope::class)

@@ -14,6 +14,7 @@ import kotlinx.coroutines.ensureActive
 /** Local collator per snapshot: Collator is mutable and cannot be shared across subscriptions. */
 internal suspend fun List<MediaStoreAudioRow>.toTracks(query: LibraryQuery): List<LibraryTrack> {
     val context = currentCoroutineContext()
+    val artwork = artworkReferences()
     val collator = Collator.getInstance(Locale.forLanguageTag(query.localeTag))
     val entries = map { row ->
         context.ensureActive()
@@ -29,6 +30,8 @@ internal suspend fun List<MediaStoreAudioRow>.toTracks(query: LibraryQuery): Lis
                 artist = row.artist.metadataOrNull(),
                 album = row.album.metadataOrNull(),
                 durationMs = row.durationMs?.takeIf { it >= 0 },
+                sizeBytes = row.sizeBytes?.takeIf { it >= 0 },
+                artwork = artwork[row.artworkKey()],
             ),
             row.dateAddedSeconds?.takeIf { it > 0 },
         )

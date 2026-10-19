@@ -5,6 +5,7 @@ import com.zaus.nullwave.core.navigation.navigateTo
 import com.zaus.nullwave.feature.about.api.AboutKey
 import com.zaus.nullwave.feature.library.ui.LibraryRoot
 import com.zaus.nullwave.feature.library.api.LibraryKey
+import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
@@ -16,9 +17,9 @@ import dev.zacsweers.metro.Provides
 object LibraryEntries {
     @Provides
     @IntoSet
-    fun entries(): EntryProviderInstaller = {
+    fun entries(artworkLoader: () -> LibraryArtworkLoader): EntryProviderInstaller = {
         entry<LibraryKey> {
-            LibraryRoot(onAboutClick = { navigateTo(AboutKey) })
+            LibraryRoot(onAboutClick = { navigateTo(AboutKey) }, artworkLoader = artworkLoader())
         }
     }
 }

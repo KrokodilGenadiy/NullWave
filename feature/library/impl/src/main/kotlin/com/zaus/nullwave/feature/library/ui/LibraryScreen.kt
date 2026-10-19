@@ -1,5 +1,7 @@
 package com.zaus.nullwave.feature.library.ui
 
+import android.text.format.Formatter
+
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -44,7 +48,6 @@ import com.zaus.nullwave.core.designsystem.components.layout.NullWaveScaffold
 import com.zaus.nullwave.core.designsystem.components.navigation.NullWaveTopBar
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveDivider
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveOctagonFrame
-import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveSectionHeader
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcon
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.designsystem.modifier.NullWaveBorderStyle
@@ -52,6 +55,7 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.mvi.ui.asString
 import com.zaus.nullwave.core.mvi.ui.collectMviStateWithLifecycle
 import com.zaus.nullwave.feature.library.impl.R
+import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
 import com.zaus.nullwave.feature.library.platform.AndroidAudioPermission
 import com.zaus.nullwave.feature.library.platform.AudioPermission
 import com.zaus.nullwave.feature.library.presentation.AccessAction
@@ -65,6 +69,7 @@ import dev.zacsweers.metrox.viewmodel.metroViewModel
 @Composable
 internal fun LibraryRoot(
     onAboutClick: () -> Unit,
+    artworkLoader: LibraryArtworkLoader?,
     viewModel: LibraryViewModel = metroViewModel(),
     permission: AudioPermission = rememberAudioPermission(),
 ) {
@@ -72,7 +77,7 @@ internal fun LibraryRoot(
     val localeTag = LocalConfiguration.current.locales[0].toLanguageTag()
     LaunchedEffect(viewModel, localeTag) { viewModel.onIntent(LibraryIntent.LocaleChanged(localeTag)) }
     LibraryPermissionHost(permission, { viewModel.onIntent(LibraryIntent.AccessChecked(it)) }) { accessUi ->
-        LibraryScreen(state, viewModel::onIntent, onAboutClick, accessUi)
+        LibraryScreen(state, viewModel::onIntent, onAboutClick, accessUi, artworkLoader)
     }
 }
 
@@ -89,6 +94,7 @@ internal fun LibraryScreen(
     onIntent: (LibraryIntent) -> Unit,
     onAboutClick: () -> Unit,
     accessUi: LibraryAccessUi = LibraryAccessUi(),
+    artworkLoader: LibraryArtworkLoader? = null,
 ) {
     val spacing = NullWaveTheme.spacing
     val ready = state.body as? LibraryBody.Ready
@@ -147,8 +153,13 @@ internal fun LibraryScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalArrangement = Arrangement.spacedBy(spacing.xs),
                         ) {
-                            NullWaveSectionHeader(stringResource(R.string.library_tracks),
-                                supportingText = pluralStringResource(R.plurals.library_track_count, body.tracks.size, body.tracks.size))
+                            val bytes = remember(body.tracks) { libraryTotalBytes(body.tracks) }
+                            val size = bytes?.let { Formatter.formatShortFileSize(LocalContext.current, it) }
+                                ?: stringResource(R.string.library_size_unknown)
+                            val count = pluralStringResource(R.plurals.library_track_count, body.tracks.size, body.tracks.size)
+                            Text(stringResource(R.string.library_summary, count, size),
+                                Modifier.align(Alignment.CenterVertically).testTag("library_summary"),
+                                style = NullWaveTheme.typography.micro, color = NullWaveTheme.colors.textSecondary)
                             LibraryFiltersButton(state.query, onClick = { filtersVisible = true })
                         }
                     }
@@ -170,9 +181,10 @@ internal fun LibraryScreen(
                     items(body.tracks, key = { "track:${it.id.value}" }, contentType = { "track" }) { track ->
                         NullWaveTrackRow(
                             title = track.title,
-                            subtitle = track.artist ?: stringResource(R.string.library_unknown_artist),
+                            subtitle = librarySubtitle(track.artist, track.album, stringResource(R.string.library_unknown_artist)),
                             durationLabel = libraryDuration(track.durationMs),
                             modifier = Modifier.testTag("library_track:${track.id.value}"),
+                            artwork = { LibraryArtwork(track, artworkLoader) },
                         )
                         NullWaveDivider(Modifier.padding(horizontal = NullWaveTheme.dimens.gutter))
                     }

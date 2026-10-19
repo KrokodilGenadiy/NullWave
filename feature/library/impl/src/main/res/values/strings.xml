@@ -4,6 +4,8 @@
     <string name="library_load_failed">Could not load your audio library. Try again.</string>
     <string name="library_refresh_failed">Could not refresh your library. Showing the previous results.</string>
     <string name="library_tracks">Tracks</string>
+    <string name="library_summary">%1$s · %2$s</string>
+    <string name="library_size_unknown">size unknown</string>
     <plurals name="library_track_count">
         <item quantity="one">%d track</item>
         <item quantity="other">%d tracks</item>

@@ -276,7 +276,7 @@ class LibraryRootInstrumentedTest {
                 CompositionLocalProvider(LocalActivityResultRegistryOwner provides registryOwner,
                     LocalLifecycleOwner provides owner, LocalConfiguration provides configuration.value) {
                     NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
-                        LibraryRoot({}, viewModel, permission)
+                        LibraryRoot({}, artworkLoader = null, viewModel = viewModel, permission = permission)
                     }
                 }
             }
