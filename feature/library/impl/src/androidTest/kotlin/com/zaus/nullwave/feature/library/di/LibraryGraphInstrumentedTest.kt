@@ -10,6 +10,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.zaus.nullwave.core.di.dispatchers.IoDispatcher
 import com.zaus.nullwave.feature.library.api.repository.LibraryRepository
 import com.zaus.nullwave.feature.library.data.MediaStoreLibraryRepository
+import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
 import com.zaus.nullwave.feature.library.presentation.LibraryViewModel
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.DependencyGraph
@@ -43,6 +44,13 @@ class LibraryGraphInstrumentedTest {
         assertSame(first.repository, first.repository)
         assertNotSame(first.repository, second.repository)
         assertTrue(first.assistedFactories.containsKey(LibraryViewModel::class))
+        try {
+            assertSame(first.artworkLoader, first.artworkLoader)
+            assertNotSame(first.artworkLoader, second.artworkLoader)
+        } finally {
+            first.artworkLoader.imageLoader.shutdown()
+            second.artworkLoader.imageLoader.shutdown()
+        }
     }
 
     @Test
@@ -69,6 +77,7 @@ class LibraryGraphInstrumentedTest {
 internal interface LibraryPlatformTestGraph : ViewModelGraph {
     @IoDispatcher val io: CoroutineDispatcher
     val repository: LibraryRepository
+    val artworkLoader: LibraryArtworkLoader
     val assistedFactories: Map<KClass<out ViewModel>, () -> ViewModelAssistedFactory>
 
     @DependencyGraph.Factory

@@ -28,12 +28,20 @@ class MediaStoreAudioQueryInstrumentedTest {
     @Test
     fun readsLongAndNullableColumnsAndClosesCursor() = runBlocking {
         val cursor = MatrixCursor(audioProjection).apply {
-            addRow(arrayOf<Any?>(4_000_000_001L, "external_primary", "Title", "file.mp3", null, null, null, 2_000_000_000L))
+            addRow(arrayOf<Any?>(4_000_000_001L, "external_primary", "Title", "file.mp3", null, null, null,
+                2_000_000_000L, 5_000_000_001L, 6_000_000_001L, 2_000_000_001L))
+            addRow(arrayOf<Any?>(2L, "external_primary", "Other", "other.mp3", null, null, null, null, null, null, null))
         }
         val rows = queryAudioRows(Dispatchers.IO) { cursor }
-        assertEquals(4_000_000_001L, rows.single().id)
-        assertEquals(null, rows.single().durationMs)
-        assertEquals(2_000_000_000L, rows.single().dateAddedSeconds)
+        assertEquals(4_000_000_001L, rows.first().id)
+        assertEquals(null, rows.first().durationMs)
+        assertEquals(2_000_000_000L, rows.first().dateAddedSeconds)
+        assertEquals(5_000_000_001L, rows.first().albumId)
+        assertEquals(6_000_000_001L, rows.first().sizeBytes)
+        assertEquals(2_000_000_001L, rows.first().dateModifiedSeconds)
+        assertEquals(null, rows.last().albumId)
+        assertEquals(null, rows.last().sizeBytes)
+        assertEquals(null, rows.last().dateModifiedSeconds)
         assertTrue(cursor.isClosed)
     }
 

@@ -1,5 +1,7 @@
 package com.zaus.nullwave.feature.library.ui
 
+import android.text.format.Formatter
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
@@ -50,6 +52,19 @@ class LibraryScreenInstrumentedTest {
     @get:Rule val compose = createComposeRule()
     private val robot by lazy { LibraryScreenRobot(compose) }
     private val track = LibraryTrack(TrackId("test:1"), "Low Orbit", null, null, 203_000)
+
+    @Test
+    fun metadataSummaryAndSubtitleFollowTheCurrentSnapshot() {
+        val known = track.copy(artist = "Artist", album = "Album", sizeBytes = 12_000_000)
+        robot.show(LibraryBody.Ready(listOf(known)))
+        compose.onNodeWithText("Artist · Album", substring = true).assertIsDisplayed()
+        val size = Formatter.formatShortFileSize(InstrumentationRegistry.getInstrumentation().targetContext, 12_000_000)
+        compose.onNodeWithText(size, substring = true).assertIsDisplayed()
+        robot.updateBody(LibraryBody.Ready(listOf(known.copy(sizeBytes = null, artist = null))))
+        compose.onNodeWithText(robot.text(R.string.library_size_unknown), substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Album", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Artist · Album", substring = true).assertDoesNotExist()
+    }
 
     @Test
     fun loadingIsNotEmptyAndStillAllowsAbout() {

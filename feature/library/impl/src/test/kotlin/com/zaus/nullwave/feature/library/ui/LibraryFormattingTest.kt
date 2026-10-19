@@ -1,11 +1,41 @@
 package com.zaus.nullwave.feature.library.ui
 
+import com.zaus.nullwave.feature.library.api.model.LibraryTrack
+import com.zaus.nullwave.feature.library.api.model.TrackId
+
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class LibraryFormattingTest {
+    @Test
+    fun `subtitle uses the available tags without dangling separators`() {
+        assertEquals("Artist · Album", librarySubtitle("Artist", "Album", "Unknown"))
+        assertEquals("Artist", librarySubtitle("Artist", null, "Unknown"))
+        assertEquals("Album", librarySubtitle(null, "Album", "Unknown"))
+        assertEquals("Unknown", librarySubtitle(null, null, "Unknown"))
+    }
+
+    @Test
+    fun `monogram supports single words Cyrillic and supplementary code points`() {
+        assertEquals("NC", libraryMonogram("  Night   City  "))
+        assertEquals("НГ", libraryMonogram("Ночной город"))
+        assertEquals("TR", libraryMonogram("Transmission"))
+        assertEquals("Я", libraryMonogram("я"))
+        assertEquals("🎵Н", libraryMonogram("🎵Ночь"))
+    }
+
+    @Test
+    fun `total distinguishes complete empty partial and overflowing metadata`() {
+        val track = LibraryTrack(TrackId("test:1"), "Title", null, null, null)
+        assertEquals(0L, libraryTotalBytes(emptyList()))
+        assertEquals(6_000_000_001L, libraryTotalBytes(listOf(track.copy(sizeBytes = 6_000_000_000), track.copy(sizeBytes = 1))))
+        assertNull(libraryTotalBytes(listOf(track.copy(sizeBytes = 500), track)))
+        assertNull(libraryTotalBytes(listOf(track.copy(sizeBytes = Long.MAX_VALUE), track.copy(sizeBytes = 1))))
+        assertThrows(IllegalArgumentException::class.java) { track.copy(sizeBytes = -1) }
+    }
+
     @Test
     fun `unknown duration differs from a known zero`() {
         assertNull(libraryDuration(null))
