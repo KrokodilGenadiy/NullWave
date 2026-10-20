@@ -1,8 +1,7 @@
 package com.zaus.nullwave.feature.library.ui
 
-import com.zaus.nullwave.feature.library.api.model.LibraryTrack
-import com.zaus.nullwave.feature.library.api.model.TrackId
-
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.feature.library.api.model.track.TrackId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows

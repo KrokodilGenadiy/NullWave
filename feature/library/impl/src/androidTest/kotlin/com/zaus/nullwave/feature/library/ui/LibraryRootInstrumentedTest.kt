@@ -20,20 +20,20 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.core.app.ActivityOptionsCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelStore
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.test.platform.app.InstrumentationRegistry
 import com.zaus.nullwave.core.designsystem.theme.NullWaveEffects
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.DataError
-import com.zaus.nullwave.feature.library.api.model.LibraryQuery
-import com.zaus.nullwave.feature.library.api.model.LibraryTrack
-import com.zaus.nullwave.feature.library.api.model.TrackId
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
+import com.zaus.nullwave.feature.library.api.model.track.TrackId
 import com.zaus.nullwave.feature.library.api.repository.LibraryRepository
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.platform.AudioPermission
@@ -258,7 +258,7 @@ class LibraryRootInstrumentedTest {
         compose.runOnUiThread {
             owner = ScreenOwner()
             val repository = object : LibraryRepository {
-                override fun observeTracks(query: LibraryQuery) = flow<AppResult<List<LibraryTrack>, DataError>> {
+                override fun observeTracks(query: LibraryTrackQuery) = flow<AppResult<List<LibraryTrack>, DataError>> {
                     subscriptions++
                     if (permission.granted) {
                         emit(AppResult.Success(listOf(LibraryTrack(TrackId("test:1"), "Low Orbit", null, null, 203_000))))

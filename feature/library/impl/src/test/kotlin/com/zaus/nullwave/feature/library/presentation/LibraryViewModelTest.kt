@@ -5,25 +5,25 @@ import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.ui.UiText
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.DataError
-import com.zaus.nullwave.feature.library.api.model.LibraryQuery
-import com.zaus.nullwave.feature.library.api.model.LibrarySort
-import com.zaus.nullwave.feature.library.api.model.LibraryTrack
 import com.zaus.nullwave.feature.library.api.model.SortDirection
-import com.zaus.nullwave.feature.library.api.model.TrackId
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
+import com.zaus.nullwave.feature.library.api.model.track.TrackId
 import com.zaus.nullwave.feature.library.impl.R
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -56,11 +56,11 @@ class LibraryViewModelTest {
     @Test
     fun `state reads and intents without UI binding do not read the catalog`() = runTest(dispatcher) {
         val vm = createVm()
-        assertEquals(LibraryState(LibraryQuery("ru")), vm.state.value)
+        assertEquals(LibraryState(LibraryTrackQuery("ru")), vm.state.value)
         send(vm, LibraryIntent.Retry)
         send(vm, LibraryIntent.Refresh)
         send(vm, LibraryIntent.AccessChecked(LibraryAccess.Granted))
-        send(vm, LibraryIntent.SortChanged(LibrarySort.Artist, SortDirection.Descending))
+        send(vm, LibraryIntent.SortChanged(LibraryTrackSort.Artist, SortDirection.Descending))
         assertTrue(repository.subscriptions.isEmpty())
 
         bind(vm)
@@ -225,7 +225,7 @@ class LibraryViewModelTest {
         send(vm, LibraryIntent.AccessChecked(LibraryAccess.Granted))
         assertEquals(LibraryBody.Ready(listOf(track), RefreshState.Running), vm.state.value.body)
         assertEquals(3, repository.subscriptions.size)
-        assertTrue(repository.subscriptions.all { it.query == LibraryQuery("ru") })
+        assertTrue(repository.subscriptions.all { it.query == LibraryTrackQuery("ru") })
         reply(AppResult.Success(emptyList()))
         assertEquals(LibraryBody.Ready(emptyList()), vm.state.value.body)
     }
@@ -236,12 +236,12 @@ class LibraryViewModelTest {
         bind(vm)
         reply(AppResult.Success(listOf(track)))
         val cases = listOf(
-            LibraryIntent.SortChanged(LibrarySort.Artist, SortDirection.Ascending) to
-                LibraryQuery("ru", LibrarySort.Artist),
-            LibraryIntent.SortChanged(LibrarySort.Artist, SortDirection.Descending) to
-                LibraryQuery("ru", LibrarySort.Artist, SortDirection.Descending),
+            LibraryIntent.SortChanged(LibraryTrackSort.Artist, SortDirection.Ascending) to
+                LibraryTrackQuery("ru", LibraryTrackSort.Artist),
+            LibraryIntent.SortChanged(LibraryTrackSort.Artist, SortDirection.Descending) to
+                LibraryTrackQuery("ru", LibraryTrackSort.Artist, SortDirection.Descending),
             LibraryIntent.LocaleChanged("en-US") to
-                LibraryQuery("en-US", LibrarySort.Artist, SortDirection.Descending),
+                LibraryTrackQuery("en-US", LibraryTrackSort.Artist, SortDirection.Descending),
         )
         for ((intent, expected) in cases) {
             send(vm, intent)
@@ -258,7 +258,7 @@ class LibraryViewModelTest {
         bind(vm)
         reply(AppResult.Success(listOf(track)))
         val before = vm.state.value
-        send(vm, LibraryIntent.SortChanged(LibrarySort.Title, SortDirection.Ascending))
+        send(vm, LibraryIntent.SortChanged(LibraryTrackSort.Title, SortDirection.Ascending))
         send(vm, LibraryIntent.LocaleChanged("ru"))
         assertSame(before, vm.state.value)
         assertEquals(1, repository.subscriptions.size)
@@ -269,7 +269,7 @@ class LibraryViewModelTest {
         val vm = createVm()
         bind(vm)
         send(vm, LibraryIntent.AccessChecked(LibraryAccess.Required(AccessAction.Request)))
-        send(vm, LibraryIntent.SortChanged(LibrarySort.Artist, SortDirection.Descending))
+        send(vm, LibraryIntent.SortChanged(LibraryTrackSort.Artist, SortDirection.Descending))
         assertEquals(LibraryBody.AccessRequired(AccessAction.Request), vm.state.value.body)
 
         send(vm, LibraryIntent.AccessChecked(LibraryAccess.Granted))
@@ -322,14 +322,14 @@ class LibraryViewModelTest {
         bind(vm)
         val original = repository.subscriptions.single()
         original.delayCleanupWith(AppResult.Success(listOf(track)))
-        send(vm, LibraryIntent.SortChanged(LibrarySort.Artist, SortDirection.Ascending))
-        send(vm, LibraryIntent.SortChanged(LibrarySort.Title, SortDirection.Ascending))
+        send(vm, LibraryIntent.SortChanged(LibraryTrackSort.Artist, SortDirection.Ascending))
+        send(vm, LibraryIntent.SortChanged(LibraryTrackSort.Title, SortDirection.Ascending))
         original.cleanupGate!!.complete(Unit)
         runCurrent()
 
         assertTrue(original.lateDeliveryAttempted)
         assertSame(LibraryBody.Loading, vm.state.value.body)
-        assertEquals(listOf(LibraryQuery("ru"), LibraryQuery("ru")), repository.subscriptions.map { it.query })
+        assertEquals(listOf(LibraryTrackQuery("ru"), LibraryTrackQuery("ru")), repository.subscriptions.map { it.query })
         reply(AppResult.Success(listOf(otherTrack)))
         assertEquals(LibraryBody.Ready(listOf(otherTrack)), vm.state.value.body)
     }
@@ -405,7 +405,7 @@ class LibraryViewModelTest {
         val vm = createVm(handle)
         bind(vm)
         reply(AppResult.Success(listOf(track)))
-        send(vm, LibraryIntent.SortChanged(LibrarySort.RecentlyAdded, SortDirection.Descending))
+        send(vm, LibraryIntent.SortChanged(LibraryTrackSort.RecentlyAdded, SortDirection.Descending))
         send(vm, LibraryIntent.LocaleChanged("de"))
         reply(AppResult.Failure(DataError.Io))
         send(vm, LibraryIntent.AccessChecked(LibraryAccess.Required(AccessAction.SettingsSuggested)))
@@ -415,7 +415,7 @@ class LibraryViewModelTest {
         runCurrent()
 
         val restored = createVm(SavedStateHandle(saved), localeTag = "en-US")
-        val expected = LibraryQuery("en-US", LibrarySort.RecentlyAdded, SortDirection.Descending)
+        val expected = LibraryTrackQuery("en-US", LibraryTrackSort.RecentlyAdded, SortDirection.Descending)
         assertEquals(LibraryState(expected), restored.state.value)
         bind(restored)
         assertEquals(expected, repository.subscriptions.last().query)
@@ -426,9 +426,9 @@ class LibraryViewModelTest {
     @Test
     fun `unknown or malformed saved inputs fall back independently`() = runTest(dispatcher) {
         val malformed = createVm(SavedStateHandle(mapOf("library.sort" to 123, "library.direction" to "Removed")))
-        assertEquals(LibraryQuery("ru"), malformed.state.value.query)
+        assertEquals(LibraryTrackQuery("ru"), malformed.state.value.query)
         val partial = createVm(SavedStateHandle(mapOf("library.sort" to "Artist", "library.direction" to false)))
-        assertEquals(LibraryQuery("ru", LibrarySort.Artist), partial.state.value.query)
+        assertEquals(LibraryTrackQuery("ru", LibraryTrackSort.Artist), partial.state.value.query)
     }
 
     @Test
@@ -452,7 +452,7 @@ class LibraryViewModelTest {
         repository.initialResult = AppResult.Success(listOf(otherTrack))
         send(vm, LibraryIntent.AccessChecked(LibraryAccess.Granted))
         assertEquals(LibraryBody.Ready(listOf(otherTrack)), vm.state.value.body)
-        send(vm, LibraryIntent.SortChanged(LibrarySort.Artist, SortDirection.Descending))
+        send(vm, LibraryIntent.SortChanged(LibraryTrackSort.Artist, SortDirection.Descending))
         assertEquals(LibraryBody.Ready(listOf(otherTrack)), vm.state.value.body)
     }
 
@@ -463,13 +463,13 @@ class LibraryViewModelTest {
         val vm = createVm(handle)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             vm.state.collect {
-                if (it.query.sort == LibrarySort.Artist) {
-                    vm.onIntent(LibraryIntent.SortChanged(LibrarySort.RecentlyAdded, SortDirection.Descending))
+                if (it.query.sort == LibraryTrackSort.Artist) {
+                    vm.onIntent(LibraryIntent.SortChanged(LibraryTrackSort.RecentlyAdded, SortDirection.Descending))
                 }
             }
         }
-        send(vm, LibraryIntent.SortChanged(LibrarySort.Artist, SortDirection.Ascending))
-        assertEquals(LibrarySort.RecentlyAdded, vm.state.value.query.sort)
+        send(vm, LibraryIntent.SortChanged(LibraryTrackSort.Artist, SortDirection.Ascending))
+        assertEquals(LibraryTrackSort.RecentlyAdded, vm.state.value.query.sort)
         val saved = handle.keys().associateWith { handle.get<Any?>(it) }
         val restored = createVm(SavedStateHandle(saved))
         assertEquals(vm.state.value.query, restored.state.value.query)

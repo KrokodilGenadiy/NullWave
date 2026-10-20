@@ -2,14 +2,14 @@ package com.zaus.nullwave.feature.library.presentation
 
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.DataError
-import com.zaus.nullwave.feature.library.api.model.LibraryQuery
-import com.zaus.nullwave.feature.library.api.model.LibraryTrack
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.api.repository.LibraryRepository
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
 internal typealias LibraryResult = AppResult<List<LibraryTrack>, DataError>
@@ -25,7 +25,7 @@ internal class FakeLibraryRepository : LibraryRepository {
     var maxActiveCount = 0
         private set
 
-    override fun observeTracks(query: LibraryQuery): Flow<LibraryResult> = object : Flow<LibraryResult> {
+    override fun observeTracks(query: LibraryTrackQuery): Flow<LibraryResult> = object : Flow<LibraryResult> {
         override suspend fun collect(collector: FlowCollector<LibraryResult>) {
             val subscription = Subscription(query).also(subscriptions::add)
             activeCount++
@@ -64,7 +64,7 @@ internal class FakeLibraryRepository : LibraryRepository {
 
     private fun LibraryResult.isAccessDenied() = this is AppResult.Failure && error == DataError.AccessDenied
 
-    class Subscription(val query: LibraryQuery) {
+    class Subscription(val query: LibraryTrackQuery) {
         val results = Channel<LibraryResult>(Channel.UNLIMITED)
         var cleanupGate: CompletableDeferred<Unit>? = null
         var lateResult: LibraryResult? = null

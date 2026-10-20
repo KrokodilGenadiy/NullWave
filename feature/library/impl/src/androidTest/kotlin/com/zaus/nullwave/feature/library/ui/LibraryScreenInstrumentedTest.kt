@@ -1,7 +1,6 @@
 package com.zaus.nullwave.feature.library.ui
 
 import android.text.format.Formatter
-
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
@@ -10,14 +9,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
-import androidx.compose.ui.test.assertHeightIsAtLeast
-import androidx.compose.ui.test.assertTouchHeightIsEqualTo
 import androidx.compose.ui.test.assertHasNoClickAction
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTouchHeightIsEqualTo
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -25,19 +24,19 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
-import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.platform.app.InstrumentationRegistry
 import com.zaus.nullwave.core.designsystem.theme.NullWaveEffects
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.mvi.ui.UiText
-import com.zaus.nullwave.feature.library.api.model.LibraryQuery
-import com.zaus.nullwave.feature.library.api.model.LibrarySort
-import com.zaus.nullwave.feature.library.api.model.LibraryTrack
 import com.zaus.nullwave.feature.library.api.model.SortDirection
-import com.zaus.nullwave.feature.library.api.model.TrackId
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
+import com.zaus.nullwave.feature.library.api.model.track.TrackId
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.presentation.AccessAction
 import com.zaus.nullwave.feature.library.presentation.LibraryBody
@@ -146,7 +145,7 @@ class LibraryScreenInstrumentedTest {
         compose.onNodeWithText(robot.text(R.string.library_sort_artist)).assertIsSelected()
         compose.onNodeWithText(robot.text(R.string.library_descending)).performClick()
         compose.runOnIdle {
-            assertEquals(LibraryIntent.SortChanged(LibrarySort.Artist, SortDirection.Descending), robot.intents.last())
+            assertEquals(LibraryIntent.SortChanged(LibraryTrackSort.Artist, SortDirection.Descending), robot.intents.last())
         }
         compose.onNodeWithText(robot.text(R.string.library_done)).performClick()
         compose.onNodeWithText(robot.text(R.string.library_descending)).assertDoesNotExist()
@@ -173,13 +172,13 @@ class LibraryScreenInstrumentedTest {
 
 private class LibraryScreenRobot(private val compose: ComposeContentTestRule) {
     val intents = mutableListOf<LibraryIntent>()
-    private val state = mutableStateOf(LibraryState(LibraryQuery("en")))
+    private val state = mutableStateOf(LibraryState(LibraryTrackQuery("en")))
     var aboutClicks = 0
     fun text(id: Int, vararg args: Any) = InstrumentationRegistry.getInstrumentation().targetContext.getString(id, *args)
 
     fun show(body: LibraryBody, access: LibraryAccessUi = LibraryAccessUi(),
              fontScale: Float = 1f, direction: LayoutDirection = LayoutDirection.Ltr) = apply {
-        state.value = LibraryState(LibraryQuery("en"), body)
+        state.value = LibraryState(LibraryTrackQuery("en"), body)
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale),
                 LocalLayoutDirection provides direction) {

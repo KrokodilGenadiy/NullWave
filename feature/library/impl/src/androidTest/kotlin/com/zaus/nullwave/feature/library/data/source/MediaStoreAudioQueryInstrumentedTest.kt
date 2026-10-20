@@ -1,4 +1,4 @@
-package com.zaus.nullwave.feature.library.data
+package com.zaus.nullwave.feature.library.data.source
 
 import android.database.MatrixCursor
 import android.database.sqlite.SQLiteDiskIOException
@@ -6,7 +6,8 @@ import android.os.OperationCanceledException
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.DataError
-import com.zaus.nullwave.feature.library.api.model.LibraryQuery
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
+import com.zaus.nullwave.feature.library.data.repository.MediaStoreLibraryRepository
 import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -19,8 +20,8 @@ import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Test
 import org.junit.runner.RunWith
+import org.junit.Test
 
 /** Uses Android Cursor/CancellationSignal without reading, modifying or requesting access to media. */
 @RunWith(AndroidJUnit4::class)
@@ -29,8 +30,8 @@ class MediaStoreAudioQueryInstrumentedTest {
     fun readsLongAndNullableColumnsAndClosesCursor() = runBlocking {
         val cursor = MatrixCursor(audioProjection).apply {
             addRow(arrayOf<Any?>(4_000_000_001L, "external_primary", "Title", "file.mp3", null, null, null,
-                2_000_000_000L, 5_000_000_001L, 6_000_000_001L, 2_000_000_001L))
-            addRow(arrayOf<Any?>(2L, "external_primary", "Other", "other.mp3", null, null, null, null, null, null, null))
+                2_000_000_000L, 5_000_000_001L, 6_000_000_001L, 2_000_000_001L, 7_000_000_001L))
+            addRow(arrayOf<Any?>(2L, "external_primary", "Other", "other.mp3", null, null, null, null, null, null, null, null))
         }
         val rows = queryAudioRows(Dispatchers.IO) { cursor }
         assertEquals(4_000_000_001L, rows.first().id)
@@ -39,9 +40,11 @@ class MediaStoreAudioQueryInstrumentedTest {
         assertEquals(5_000_000_001L, rows.first().albumId)
         assertEquals(6_000_000_001L, rows.first().sizeBytes)
         assertEquals(2_000_000_001L, rows.first().dateModifiedSeconds)
+        assertEquals(7_000_000_001L, rows.first().artistId)
         assertEquals(null, rows.last().albumId)
         assertEquals(null, rows.last().sizeBytes)
         assertEquals(null, rows.last().dateModifiedSeconds)
+        assertEquals(null, rows.last().artistId)
         assertTrue(cursor.isClosed)
     }
 
@@ -98,7 +101,7 @@ class MediaStoreAudioQueryInstrumentedTest {
                 override suspend fun readRows(): List<MediaStoreAudioRow> = queryAudioRows(Dispatchers.IO) { throw problem }
             }
             val result = MediaStoreLibraryRepository(source, Dispatchers.IO)
-                .observeTracks(LibraryQuery("en")).first() as AppResult.Failure
+                .observeTracks(LibraryTrackQuery("en")).first() as AppResult.Failure
             assertEquals(DataError.Io, result.error)
             assertTrue(generateSequence(result.cause) { it.cause }.any { it === problem })
             assertEquals(problem.message, result.originalMessage)

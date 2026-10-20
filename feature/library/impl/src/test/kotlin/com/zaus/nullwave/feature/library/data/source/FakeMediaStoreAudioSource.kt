@@ -1,10 +1,11 @@
-package com.zaus.nullwave.feature.library.data
+package com.zaus.nullwave.feature.library.data.source
 
 /** Fake of the platform seam; repository flow/error/mapping code stays real in these tests. */
 internal class FakeMediaStoreAudioSource : MediaStoreAudioSource {
     var granted = true
     var registrationFailure: Exception? = null
     var closeFailure: Exception? = null
+    var beforeRegister: (() -> Unit)? = null
     var onRegister: (() -> Unit)? = null
     var read: suspend () -> List<MediaStoreAudioRow> = { emptyList() }
     var reads = 0
@@ -16,6 +17,7 @@ internal class FakeMediaStoreAudioSource : MediaStoreAudioSource {
     override fun hasReadAccess(): Boolean = granted
 
     override fun observeChanges(onChanged: () -> Unit): AutoCloseable {
+        beforeRegister?.invoke()
         registrationFailure?.let { throw it }
         observers += onChanged
         registrations++
@@ -44,4 +46,4 @@ internal fun audioRow(
     title: String? = "Low Orbit",
     artist: String? = "Nullwave",
     added: Long? = 123,
-) = MediaStoreAudioRow(id, volume, title, "track.mp3", artist, "Signals", 180_000, added)
+) = MediaStoreAudioRow(id, volume, title, "track.mp3", artist, "Signals", 180_000, added, albumId = 8, artistId = 4)
