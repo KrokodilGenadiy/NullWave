@@ -1,12 +1,12 @@
 package com.zaus.nullwave.feature.library.ui
 
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInspectionMode
@@ -15,9 +15,9 @@ import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
 import com.zaus.nullwave.core.designsystem.components.content.NullWaveArtworkPlaceholder
 import com.zaus.nullwave.core.designsystem.components.content.NullWaveCoverArt
-import com.zaus.nullwave.feature.library.api.model.LibraryTrack
-import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
 import com.zaus.nullwave.feature.library.artwork.artworkRequest
+import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
 
 /** Only composed rows request artwork. Preview/null-loader paths never access the device catalog. */
 @Composable

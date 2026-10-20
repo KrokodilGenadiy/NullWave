@@ -1,13 +1,11 @@
-package com.zaus.nullwave.feature.library.api.model
+package com.zaus.nullwave.feature.library.api.model.track
 
-enum class LibrarySort { Title, Artist, RecentlyAdded }
-
-enum class SortDirection { Ascending, Descending }
+import com.zaus.nullwave.feature.library.api.model.SortDirection
 
 /** Complete value input; locale-dependent sorting must not read hidden UI configuration. */
-data class LibraryQuery(
+data class LibraryTrackQuery(
     val localeTag: String,
-    val sort: LibrarySort = LibrarySort.Title,
+    val sort: LibraryTrackSort = LibraryTrackSort.Title,
     val direction: SortDirection = SortDirection.Ascending,
 ) {
     init {

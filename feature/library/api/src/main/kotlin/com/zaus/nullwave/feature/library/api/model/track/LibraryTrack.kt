@@ -1,4 +1,6 @@
-package com.zaus.nullwave.feature.library.api.model
+package com.zaus.nullwave.feature.library.api.model.track
+
+import com.zaus.nullwave.feature.library.api.model.ArtworkRef
 
 /** Catalog metadata, independent of Android URIs, formatted UI text and playback state. */
 data class LibraryTrack(

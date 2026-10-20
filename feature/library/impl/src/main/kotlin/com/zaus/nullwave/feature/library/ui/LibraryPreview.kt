@@ -1,8 +1,8 @@
 package com.zaus.nullwave.feature.library.ui
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -12,14 +12,14 @@ import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import com.zaus.nullwave.core.designsystem.theme.NullWaveEffects
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.mvi.ui.UiText
-import com.zaus.nullwave.feature.library.api.model.LibraryQuery
-import com.zaus.nullwave.feature.library.api.model.LibraryTrack
-import com.zaus.nullwave.feature.library.api.model.TrackId
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
+import com.zaus.nullwave.feature.library.api.model.track.TrackId
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.presentation.AccessAction
 import com.zaus.nullwave.feature.library.presentation.LibraryBody
-import com.zaus.nullwave.feature.library.presentation.LibraryState
 import com.zaus.nullwave.feature.library.presentation.LibraryIntent
+import com.zaus.nullwave.feature.library.presentation.LibraryState
 import com.zaus.nullwave.feature.library.presentation.RefreshState
 import kotlinx.coroutines.delay
 
@@ -40,7 +40,7 @@ internal class LibraryPreviewStates : PreviewParameterProvider<LibraryState> {
         LibraryBody.Failed(UiText.Resource(R.string.library_load_failed)),
         LibraryBody.Ready(previewTracks, RefreshState.Running),
         LibraryBody.Ready(previewTracks, RefreshState.Failed(UiText.Resource(R.string.library_refresh_failed))),
-    ).map { LibraryState(LibraryQuery("ru"), it) }
+    ).map { LibraryState(LibraryTrackQuery("ru"), it) }
 }
 
 @Preview(name = "Library states", widthDp = 360, heightDp = 800, locale = "ru")
@@ -55,7 +55,7 @@ private fun LibraryPreview(@PreviewParameter(LibraryPreviewStates::class) state:
 @Composable
 private fun LibraryLargeTextPreview() {
     NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
-        LibraryScreen(LibraryState(LibraryQuery("ru"), LibraryBody.Ready(previewTracks)), {}, {})
+        LibraryScreen(LibraryState(LibraryTrackQuery("ru"), LibraryBody.Ready(previewTracks)), {}, {})
     }
 }
 
@@ -64,7 +64,7 @@ private fun LibraryLargeTextPreview() {
 @Preview(name = "Library filters - Large text", widthDp = 320, heightDp = 640, fontScale = 2f, locale = "ru")
 @Composable
 private fun LibraryFiltersPreview() {
-    var query by remember { mutableStateOf(LibraryQuery("ru")) }
+    var query by remember { mutableStateOf(LibraryTrackQuery("ru")) }
     NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
         LibraryScreen(
             LibraryState(query, LibraryBody.Ready(previewTracks)),
@@ -94,7 +94,7 @@ private fun LibraryRefreshPreview() {
     }
     NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
         LibraryScreen(
-            LibraryState(LibraryQuery("ru"), LibraryBody.Ready(tracks,
+            LibraryState(LibraryTrackQuery("ru"), LibraryBody.Ready(tracks,
                 if (refreshing) RefreshState.Running else RefreshState.Idle)),
             onIntent = { if (it == LibraryIntent.Refresh) refreshing = true }, onAboutClick = {},
         )

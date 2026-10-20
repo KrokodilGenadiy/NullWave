@@ -1,4 +1,4 @@
-package com.zaus.nullwave.feature.library.api.model
+package com.zaus.nullwave.feature.library.api.model.track
 
 /** Opaque catalog identity. Consumers must not parse it or assume it survives reindexing. */
 @JvmInline

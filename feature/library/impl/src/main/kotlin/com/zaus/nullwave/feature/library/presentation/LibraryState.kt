@@ -1,12 +1,12 @@
 package com.zaus.nullwave.feature.library.presentation
 
-import com.zaus.nullwave.core.mvi.UiState
 import com.zaus.nullwave.core.mvi.ui.UiText
-import com.zaus.nullwave.feature.library.api.model.LibraryQuery
-import com.zaus.nullwave.feature.library.api.model.LibraryTrack
+import com.zaus.nullwave.core.mvi.UiState
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 
 internal data class LibraryState(
-    val query: LibraryQuery,
+    val query: LibraryTrackQuery,
     val body: LibraryBody = LibraryBody.Loading,
 ) : UiState
 

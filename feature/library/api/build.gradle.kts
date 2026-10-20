@@ -12,4 +12,5 @@ dependencies {
     api(project(":core:result"))
     api(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.core)
+    testImplementation(libs.junit)
 }

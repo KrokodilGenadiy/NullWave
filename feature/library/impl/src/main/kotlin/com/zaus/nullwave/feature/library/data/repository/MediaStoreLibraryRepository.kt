@@ -1,4 +1,4 @@
-package com.zaus.nullwave.feature.library.data
+package com.zaus.nullwave.feature.library.data.repository
 
 import android.database.sqlite.SQLiteCantOpenDatabaseException
 import android.database.sqlite.SQLiteDatabaseCorruptException
@@ -6,24 +6,44 @@ import android.database.sqlite.SQLiteDiskIOException
 import android.os.OperationCanceledException
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.DataError
-import com.zaus.nullwave.feature.library.api.model.LibraryQuery
-import com.zaus.nullwave.feature.library.api.model.LibraryTrack
-import com.zaus.nullwave.feature.library.api.repository.LibraryRepository
+import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
+import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumQuery
+import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
+import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
+import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
+import com.zaus.nullwave.feature.library.data.mapping.toAlbums
+import com.zaus.nullwave.feature.library.data.mapping.toArtists
+import com.zaus.nullwave.feature.library.data.mapping.toTracks
+import com.zaus.nullwave.feature.library.data.source.MediaStoreAudioRow
+import com.zaus.nullwave.feature.library.data.source.MediaStoreAudioSource
 import java.io.IOException
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 
 internal class MediaStoreLibraryRepository(
     private val source: MediaStoreAudioSource,
     private val io: CoroutineDispatcher,
-) : LibraryRepository {
-    override fun observeTracks(query: LibraryQuery): Flow<AppResult<List<LibraryTrack>, DataError>> = flow {
+) : LibraryCatalogRepository {
+    override fun observeTracks(query: LibraryTrackQuery): Flow<AppResult<List<LibraryTrack>, DataError>> =
+        observe { it.toTracks(query) }
+
+    override fun observeAlbums(query: LibraryAlbumQuery): Flow<AppResult<List<LibraryAlbum>, DataError>> =
+        observe { it.toAlbums(query) }
+
+    override fun observeArtists(query: LibraryArtistQuery): Flow<AppResult<List<LibraryArtist>, DataError>> =
+        observe { it.toArtists(query) }
+
+    private fun <T> observe(
+        transform: suspend (List<MediaStoreAudioRow>) -> List<T>,
+    ): Flow<AppResult<List<T>, DataError>> = flow {
         val changes = Channel<Unit>(Channel.CONFLATED)
         try {
             val observation = readResult { source.observeChanges { changes.trySend(Unit) } }
@@ -32,7 +52,7 @@ internal class MediaStoreLibraryRepository(
                 is AppResult.Success -> observation.value.use {
                     changes.trySend(Unit)
                     for (ignored in changes) {
-                        val result = readResult { source.readRows().toTracks(query) }
+                        val result = readResult { transform(source.readRows()) }
                         // Access may have been revoked while the provider was reading or sorting.
                         val checked = if (result is AppResult.Success && !source.hasReadAccess()) {
                             AppResult.Failure(DataError.AccessDenied)
@@ -71,6 +91,8 @@ internal class MediaStoreLibraryRepository(
 
     private suspend fun ioFailure(failure: Exception): AppResult.Failure<DataError> {
         currentCoroutineContext().ensureActive()
-        return AppResult.Failure(DataError.Io, failure)
+        // Both querying and observer registration can fail after access has been revoked.
+        val error = if (source.hasReadAccess()) DataError.Io else DataError.AccessDenied
+        return AppResult.Failure(error, failure)
     }
 }

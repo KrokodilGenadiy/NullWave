@@ -1,12 +1,12 @@
-package com.zaus.nullwave.feature.library.data
+package com.zaus.nullwave.feature.library.data.source
 
 import android.database.Cursor
 import android.os.CancellationSignal
 import android.os.OperationCanceledException
 import android.provider.MediaStore.Audio.Media
 import java.io.IOException
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.async
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -16,7 +16,7 @@ internal val audioProjection: Array<String>
     get() = arrayOf(
         Media._ID, Media.VOLUME_NAME, Media.TITLE, Media.DISPLAY_NAME,
         Media.ARTIST, Media.ALBUM, Media.DURATION, Media.DATE_ADDED,
-        Media.ALBUM_ID, Media.SIZE, Media.DATE_MODIFIED,
+        Media.ALBUM_ID, Media.SIZE, Media.DATE_MODIFIED, Media.ARTIST_ID,
     )
 
 internal fun audioSelection(sdk: Int): String = if (sdk >= 30) {
@@ -60,6 +60,7 @@ private fun Cursor.readRows(cancellation: CancellationSignal): List<MediaStoreAu
     val albumId = getColumnIndexOrThrow(Media.ALBUM_ID)
     val size = getColumnIndexOrThrow(Media.SIZE)
     val modified = getColumnIndexOrThrow(Media.DATE_MODIFIED)
+    val artistId = getColumnIndexOrThrow(Media.ARTIST_ID)
     return buildList {
         while (true) {
             cancellation.throwIfCanceled()
@@ -77,6 +78,7 @@ private fun Cursor.readRows(cancellation: CancellationSignal): List<MediaStoreAu
                 albumId = if (isNull(albumId)) null else getLong(albumId),
                 sizeBytes = if (isNull(size)) null else getLong(size),
                 dateModifiedSeconds = if (isNull(modified)) null else getLong(modified),
+                artistId = if (isNull(artistId)) null else getLong(artistId),
             ))
         }
     }

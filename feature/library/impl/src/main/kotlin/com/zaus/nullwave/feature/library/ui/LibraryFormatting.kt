@@ -1,6 +1,6 @@
 package com.zaus.nullwave.feature.library.ui
 
-import com.zaus.nullwave.feature.library.api.model.LibraryTrack
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
 import java.util.Locale
 
 internal fun librarySubtitle(artist: String?, album: String?, unknownArtist: String): String =

@@ -1,17 +1,17 @@
 package com.zaus.nullwave.feature.library.presentation
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.createSavedStateHandle
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.zaus.nullwave.core.mvi.BaseMviViewModel
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
 import com.zaus.nullwave.core.mvi.ui.UiText
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.DataError
-import com.zaus.nullwave.feature.library.api.model.LibraryQuery
-import com.zaus.nullwave.feature.library.api.model.LibrarySort
-import com.zaus.nullwave.feature.library.api.model.LibraryTrack
 import com.zaus.nullwave.feature.library.api.model.SortDirection
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
 import com.zaus.nullwave.feature.library.api.repository.LibraryRepository
 import com.zaus.nullwave.feature.library.di.LibraryInitialLocale
 import com.zaus.nullwave.feature.library.impl.R
@@ -86,7 +86,7 @@ internal class LibraryViewModel(
     }
 }
 
-private fun LibraryState.withQuery(next: LibraryQuery): LibraryState = if (next == query) this else copy(
+private fun LibraryState.withQuery(next: LibraryTrackQuery): LibraryState = if (next == query) this else copy(
     query = next,
     body = (body as? LibraryBody.AccessRequired) ?: LibraryBody.Loading,
 )
@@ -116,9 +116,9 @@ private fun LibraryBody.applyResult(result: AppResult<List<LibraryTrack>, DataEr
 private const val SORT_KEY = "library.sort"
 private const val DIRECTION_KEY = "library.direction"
 
-private fun SavedStateHandle.restoreQuery(localeTag: String): LibraryQuery = LibraryQuery(
+private fun SavedStateHandle.restoreQuery(localeTag: String): LibraryTrackQuery = LibraryTrackQuery(
     localeTag = localeTag,
-    sort = LibrarySort.entries.firstOrNull { it.name == get<Any?>(SORT_KEY) } ?: LibrarySort.Title,
+    sort = LibraryTrackSort.entries.firstOrNull { it.name == get<Any?>(SORT_KEY) } ?: LibraryTrackSort.Title,
     direction = SortDirection.entries.firstOrNull { it.name == get<Any?>(DIRECTION_KEY) }
         ?: SortDirection.Ascending,
 )

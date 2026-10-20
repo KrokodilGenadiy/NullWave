@@ -1,4 +1,4 @@
-package com.zaus.nullwave.feature.library.data
+package com.zaus.nullwave.feature.library.data.source
 
 import android.content.Context
 import android.database.ContentObserver
