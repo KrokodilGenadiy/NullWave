@@ -1,21 +1,16 @@
 package com.zaus.nullwave.feature.library.ui
 
-import android.text.format.Formatter
-
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
-import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,16 +20,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
-import com.zaus.nullwave.core.designsystem.components.content.NullWaveTrackRow
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButton
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButtonVariant
 import com.zaus.nullwave.core.designsystem.components.control.iconButton.NullWaveIconButton
@@ -42,11 +34,11 @@ import com.zaus.nullwave.core.designsystem.components.feedback.NullWaveEmptyStat
 import com.zaus.nullwave.core.designsystem.components.feedback.NullWaveErrorState
 import com.zaus.nullwave.core.designsystem.components.feedback.NullWaveInlineMessage
 import com.zaus.nullwave.core.designsystem.components.feedback.NullWaveLoadingIndicator
-import com.zaus.nullwave.core.designsystem.components.feedback.NullWaveMessageAction
 import com.zaus.nullwave.core.designsystem.components.feedback.NullWaveMessageVariant
 import com.zaus.nullwave.core.designsystem.components.layout.NullWaveScaffold
 import com.zaus.nullwave.core.designsystem.components.navigation.NullWaveTopBar
-import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveDivider
+import com.zaus.nullwave.core.designsystem.components.navigation.NullWaveTabItem
+import com.zaus.nullwave.core.designsystem.components.navigation.NullWaveTabRow
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveOctagonFrame
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcon
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
@@ -54,7 +46,6 @@ import com.zaus.nullwave.core.designsystem.modifier.NullWaveBorderStyle
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.mvi.ui.asString
 import com.zaus.nullwave.core.mvi.ui.collectMviStateWithLifecycle
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
 import com.zaus.nullwave.feature.library.platform.AndroidAudioPermission
@@ -63,6 +54,7 @@ import com.zaus.nullwave.feature.library.presentation.AccessAction
 import com.zaus.nullwave.feature.library.presentation.LibraryBody
 import com.zaus.nullwave.feature.library.presentation.LibraryIntent
 import com.zaus.nullwave.feature.library.presentation.LibraryState
+import com.zaus.nullwave.feature.library.presentation.LibraryTab
 import com.zaus.nullwave.feature.library.presentation.LibraryViewModel
 import com.zaus.nullwave.feature.library.presentation.RefreshState
 import dev.zacsweers.metrox.viewmodel.metroViewModel
@@ -97,9 +89,19 @@ internal fun LibraryScreen(
     accessUi: LibraryAccessUi = LibraryAccessUi(),
     artworkLoader: LibraryArtworkLoader? = null,
 ) {
+    // Keep each position alive while another tab or a Loading/Failed branch is composed.
+    // Feeding a temporary one-item loading grid into these states would clamp their positions.
+    val songsScroll = rememberLazyGridState()
+    val artistsScroll = rememberLazyGridState()
+    val albumsScroll = rememberLazyGridState()
+    val listState = when (state.selectedTab) {
+        LibraryTab.Songs -> songsScroll
+        LibraryTab.Artists -> artistsScroll
+        LibraryTab.Albums -> albumsScroll
+    }
     val spacing = NullWaveTheme.spacing
-    val ready = state.body as? LibraryBody.Ready<LibraryTrack>
-    var filtersVisible by rememberSaveable { mutableStateOf(false) }
+    val ready = state.selectedBody as? LibraryBody.Ready<*>
+    var filtersVisible by rememberSaveable(state.selectedTab) { mutableStateOf(false) }
     NullWaveScaffold(
         modifier = Modifier.fillMaxSize().testTag("library_screen"),
         topBar = {
@@ -116,15 +118,24 @@ internal fun LibraryScreen(
                         enabled = ready != null)
                     NullWaveIconButton(NullWaveIcons.Info, stringResource(R.string.library_action), onAboutClick)
                 })
-                NullWaveDivider()
+                NullWaveTabRow(
+                    items = LibraryVisibleTabs.map { NullWaveTabItem(stringResource(it.tabLabel())) },
+                    selectedIndex = LibraryVisibleTabs.indexOf(state.selectedTab),
+                    onSelect = { onIntent(LibraryIntent.TabSelected(LibraryVisibleTabs[it])) },
+                    modifier = Modifier.testTag("library_tabs"),
+                )
             }
         },
     ) { padding ->
+        if (ready != null) {
+            LibraryReadyContent(state, onIntent, { filtersVisible = true }, artworkLoader, padding, listState)
+            return@NullWaveScaffold
+        }
         LazyColumn(
             Modifier.fillMaxSize().consumeWindowInsets(padding).testTag("library_list"),
             contentPadding = padding,
         ) {
-            when (val body = state.body) {
+            when (val body = state.selectedBody) {
                 LibraryBody.Loading -> item("loading") {
                     Box(Modifier.fillParentMaxSize().padding(spacing.lg), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally,
@@ -147,53 +158,11 @@ internal fun LibraryScreen(
                         },
                     )
                 }
-                is LibraryBody.Ready -> {
-                    item("summary") {
-                        FlowRow(
-                            Modifier.fillMaxWidth().padding(NullWaveTheme.dimens.gutter),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalArrangement = Arrangement.spacedBy(spacing.xs),
-                        ) {
-                            val bytes = remember(body.items) { libraryTotalBytes(body.items) }
-                            val size = bytes?.let { Formatter.formatShortFileSize(LocalContext.current, it) }
-                                ?: stringResource(R.string.library_size_unknown)
-                            val count = pluralStringResource(R.plurals.library_track_count, body.items.size, body.items.size)
-                            Text(stringResource(R.string.library_summary, count, size),
-                                Modifier.align(Alignment.CenterVertically).testTag("library_summary"),
-                                style = NullWaveTheme.typography.micro, color = NullWaveTheme.colors.textSecondary)
-                            LibraryFiltersButton(state.query, onClick = { filtersVisible = true })
-                        }
-                    }
-                    when (val refresh = body.refresh) {
-                        RefreshState.Idle, RefreshState.Running -> Unit
-                        is RefreshState.Failed -> item("refresh_error") {
-                            NullWaveInlineMessage(refresh.message.asString(),
-                                Modifier.padding(spacing.md).testTag("library_refresh_error")
-                                    .semantics { liveRegion = LiveRegionMode.Polite },
-                                variant = NullWaveMessageVariant.Error,
-                                action = NullWaveMessageAction(stringResource(R.string.library_retry), { onIntent(LibraryIntent.Retry) }))
-                        }
-                    }
-                    if (body.items.isEmpty()) item("empty") {
-                        NullWaveEmptyState(stringResource(R.string.library_empty_title), stringResource(R.string.library_empty_body),
-                            modifier = Modifier.testTag("library_empty"),
-                            illustration = { LibraryStateIcon(NullWaveIcons.Songs) })
-                    }
-                    items(body.items, key = { "track:${it.id.value}" }, contentType = { "track" }) { track ->
-                        NullWaveTrackRow(
-                            title = track.title,
-                            subtitle = librarySubtitle(track.artist, track.album, stringResource(R.string.library_unknown_artist)),
-                            durationLabel = libraryDuration(track.durationMs),
-                            modifier = Modifier.testTag("library_track:${track.id.value}"),
-                            artwork = { LibraryArtwork(track, artworkLoader) },
-                        )
-                        NullWaveDivider(Modifier.padding(horizontal = NullWaveTheme.dimens.gutter))
-                    }
-                }
+                is LibraryBody.Ready -> Unit
             }
         }
     }
-    if (filtersVisible) LibraryFiltersDialog(state.query, onIntent, onDismiss = { filtersVisible = false })
+    if (filtersVisible) LibraryFiltersDialog(state, onIntent, onDismiss = { filtersVisible = false })
 }
 
 @Composable
@@ -227,7 +196,7 @@ private fun LibraryAccessContent(action: AccessAction, accessUi: LibraryAccessUi
 }
 
 @Composable
-private fun LibraryStateIcon(icon: Int) {
+internal fun LibraryStateIcon(icon: Int) {
     NullWaveOctagonFrame(Modifier.size(72.dp), borderStyle = NullWaveBorderStyle.ClippedCorners) {
         NullWaveIcon(icon, contentDescription = null, modifier = Modifier.size(32.dp), tint = NullWaveTheme.colors.primary)
     }

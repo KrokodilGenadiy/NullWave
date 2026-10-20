@@ -4,6 +4,24 @@
     <string name="library_load_failed">Could not load your audio library. Try again.</string>
     <string name="library_refresh_failed">Could not refresh your library. Showing the previous results.</string>
     <string name="library_tracks">Tracks</string>
+    <string name="library_tab_songs">SONGS</string>
+    <string name="library_tab_artists">ARTISTS</string>
+    <string name="library_tab_albums">ALBUMS</string>
+    <string name="library_sort_name">Name</string>
+    <string name="library_unknown_album">Unknown album</string>
+    <string name="library_various_artists">Various artists</string>
+    <string name="library_albums_empty_title">No albums found</string>
+    <string name="library_albums_empty_body">The device media catalog has no album groups. Audio may still be available in Songs.</string>
+    <string name="library_artists_empty_title">No artists found</string>
+    <string name="library_artists_empty_body">The device media catalog has no artist groups. Audio may still be available in Songs.</string>
+    <plurals name="library_album_count">
+        <item quantity="one">%d album</item>
+        <item quantity="other">%d albums</item>
+    </plurals>
+    <plurals name="library_artist_count">
+        <item quantity="one">%d artist</item>
+        <item quantity="other">%d artists</item>
+    </plurals>
     <string name="library_summary">%1$s · %2$s</string>
     <string name="library_size_unknown">size unknown</string>
     <plurals name="library_track_count">

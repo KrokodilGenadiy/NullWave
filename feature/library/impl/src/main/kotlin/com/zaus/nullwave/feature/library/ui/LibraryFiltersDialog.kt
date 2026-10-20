@@ -20,10 +20,11 @@ import com.zaus.nullwave.core.designsystem.components.overlay.NullWaveDialog
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveDivider
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.feature.library.api.model.SortDirection
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.presentation.LibraryIntent
+import com.zaus.nullwave.feature.library.presentation.LibraryState
+import com.zaus.nullwave.feature.library.presentation.LibraryTab
 
 @StringRes
 internal fun LibraryTrackSort.label(): Int = when (this) {
@@ -33,7 +34,7 @@ internal fun LibraryTrackSort.label(): Int = when (this) {
 }
 
 @Composable
-internal fun LibraryFiltersDialog(query: LibraryTrackQuery, onIntent: (LibraryIntent) -> Unit, onDismiss: () -> Unit) {
+internal fun LibraryFiltersDialog(state: LibraryState, onIntent: (LibraryIntent) -> Unit, onDismiss: () -> Unit) {
     NullWaveDialog(
         title = stringResource(R.string.library_filters),
         onDismissRequest = onDismiss,
@@ -41,12 +42,16 @@ internal fun LibraryFiltersDialog(query: LibraryTrackQuery, onIntent: (LibraryIn
     ) {
         Text(stringResource(R.string.library_sort), Modifier.semantics { heading() },
             style = NullWaveTheme.typography.micro)
-        Column(Modifier.selectableGroup()) {
-            LibraryTrackSort.entries.forEach { sort ->
-                SortOption(stringResource(sort.label()), query.sort == sort) {
-                    onIntent(LibraryIntent.SortChanged(sort, query.direction))
+        if (state.selectedTab == LibraryTab.Songs) {
+            Column(Modifier.selectableGroup()) {
+                LibraryTrackSort.entries.forEach { sort ->
+                    SortOption(stringResource(sort.label()), state.query.sort == sort) {
+                        onIntent(LibraryIntent.SortChanged(sort, state.query.direction))
+                    }
                 }
             }
+        } else {
+            Text(stringResource(state.sortLabel()), style = NullWaveTheme.typography.body)
         }
         NullWaveDivider()
         Text(stringResource(R.string.library_sort_direction), Modifier.semantics { heading() },
@@ -54,8 +59,8 @@ internal fun LibraryFiltersDialog(query: LibraryTrackQuery, onIntent: (LibraryIn
         Column(Modifier.selectableGroup()) {
             SortDirection.entries.forEach { direction ->
                 SortOption(stringResource(if (direction == SortDirection.Ascending) R.string.library_ascending
-                    else R.string.library_descending), query.direction == direction) {
-                    onIntent(LibraryIntent.SortChanged(query.sort, direction))
+                    else R.string.library_descending), state.sortDirection == direction) {
+                    onIntent(state.sortIntent(direction))
                 }
             }
         }

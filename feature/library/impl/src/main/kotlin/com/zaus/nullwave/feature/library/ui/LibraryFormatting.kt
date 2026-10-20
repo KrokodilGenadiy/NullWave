@@ -1,7 +1,14 @@
 package com.zaus.nullwave.feature.library.ui
 
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.feature.library.api.model.album.AlbumArtistCredit
 import java.util.Locale
+
+internal fun libraryAlbumCredit(credit: AlbumArtistCredit, unknown: String, various: String): String = when (credit) {
+    AlbumArtistCredit.Unknown -> unknown
+    AlbumArtistCredit.Various -> various
+    is AlbumArtistCredit.Named -> credit.name
+}
 
 internal fun librarySubtitle(artist: String?, album: String?, unknownArtist: String): String =
     listOfNotNull(artist, album).joinToString(" · ").ifEmpty { unknownArtist }

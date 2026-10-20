@@ -4,6 +4,28 @@
     <string name="library_load_failed">Не удалось загрузить аудиотеку. Попробуйте ещё раз.</string>
     <string name="library_refresh_failed">Не удалось обновить библиотеку. Показаны предыдущие результаты.</string>
     <string name="library_tracks">Треки</string>
+    <string name="library_tab_songs">ТРЕКИ</string>
+    <string name="library_tab_artists">ИСПОЛНИТЕЛИ</string>
+    <string name="library_tab_albums">АЛЬБОМЫ</string>
+    <string name="library_sort_name">Имя</string>
+    <string name="library_unknown_album">Неизвестный альбом</string>
+    <string name="library_various_artists">Разные исполнители</string>
+    <string name="library_albums_empty_title">Альбомы не найдены</string>
+    <string name="library_albums_empty_body">В медиакаталоге устройства нет групп альбомов. Аудио может быть доступно во вкладке «Треки».</string>
+    <string name="library_artists_empty_title">Исполнители не найдены</string>
+    <string name="library_artists_empty_body">В медиакаталоге устройства нет групп исполнителей. Аудио может быть доступно во вкладке «Треки».</string>
+    <plurals name="library_album_count">
+        <item quantity="one">%d альбом</item>
+        <item quantity="few">%d альбома</item>
+        <item quantity="many">%d альбомов</item>
+        <item quantity="other">%d альбома</item>
+    </plurals>
+    <plurals name="library_artist_count">
+        <item quantity="one">%d исполнитель</item>
+        <item quantity="few">%d исполнителя</item>
+        <item quantity="many">%d исполнителей</item>
+        <item quantity="other">%d исполнителя</item>
+    </plurals>
     <string name="library_summary">%1$s · %2$s</string>
     <string name="library_size_unknown">размер неизвестен</string>
     <plurals name="library_track_count">
