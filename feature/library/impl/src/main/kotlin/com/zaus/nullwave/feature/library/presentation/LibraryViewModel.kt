@@ -5,16 +5,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.zaus.nullwave.core.mvi.BaseMviViewModel
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
-import com.zaus.nullwave.core.mvi.ui.UiText
-import com.zaus.nullwave.core.result.AppResult
-import com.zaus.nullwave.core.result.DataError
-import com.zaus.nullwave.feature.library.api.model.SortDirection
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
-import com.zaus.nullwave.feature.library.api.repository.LibraryRepository
+import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
 import com.zaus.nullwave.feature.library.di.LibraryInitialLocale
-import com.zaus.nullwave.feature.library.impl.R
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Assisted
 import dev.zacsweers.metro.AssistedFactory
@@ -23,14 +15,14 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactory
 import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactoryKey
 
-/** Entry-owned presentation logic. Platform access requests belong to the future LibraryRoot. */
+/** Entry-owned presentation logic. Platform access requests belong to LibraryRoot. */
 @AssistedInject
 internal class LibraryViewModel(
-    private val repository: LibraryRepository,
+    private val repository: LibraryCatalogRepository,
     @Assisted private val savedStateHandle: SavedStateHandle,
     @LibraryInitialLocale initialLocaleTag: String,
 ) : BaseMviViewModel<LibraryState, LibraryIntent, Nothing>(
-    LibraryState(query = savedStateHandle.restoreQuery(initialLocaleTag)),
+    savedStateHandle.restoreLibraryState(initialLocaleTag),
 ) {
     @AssistedFactory
     @ViewModelAssistedFactoryKey(LibraryViewModel::class)
@@ -42,83 +34,63 @@ internal class LibraryViewModel(
 
     override fun MviDefinition<LibraryState, LibraryIntent, Nothing>.define() {
         source(
-            name = "library.tracks",
-            input = { query },
-            flow = repository::observeTracks,
+            name = "library.catalog",
+            input = { catalogRequest },
+            flow = repository::observe,
         ) { _, result ->
-            copy(body = body.applyResult(result))
+            applyResult(result)
         }
 
         on<LibraryIntent.Refresh> {
-            val ready = state.body as? LibraryBody.Ready ?: return@on
+            val ready = state.selectedBody as? LibraryBody.Ready<*> ?: return@on
             if (ready.refresh == RefreshState.Running) return@on
-            reduce { copy(body = ready.copy(refresh = RefreshState.Running)) }
+            reduce { startReadingSelected() }
             restartSources()
         }
         on<LibraryIntent.Retry> {
-            val current = state.body
+            val current = state.selectedBody
             if (current !is LibraryBody.Failed &&
-                !(current is LibraryBody.Ready && current.refresh is RefreshState.Failed)
+                !(current is LibraryBody.Ready<*> && current.refresh is RefreshState.Failed)
             ) return@on
-            reduce { copy(body = body.startReading()) }
+            reduce { startReadingSelected() }
             restartSources()
         }
         on<LibraryIntent.AccessChecked> { intent ->
             reduce {
-                copy(body = when (val access = intent.access) {
-                    LibraryAccess.Granted -> body.startReading()
-                    is LibraryAccess.Required -> LibraryBody.AccessRequired(access.action)
-                })
+                when (val access = intent.access) {
+                    LibraryAccess.Granted -> startReadingSelected()
+                    is LibraryAccess.Required -> requireAccess(access.action)
+                }
             }
             // A fresh OS check invalidates even an equal query/grant after returning to the screen.
             // Publish the loading/gate state first: a synchronous Flow must have the final word.
             restartSources()
         }
         on<LibraryIntent.SortChanged> { intent ->
-            reduce { withQuery(query.copy(sort = intent.sort, direction = intent.direction)) }
+            reduce { withInputs(copy(query = query.copy(sort = intent.sort, direction = intent.direction))) }
             // Persist the current state, not captured intent fields that a reentrant UI may replace.
-            savedStateHandle[SORT_KEY] = state.query.sort.name
-            savedStateHandle[DIRECTION_KEY] = state.query.direction.name
+            savedStateHandle.saveTrackSort(state)
+        }
+        on<LibraryIntent.TabSelected> { intent ->
+            reduce { withInputs(copy(selectedTab = intent.tab)) }
+            savedStateHandle.saveTab(state)
+        }
+        on<LibraryIntent.AlbumSortChanged> { intent ->
+            reduce { withInputs(copy(albumQuery = albumQuery.copy(direction = intent.direction))) }
+            savedStateHandle.saveAlbumSort(state)
+        }
+        on<LibraryIntent.ArtistSortChanged> { intent ->
+            reduce { withInputs(copy(artistQuery = artistQuery.copy(direction = intent.direction))) }
+            savedStateHandle.saveArtistSort(state)
         }
         on<LibraryIntent.LocaleChanged> { intent ->
-            reduce { withQuery(query.copy(localeTag = intent.localeTag)) }
-        }
-    }
-}
-
-private fun LibraryState.withQuery(next: LibraryTrackQuery): LibraryState = if (next == query) this else copy(
-    query = next,
-    body = (body as? LibraryBody.AccessRequired) ?: LibraryBody.Loading,
-)
-
-private fun LibraryBody.startReading(): LibraryBody = when (this) {
-    is LibraryBody.Ready -> copy(refresh = RefreshState.Running)
-    else -> LibraryBody.Loading
-}
-
-private fun LibraryBody.applyResult(result: AppResult<List<LibraryTrack>, DataError>): LibraryBody =
-    when (result) {
-        is AppResult.Success -> LibraryBody.Ready(result.value.toList())
-        is AppResult.Failure -> when (result.error) {
-            DataError.AccessDenied -> (this as? LibraryBody.AccessRequired)
-                ?: LibraryBody.AccessRequired(AccessAction.CheckAgain)
-            DataError.Io -> if (this is LibraryBody.Ready) {
-                copy(refresh = RefreshState.Failed(UiText.Resource(R.string.library_refresh_failed)))
-            } else {
-                LibraryBody.Failed(UiText.Resource(R.string.library_load_failed))
+            reduce {
+                withInputs(copy(
+                    query = query.copy(localeTag = intent.localeTag),
+                    albumQuery = albumQuery.copy(localeTag = intent.localeTag),
+                    artistQuery = artistQuery.copy(localeTag = intent.localeTag),
+                ))
             }
-            DataError.NotFound, DataError.StorageFull -> throw IllegalStateException(
-                "Library observation returned an unsupported read failure: ${result.error}", result.cause,
-            )
         }
     }
-
-private const val SORT_KEY = "library.sort"
-private const val DIRECTION_KEY = "library.direction"
-
-private fun SavedStateHandle.restoreQuery(localeTag: String): LibraryTrackQuery = LibraryTrackQuery(
-    localeTag = localeTag,
-    sort = LibraryTrackSort.entries.firstOrNull { it.name == get<Any?>(SORT_KEY) } ?: LibraryTrackSort.Title,
-    direction = SortDirection.entries.firstOrNull { it.name == get<Any?>(DIRECTION_KEY) }
-        ?: SortDirection.Ascending,
-)
+}

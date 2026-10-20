@@ -54,6 +54,7 @@ import com.zaus.nullwave.core.designsystem.modifier.NullWaveBorderStyle
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.mvi.ui.asString
 import com.zaus.nullwave.core.mvi.ui.collectMviStateWithLifecycle
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
 import com.zaus.nullwave.feature.library.platform.AndroidAudioPermission
@@ -97,7 +98,7 @@ internal fun LibraryScreen(
     artworkLoader: LibraryArtworkLoader? = null,
 ) {
     val spacing = NullWaveTheme.spacing
-    val ready = state.body as? LibraryBody.Ready
+    val ready = state.body as? LibraryBody.Ready<LibraryTrack>
     var filtersVisible by rememberSaveable { mutableStateOf(false) }
     NullWaveScaffold(
         modifier = Modifier.fillMaxSize().testTag("library_screen"),
@@ -153,10 +154,10 @@ internal fun LibraryScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalArrangement = Arrangement.spacedBy(spacing.xs),
                         ) {
-                            val bytes = remember(body.tracks) { libraryTotalBytes(body.tracks) }
+                            val bytes = remember(body.items) { libraryTotalBytes(body.items) }
                             val size = bytes?.let { Formatter.formatShortFileSize(LocalContext.current, it) }
                                 ?: stringResource(R.string.library_size_unknown)
-                            val count = pluralStringResource(R.plurals.library_track_count, body.tracks.size, body.tracks.size)
+                            val count = pluralStringResource(R.plurals.library_track_count, body.items.size, body.items.size)
                             Text(stringResource(R.string.library_summary, count, size),
                                 Modifier.align(Alignment.CenterVertically).testTag("library_summary"),
                                 style = NullWaveTheme.typography.micro, color = NullWaveTheme.colors.textSecondary)
@@ -173,12 +174,12 @@ internal fun LibraryScreen(
                                 action = NullWaveMessageAction(stringResource(R.string.library_retry), { onIntent(LibraryIntent.Retry) }))
                         }
                     }
-                    if (body.tracks.isEmpty()) item("empty") {
+                    if (body.items.isEmpty()) item("empty") {
                         NullWaveEmptyState(stringResource(R.string.library_empty_title), stringResource(R.string.library_empty_body),
                             modifier = Modifier.testTag("library_empty"),
                             illustration = { LibraryStateIcon(NullWaveIcons.Songs) })
                     }
-                    items(body.tracks, key = { "track:${it.id.value}" }, contentType = { "track" }) { track ->
+                    items(body.items, key = { "track:${it.id.value}" }, contentType = { "track" }) { track ->
                         NullWaveTrackRow(
                             title = track.title,
                             subtitle = librarySubtitle(track.artist, track.album, stringResource(R.string.library_unknown_artist)),
