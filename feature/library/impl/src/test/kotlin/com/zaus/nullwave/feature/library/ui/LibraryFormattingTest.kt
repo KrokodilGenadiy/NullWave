@@ -1,6 +1,7 @@
 package com.zaus.nullwave.feature.library.ui
 
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.feature.library.api.model.album.AlbumArtistCredit
 import com.zaus.nullwave.feature.library.api.model.track.TrackId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -8,6 +9,13 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class LibraryFormattingTest {
+    @Test
+    fun `album credit distinguishes missing tags from compilation credits without translating names`() {
+        assertEquals("Unknown", libraryAlbumCredit(AlbumArtistCredit.Unknown, "Unknown", "Various"))
+        assertEquals("Various", libraryAlbumCredit(AlbumArtistCredit.Various, "Unknown", "Various"))
+        assertEquals("Сигнал", libraryAlbumCredit(AlbumArtistCredit.Named("Сигнал"), "Unknown", "Various"))
+    }
+
     @Test
     fun `subtitle uses the available tags without dangling separators`() {
         assertEquals("Artist · Album", librarySubtitle("Artist", "Album", "Unknown"))

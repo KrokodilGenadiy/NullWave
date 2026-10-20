@@ -14,11 +14,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.core.app.ActivityOptionsCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
@@ -35,11 +37,18 @@ import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.api.model.track.TrackId
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumQuery
+import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
+import com.zaus.nullwave.feature.library.api.model.album.AlbumId
+import com.zaus.nullwave.feature.library.api.model.album.AlbumArtistCredit
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
+import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
+import com.zaus.nullwave.feature.library.api.model.artist.ArtistId
+import com.zaus.nullwave.feature.library.api.model.SortDirection
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.platform.AudioPermission
 import com.zaus.nullwave.feature.library.presentation.LibraryViewModel
+import com.zaus.nullwave.feature.library.presentation.LibraryTab
 import java.util.Locale
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.flow
@@ -58,6 +67,8 @@ class LibraryRootInstrumentedTest {
     private lateinit var owner: ScreenOwner
     private lateinit var viewModel: LibraryViewModel
     private var subscriptions = 0
+    private val catalogQueries = mutableListOf<Any>()
+    private var activeSources = 0
     private val configuration = mutableStateOf(Configuration().apply { setLocale(Locale.ENGLISH) })
 
     @After
@@ -253,24 +264,65 @@ class LibraryRootInstrumentedTest {
         compose.runOnIdle { assertEquals("ru-RU", viewModel.state.value.query.localeTag) }
     }
 
+    @Test
+    fun restoredTabAndUiActionsSelectOneCatalogSourceAndRespectRevocation() {
+        permission.granted = true
+        show(SavedStateHandle(mapOf("library.tab" to "Albums", "library.albums.direction" to "Descending")))
+        compose.onNodeWithText("Test album").assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.library_tab_albums)).assertIsSelected()
+        compose.runOnIdle {
+            assertEquals(1, activeSources)
+            assertTrue(catalogQueries.all { it is LibraryAlbumQuery })
+            assertEquals(SortDirection.Descending, (catalogQueries.last() as LibraryAlbumQuery).direction)
+        }
+        compose.onNodeWithText(text(R.string.library_tab_artists)).performScrollTo().performClick()
+        compose.onNodeWithText("Test artist").assertIsDisplayed()
+        compose.onNodeWithTag("library_filters").performClick()
+        compose.onNodeWithText(text(R.string.library_descending)).performClick()
+        compose.onNodeWithText(text(R.string.library_done)).performClick()
+        compose.onNodeWithText("Test artist").assertIsDisplayed()
+        val reads = compose.runOnIdle {
+            assertEquals(1, activeSources)
+            assertEquals(LibraryTab.Artists, viewModel.state.value.selectedTab)
+            assertEquals(SortDirection.Descending, (catalogQueries.last() as LibraryArtistQuery).direction)
+            owner.registry.currentState = Lifecycle.State.STARTED
+            permission.granted = false
+            owner.registry.currentState = Lifecycle.State.RESUMED
+            catalogQueries.size
+        }
+        compose.onNodeWithTag("library_access").assertIsDisplayed()
+        compose.onNodeWithText("Test artist").assertDoesNotExist()
+        compose.onNodeWithText(text(R.string.library_tab_songs)).performScrollTo().performClick()
+        compose.onNodeWithTag("library_access").assertIsDisplayed()
+        compose.runOnIdle {
+            assertEquals(reads, catalogQueries.size)
+            assertEquals(0, activeSources)
+            owner.registry.currentState = Lifecycle.State.STARTED
+            permission.granted = true
+            owner.registry.currentState = Lifecycle.State.RESUMED
+        }
+        compose.onNodeWithText("Low Orbit").assertIsDisplayed()
+        compose.runOnIdle {
+            assertTrue(catalogQueries.last() is LibraryTrackQuery)
+            assertEquals(1, activeSources)
+        }
+    }
+
     private fun clickAccess() { compose.onNodeWithTag("library_access_action").performClick() }
     private fun text(id: Int) = InstrumentationRegistry.getInstrumentation().targetContext.getString(id)
 
-    private fun show(): StateRestorationTester {
+    private fun show(savedState: SavedStateHandle = SavedStateHandle()): StateRestorationTester {
         compose.runOnUiThread {
             owner = ScreenOwner()
             val repository = object : LibraryCatalogRepository {
-                override fun observeAlbums(query: LibraryAlbumQuery): Nothing = error("Songs permission test must not read albums")
-                override fun observeArtists(query: LibraryArtistQuery): Nothing = error("Songs permission test must not read artists")
-                override fun observeTracks(query: LibraryTrackQuery) = flow<AppResult<List<LibraryTrack>, DataError>> {
-                    subscriptions++
-                    if (permission.granted) {
-                        emit(AppResult.Success(listOf(LibraryTrack(TrackId("test:1"), "Low Orbit", null, null, 203_000))))
-                        awaitCancellation()
-                    } else emit(AppResult.Failure(DataError.AccessDenied))
-                }
+                override fun observeAlbums(query: LibraryAlbumQuery) = observe(query, listOf(
+                    LibraryAlbum(AlbumId("test:album"), "Test album", AlbumArtistCredit.Unknown, 1)))
+                override fun observeArtists(query: LibraryArtistQuery) = observe(query, listOf(
+                    LibraryArtist(ArtistId("test:artist"), "Test artist", 1, 1)))
+                override fun observeTracks(query: LibraryTrackQuery) = observe(query, listOf(
+                    LibraryTrack(TrackId("test:1"), "Low Orbit", null, null, 203_000)))
             }
-            viewModel = LibraryViewModel(repository, SavedStateHandle(), "en")
+            viewModel = LibraryViewModel(repository, savedState, "en")
             store.put("library", viewModel)
             configuration.value = Configuration(InstrumentationRegistry.getInstrumentation().targetContext.resources.configuration)
         }
@@ -285,6 +337,18 @@ class LibraryRootInstrumentedTest {
                 }
             }
         }
+    }
+
+    private fun <T> observe(query: Any, items: List<T>) = flow<AppResult<List<T>, DataError>> {
+        subscriptions++
+        catalogQueries += query
+        activeSources++
+        try {
+            if (permission.granted) {
+                emit(AppResult.Success(items))
+                awaitCancellation()
+            } else emit(AppResult.Failure(DataError.AccessDenied))
+        } finally { activeSources-- }
     }
 }
 
