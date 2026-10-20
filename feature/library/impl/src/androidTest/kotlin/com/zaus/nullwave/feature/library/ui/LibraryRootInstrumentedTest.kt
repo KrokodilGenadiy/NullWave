@@ -34,7 +34,9 @@ import com.zaus.nullwave.core.result.DataError
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.api.model.track.TrackId
-import com.zaus.nullwave.feature.library.api.repository.LibraryRepository
+import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumQuery
+import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
+import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.platform.AudioPermission
 import com.zaus.nullwave.feature.library.presentation.LibraryViewModel
@@ -257,7 +259,9 @@ class LibraryRootInstrumentedTest {
     private fun show(): StateRestorationTester {
         compose.runOnUiThread {
             owner = ScreenOwner()
-            val repository = object : LibraryRepository {
+            val repository = object : LibraryCatalogRepository {
+                override fun observeAlbums(query: LibraryAlbumQuery): Nothing = error("Songs permission test must not read albums")
+                override fun observeArtists(query: LibraryArtistQuery): Nothing = error("Songs permission test must not read artists")
                 override fun observeTracks(query: LibraryTrackQuery) = flow<AppResult<List<LibraryTrack>, DataError>> {
                     subscriptions++
                     if (permission.granted) {

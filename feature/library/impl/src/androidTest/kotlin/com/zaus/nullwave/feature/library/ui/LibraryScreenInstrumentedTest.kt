@@ -176,7 +176,7 @@ private class LibraryScreenRobot(private val compose: ComposeContentTestRule) {
     var aboutClicks = 0
     fun text(id: Int, vararg args: Any) = InstrumentationRegistry.getInstrumentation().targetContext.getString(id, *args)
 
-    fun show(body: LibraryBody, access: LibraryAccessUi = LibraryAccessUi(),
+    fun show(body: LibraryBody<LibraryTrack>, access: LibraryAccessUi = LibraryAccessUi(),
              fontScale: Float = 1f, direction: LayoutDirection = LayoutDirection.Ltr) = apply {
         state.value = LibraryState(LibraryTrackQuery("en"), body)
         compose.setContent {
@@ -194,7 +194,7 @@ private class LibraryScreenRobot(private val compose: ComposeContentTestRule) {
             }
         }
     }
-    fun updateBody(body: LibraryBody) = apply {
+    fun updateBody(body: LibraryBody<LibraryTrack>) = apply {
         compose.runOnIdle { state.value = state.value.copy(body = body) }
     }
     fun visible(tag: String) = apply { compose.onNodeWithTag(tag).assertIsDisplayed() }

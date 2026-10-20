@@ -3,12 +3,16 @@ package com.zaus.nullwave.feature.library.di
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
-import com.zaus.nullwave.feature.library.api.repository.LibraryRepository
+import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
 import com.zaus.nullwave.feature.library.data.repository.MediaStoreLibraryRepository
 import com.zaus.nullwave.feature.library.data.source.audioRow
 import com.zaus.nullwave.feature.library.data.source.FakeMediaStoreAudioSource
 import com.zaus.nullwave.feature.library.presentation.LibraryBody
+import com.zaus.nullwave.feature.library.presentation.LibraryIntent
+import com.zaus.nullwave.feature.library.presentation.LibraryTab
 import com.zaus.nullwave.feature.library.presentation.LibraryViewModel
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.createGraphFactory
@@ -67,7 +71,12 @@ class LibraryGraphTest {
         backgroundScope.launch { second.withUiBinding { awaitCancellation() } }
         runCurrent()
         assertEquals(2, source.activeObservers)
-        assertEquals("Low Orbit", (first.state.value.body as LibraryBody.Ready).tracks.single().title)
+        assertEquals("Low Orbit", (first.state.value.body as LibraryBody.Ready<LibraryTrack>).items.single().title)
+        first.onIntent(LibraryIntent.TabSelected(LibraryTab.Albums))
+        runCurrent()
+        assertEquals("Signals", (first.state.value.albums as LibraryBody.Ready<LibraryAlbum>).items.single().title)
+        assertEquals(LibraryTab.Songs, second.state.value.selectedTab)
+        assertEquals(2, source.activeObservers)
         store.clear()
         runCurrent()
         assertEquals(0, source.activeObservers)
@@ -84,7 +93,7 @@ internal interface LibraryTestGraph : ViewModelGraph {
     @DependencyGraph.Factory
     fun interface Factory {
         fun create(
-            @Provides repository: LibraryRepository,
+            @Provides repository: LibraryCatalogRepository,
             @Provides @LibraryInitialLocale locale: String,
         ): LibraryTestGraph
     }
