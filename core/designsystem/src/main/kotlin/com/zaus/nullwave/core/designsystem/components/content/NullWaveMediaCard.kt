@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.zaus.nullwave.core.designsystem.components.control.iconButton.NullWaveIconButton
@@ -38,13 +39,14 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
  * [artwork] fills a square and must be decorative/noninteractive; its semantics are suppressed.
  * [badge] is noninteractive text, included in the card's accessible name. Labels stay single-line
  * with ellipsis and retain their full semantics. No marquee, loading job or entity policy here.
- * One open action for the whole tile; labels use the full width beneath the artwork.
+ * Optional open action for the whole tile; labels use the full width beneath the artwork.
+ * A null [onClick] presents informational content without a button role or disabled styling.
  */
 @Composable
 fun NullWaveMediaGridCard(
     title: String,
-    onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
     supportingText: String? = null,
     artwork: @Composable () -> Unit = { NullWaveCoverArt() },
     badge: @Composable (() -> Unit)? = null,
@@ -67,15 +69,15 @@ fun NullWaveMediaGridCard(
 
 /**
  * Compact collection row, sharing card styling with [NullWaveMediaGridCard]. Artwork is 56 dp;
- * badge sits below labels so it cannot squeeze the title or overflow action. This is an open action,
- * not a track selection/playback control. Full metadata belongs to a details surface.
+ * badge sits below labels so it cannot squeeze the title or overflow action. [onClick] optionally
+ * opens details; null presents informational content. Full metadata belongs to a details surface.
  * Optional overflow is a separate 48 dp action and requires a contextual [moreDescription].
  */
 @Composable
 fun NullWaveMediaListItem(
     title: String,
-    onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
     supportingText: String? = null,
     artwork: @Composable () -> Unit = { NullWaveCoverArt() },
     badge: @Composable (() -> Unit)? = null,
@@ -116,7 +118,7 @@ private fun MediaLabels(title: String, supportingText: String?, enabled: Boolean
 
 @Composable
 private fun MediaCardContainer(
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
     modifier: Modifier,
     enabled: Boolean,
     interactionSource: MutableInteractionSource?,
@@ -129,18 +131,19 @@ private fun MediaCardContainer(
     val colors = NullWaveTheme.colors
     val dimens = NullWaveTheme.dimens
     val shape = NullWaveTheme.shapes.medium
+    val interactive = enabled && onClick != null
     Box(
         modifier.fillMaxWidth().defaultMinSize(minWidth = dimens.touchTarget, minHeight = dimens.touchTarget)
             .clip(shape)
-            .background(if (enabled && pressed) colors.surfaceRaised else colors.surface)
+            .background(if (interactive && pressed) colors.surfaceRaised else colors.surface)
             .nullWaveBorder(
-                if (enabled && focused) BorderStroke(dimens.focusBorder, colors.textPrimary) else BorderStroke(dimens.hairline, colors.outline),
-                shape, if (enabled && focused) NullWaveBorderStyle.Closed else borderStyle,
+                if (interactive && focused) BorderStroke(dimens.focusBorder, colors.textPrimary) else BorderStroke(dimens.hairline, colors.outline),
+                shape, if (interactive && focused) NullWaveBorderStyle.Closed else borderStyle,
             )
-            .clickable(
+            .then(if (onClick != null) Modifier.clickable(
                 interactionSource = source, indication = ripple(), enabled = enabled, role = Role.Button,
                 onClick = { if (enabled) onClick() },
-            ),
+            ) else Modifier.semantics(mergeDescendants = true) {}),
     ) { content() }
 }
 

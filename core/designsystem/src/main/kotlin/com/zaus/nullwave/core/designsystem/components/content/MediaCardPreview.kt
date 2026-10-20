@@ -78,35 +78,35 @@ private fun MediaCardSheet(variant: NullWaveColorVariant) {
                     verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.sm),
                 ) {
                     NullWaveMediaGridCard(
-                        "Nullwave EP", { opens++ }, Modifier.weight(1f).then(focus.modifier), supportingText = "Static Pilgrim",
+                        "Nullwave EP", Modifier.weight(1f).then(focus.modifier), onClick = { opens++ }, supportingText = "Static Pilgrim",
                         artwork = { NullWaveCoverArt(monogram = "NW") }, enabled = enabled, borderStyle = border,
                     )
                     NullWaveMediaGridCard(
-                        "Ночной маршрут — очень длинное название плейлиста", { opens++ }, Modifier.weight(1f),
+                        "Ночной маршрут — очень длинное название плейлиста", Modifier.weight(1f), onClick = { opens++ },
                         supportingText = "128 треков · 8 ч 24 мин", artwork = { NullWaveCoverArt(monogram = "НМ") },
                         badge = { NullWaveBadge("Умный", variant = NullWaveBadgeVariant.Secondary) }, enabled = enabled, borderStyle = border,
                     )
                     NullWaveMediaGridCard(
-                        "Загрузка обложки", { opens++ }, Modifier.weight(1f),
+                        "Загрузка обложки", Modifier.weight(1f), onClick = { opens++ },
                         artwork = { NullWaveCoverArt(placeholder = NullWaveArtworkPlaceholder.Loading, reduceMotion = reduceMotion) }, enabled = enabled, borderStyle = border,
                     )
                     NullWaveMediaGridCard(
-                        "Недоступный альбом", { opens++ }, Modifier.weight(1f), supportingText = "Папка отключена",
+                        "Недоступный альбом", Modifier.weight(1f), onClick = { opens++ }, supportingText = "Папка отключена",
                         artwork = { NullWaveCoverArt(placeholder = NullWaveArtworkPlaceholder.Error) }, enabled = false, borderStyle = border,
                     )
                 }
                 NullWaveSectionHeader("List / исполнитель, папка, плейлист")
                 NullWaveMediaListItem(
-                    "Ночной Вектор", { opens++ }, supportingText = "3 альбома · 41 трек",
+                    "Ночной Вектор", onClick = { opens++ }, supportingText = "3 альбома · 41 трек",
                     artwork = { NullWaveCoverArt(monogram = "НВ") }, enabled = enabled, borderStyle = border,
                     onMoreClick = { more++ }, moreDescription = "Другие действия: Ночной Вектор",
                 )
                 NullWaveMediaListItem(
-                    "Музыка для очень долгой дороги за город", { opens++ }, supportingText = "/Music/Collections/Night drive/",
+                    "Музыка для очень долгой дороги за город", onClick = { opens++ }, supportingText = "/Music/Collections/Night drive/",
                     badge = { NullWaveBadge("На устройстве") }, enabled = enabled, borderStyle = border,
                     onMoreClick = { more++ }, moreDescription = "Другие действия: папка музыки",
                 )
-                NullWaveMediaListItem("Пустой плейлист", { opens++ }, supportingText = "0 треков", enabled = enabled, borderStyle = border)
+                NullWaveMediaListItem("Пустой плейлист", onClick = { opens++ }, supportingText = "0 треков", enabled = enabled, borderStyle = border)
                 NullWaveSectionHeader("Badge / без действий")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.xs), verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.xs)) {
                     NullWaveBadge("FLAC", borderStyle = border)
