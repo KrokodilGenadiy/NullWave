@@ -102,6 +102,11 @@ internal fun LibraryScreen(
     val spacing = NullWaveTheme.spacing
     val ready = state.selectedBody as? LibraryBody.Ready<*>
     var filtersVisible by rememberSaveable(state.selectedTab) { mutableStateOf(false) }
+    val accessRequired = state.selectedBody is LibraryBody.AccessRequired
+    // Sorting may temporarily show Loading; only lost access invalidates the open dialog.
+    LaunchedEffect(accessRequired) {
+        if (accessRequired) filtersVisible = false
+    }
     NullWaveScaffold(
         modifier = Modifier.fillMaxSize().testTag("library_screen"),
         topBar = {
@@ -162,7 +167,9 @@ internal fun LibraryScreen(
             }
         }
     }
-    if (filtersVisible) LibraryFiltersDialog(state, onIntent, onDismiss = { filtersVisible = false })
+    if (filtersVisible && !accessRequired) {
+        LibraryFiltersDialog(state, onIntent, onDismiss = { filtersVisible = false })
+    }
 }
 
 @Composable

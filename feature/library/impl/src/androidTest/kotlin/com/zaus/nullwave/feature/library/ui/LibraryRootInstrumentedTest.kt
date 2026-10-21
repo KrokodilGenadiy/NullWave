@@ -69,6 +69,8 @@ class LibraryRootInstrumentedTest {
     private var subscriptions = 0
     private val catalogQueries = mutableListOf<Any>()
     private var activeSources = 0
+    private var protectedReads = 0
+    private var observerRegistrations = 0
     private val configuration = mutableStateOf(Configuration().apply { setLocale(Locale.ENGLISH) })
 
     @After
@@ -279,29 +281,32 @@ class LibraryRootInstrumentedTest {
         compose.onNodeWithText("Test artist").assertIsDisplayed()
         compose.onNodeWithTag("library_filters").performClick()
         compose.onNodeWithText(text(R.string.library_descending)).performClick()
-        compose.onNodeWithText(text(R.string.library_done)).performClick()
-        compose.onNodeWithText("Test artist").assertIsDisplayed()
-        val reads = compose.runOnIdle {
+        compose.onNodeWithText(text(R.string.library_done)).assertIsDisplayed()
+        val protectedWork = compose.runOnIdle {
             assertEquals(1, activeSources)
             assertEquals(LibraryTab.Artists, viewModel.state.value.selectedTab)
             assertEquals(SortDirection.Descending, (catalogQueries.last() as LibraryArtistQuery).direction)
             owner.registry.currentState = Lifecycle.State.STARTED
             permission.granted = false
             owner.registry.currentState = Lifecycle.State.RESUMED
-            catalogQueries.size
+            protectedReads to observerRegistrations
         }
         compose.onNodeWithTag("library_access").assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.library_done)).assertDoesNotExist()
         compose.onNodeWithText("Test artist").assertDoesNotExist()
         compose.onNodeWithText(text(R.string.library_tab_songs)).performScrollTo().performClick()
         compose.onNodeWithTag("library_access").assertIsDisplayed()
         compose.runOnIdle {
-            assertEquals(reads, catalogQueries.size)
+            // A different tab can recheck permission through the repository. It must not do I/O.
+            assertEquals(protectedWork, protectedReads to observerRegistrations)
+            assertEquals(LibraryTab.Songs, viewModel.state.value.selectedTab)
             assertEquals(0, activeSources)
             owner.registry.currentState = Lifecycle.State.STARTED
             permission.granted = true
             owner.registry.currentState = Lifecycle.State.RESUMED
         }
         compose.onNodeWithText("Low Orbit").assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.library_done)).assertDoesNotExist()
         compose.runOnIdle {
             assertTrue(catalogQueries.last() is LibraryTrackQuery)
             assertEquals(1, activeSources)
@@ -345,6 +350,8 @@ class LibraryRootInstrumentedTest {
         activeSources++
         try {
             if (permission.granted) {
+                protectedReads++
+                observerRegistrations++
                 emit(AppResult.Success(items))
                 awaitCancellation()
             } else emit(AppResult.Failure(DataError.AccessDenied))

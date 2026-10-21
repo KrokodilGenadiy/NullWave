@@ -45,6 +45,7 @@ import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
 import com.zaus.nullwave.feature.library.api.model.track.TrackId
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.presentation.LibraryBody
+import com.zaus.nullwave.feature.library.presentation.AccessAction
 import com.zaus.nullwave.feature.library.presentation.LibraryIntent
 import com.zaus.nullwave.feature.library.presentation.LibraryState
 import com.zaus.nullwave.feature.library.presentation.LibraryTab
@@ -122,6 +123,31 @@ class LibraryCatalogInstrumentedTest {
             compose.onNodeWithText(text(R.string.library_done)).performClick()
             compose.onNodeWithTag("library_filters").performClick()
             compose.onNodeWithText(text(R.string.library_descending)).assertIsSelected()
+            compose.onNodeWithText(text(R.string.library_done)).performClick()
+        }
+    }
+
+    @Test
+    fun filtersStayOpenDuringLoadingAndRestorationButCloseOnAccessLoss() {
+        val restore = show()
+        for (selected in LibraryTab.entries) {
+            val ready = catalog(selected)
+            update { ready }
+            compose.onNodeWithTag("library_filters").performClick()
+            update { it.copy(body = LibraryBody.Loading, albums = LibraryBody.Loading, artists = LibraryBody.Loading) }
+            compose.onNodeWithText(text(R.string.library_done)).assertIsDisplayed()
+            restore.emulateSavedInstanceStateRestore()
+            compose.onNodeWithText(text(R.string.library_done)).assertIsDisplayed()
+
+            val denied = LibraryBody.AccessRequired(AccessAction.Request)
+            update { it.copy(body = denied, albums = denied, artists = denied) }
+            compose.onNodeWithText(text(R.string.library_done)).assertDoesNotExist()
+            compose.onNodeWithTag("library_access_action").assertIsDisplayed()
+            restore.emulateSavedInstanceStateRestore()
+            compose.onNodeWithText(text(R.string.library_done)).assertDoesNotExist()
+            update { ready }
+            compose.onNodeWithText(text(R.string.library_done)).assertDoesNotExist()
+            compose.onNodeWithTag("library_filters").performClick()
             compose.onNodeWithText(text(R.string.library_done)).performClick()
         }
     }
