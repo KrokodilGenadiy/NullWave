@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
         <activity
+            android:name="com.zaus.nullwave.feature.library.ui.LibraryCatalogTestActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+        <activity
             android:name="com.zaus.nullwave.feature.library.ui.LibraryPermissionTestActivity"
             android:exported="true"
             android:theme="@android:style/Theme.Material.NoActionBar" />
