@@ -1,0 +1,4 @@
+<resources>
+    <string name="search_load_failed">Не удалось выполнить поиск в библиотеке. Попробуйте ещё раз.</string>
+    <string name="search_refresh_failed">Не удалось обновить результаты поиска. Показаны предыдущие результаты.</string>
+</resources>

@@ -1,0 +1,4 @@
+<resources>
+    <string name="search_load_failed">Couldn’t search your library. Try again.</string>
+    <string name="search_refresh_failed">Couldn’t update search results. Showing the previous results.</string>
+</resources>
