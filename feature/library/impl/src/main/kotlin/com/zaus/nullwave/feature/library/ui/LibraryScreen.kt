@@ -1,6 +1,5 @@
 package com.zaus.nullwave.feature.library.ui
 
-import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,19 +13,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButton
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButtonVariant
 import com.zaus.nullwave.core.designsystem.components.control.iconButton.NullWaveIconButton
@@ -45,40 +41,14 @@ import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.designsystem.modifier.NullWaveBorderStyle
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.mvi.ui.asString
-import com.zaus.nullwave.core.mvi.ui.collectMviStateWithLifecycle
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
-import com.zaus.nullwave.feature.library.platform.AndroidAudioPermission
-import com.zaus.nullwave.feature.library.platform.AudioPermission
 import com.zaus.nullwave.feature.library.presentation.AccessAction
 import com.zaus.nullwave.feature.library.presentation.LibraryBody
 import com.zaus.nullwave.feature.library.presentation.LibraryIntent
 import com.zaus.nullwave.feature.library.presentation.LibraryState
 import com.zaus.nullwave.feature.library.presentation.LibraryTab
-import com.zaus.nullwave.feature.library.presentation.LibraryViewModel
 import com.zaus.nullwave.feature.library.presentation.RefreshState
-import dev.zacsweers.metrox.viewmodel.metroViewModel
-
-@Composable
-internal fun LibraryRoot(
-    onAboutClick: () -> Unit,
-    artworkLoader: LibraryArtworkLoader?,
-    viewModel: LibraryViewModel = metroViewModel(),
-    permission: AudioPermission = rememberAudioPermission(),
-) {
-    val state by viewModel.collectMviStateWithLifecycle(minActiveState = Lifecycle.State.RESUMED)
-    val localeTag = LocalConfiguration.current.locales[0].toLanguageTag()
-    LaunchedEffect(viewModel, localeTag) { viewModel.onIntent(LibraryIntent.LocaleChanged(localeTag)) }
-    LibraryPermissionHost(permission, { viewModel.onIntent(LibraryIntent.AccessChecked(it)) }) { accessUi ->
-        LibraryScreen(state, viewModel::onIntent, onAboutClick, accessUi, artworkLoader)
-    }
-}
-
-@Composable
-private fun rememberAudioPermission(): AudioPermission {
-    val activity = checkNotNull(LocalActivity.current) { "LibraryRoot requires an Activity host" }
-    return remember(activity) { AndroidAudioPermission(activity) }
-}
 
 /** State-only renderer; all platform launchers and repository work belong outside this function. */
 @Composable

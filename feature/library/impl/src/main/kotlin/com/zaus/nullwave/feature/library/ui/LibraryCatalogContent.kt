@@ -29,6 +29,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import com.zaus.nullwave.core.designsystem.components.content.NullWaveCoverArt
 import com.zaus.nullwave.core.designsystem.components.content.NullWaveMediaGridCard
 import com.zaus.nullwave.core.designsystem.components.content.NullWaveMediaListItem
@@ -77,16 +78,7 @@ internal fun LibraryReadyContent(
         verticalArrangement = Arrangement.spacedBy(if (isGrid) spacing.md else 0.dp),
     ) {
         item("summary", span = { GridItemSpan(maxLineSpan) }, contentType = "summary") {
-            FlowRow(
-                Modifier.fillMaxWidth().padding(horizontal = if (isGrid) 0.dp else gutter, vertical = gutter),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalArrangement = Arrangement.spacedBy(spacing.xs),
-            ) {
-                Text(librarySummary(state, ready.items.size),
-                    Modifier.align(Alignment.CenterVertically).testTag("library_summary"),
-                    style = NullWaveTheme.typography.micro, color = NullWaveTheme.colors.textSecondary)
-                LibraryFiltersButton(state, onClick = onFilters)
-            }
+            LibraryCatalogHeader(state, ready.items.size, onFilters, horizontalPadding = if (isGrid) 0.dp else gutter)
         }
         val refresh = ready.refresh
         if (refresh is RefreshState.Failed) item("refresh_error", span = { GridItemSpan(maxLineSpan) }) {
@@ -131,6 +123,20 @@ internal fun LibraryReadyContent(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LibraryCatalogHeader(state: LibraryState, count: Int, onFilters: () -> Unit, horizontalPadding: Dp) {
+    FlowRow(
+        Modifier.fillMaxWidth().padding(horizontal = horizontalPadding, vertical = NullWaveTheme.dimens.gutter),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.xs),
+    ) {
+        Text(librarySummary(state, count),
+            Modifier.align(Alignment.CenterVertically).testTag("library_summary"),
+            style = NullWaveTheme.typography.micro, color = NullWaveTheme.colors.textSecondary)
+        LibraryFiltersButton(state, onClick = onFilters)
     }
 }
 
