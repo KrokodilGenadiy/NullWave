@@ -190,7 +190,7 @@ class MediaStoreSearchMappingTest {
     @Test
     fun `unknown metadata is not indexed and absent membership does not invent groups`() = runTest {
         val rows = listOf(audioRow(title = "Known", artist = " <UNKNOWN> ").copy(album = " ", displayName = null))
-        for (query in listOf("unknown", "various", "неизвестный")) {
+        for (query in listOf("unk", "unknown", "various", "неизвестный")) {
             assertEquals(emptyList<Any>(), rows.search(query).tracks)
             assertTrue(rows.search(query).albums.isEmpty())
             assertTrue(rows.search(query).artists.isEmpty())
@@ -200,6 +200,19 @@ class MediaStoreSearchMappingTest {
         assertEquals(1, noMembership.tracks.size)
         assertTrue(noMembership.albums.isEmpty())
         assertTrue(noMembership.artists.isEmpty())
+    }
+
+    @Test
+    fun `literal Unknown Artist and Unknown Album tags remain searchable`() = runTest {
+        val rows = listOf(audioRow(title = "Signal", artist = "Unknown Artist")
+            .copy(album = "Unknown Album", displayName = "signal.flac"))
+        for (query in listOf("unk", "UNKNOWN ARTIST", "unknown album")) {
+            val result = rows.search(query)
+            assertEquals("Unknown Artist", result.tracks.single().track.artist)
+            assertEquals("Unknown Album", result.albums.single().album.title)
+            if (query == "unknown album") assertTrue(result.artists.isEmpty())
+            else assertEquals("Unknown Artist", result.artists.single().name)
+        }
     }
 
     @Test
