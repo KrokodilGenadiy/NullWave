@@ -64,4 +64,5 @@
     <string name="library_continue">Продолжить</string>
     <string name="library_cancel">Не сейчас</string>
     <string name="library_access_launch_failed">Не удалось открыть системный диалог. Попробуйте ещё раз или измените доступ к аудио в настройках Android.</string>
+    <string name="library_search">Поиск по библиотеке</string>
 </resources>

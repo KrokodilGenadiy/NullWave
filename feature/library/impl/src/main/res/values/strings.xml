@@ -58,4 +58,5 @@
     <string name="library_continue">Continue</string>
     <string name="library_cancel">Not now</string>
     <string name="library_access_launch_failed">Could not open the system dialog. Try again, or change audio access in Android settings.</string>
+    <string name="library_search">Search library</string>
 </resources>

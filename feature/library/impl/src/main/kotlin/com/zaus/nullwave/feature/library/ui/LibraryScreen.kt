@@ -43,7 +43,8 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.mvi.ui.asString
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
-import com.zaus.nullwave.feature.library.presentation.AccessAction
+import com.zaus.nullwave.feature.library.api.access.AccessAction
+import com.zaus.nullwave.feature.library.api.ui.LibraryAccessUi
 import com.zaus.nullwave.feature.library.presentation.LibraryBody
 import com.zaus.nullwave.feature.library.presentation.LibraryIntent
 import com.zaus.nullwave.feature.library.presentation.LibraryState
@@ -58,6 +59,7 @@ internal fun LibraryScreen(
     onAboutClick: () -> Unit,
     accessUi: LibraryAccessUi = LibraryAccessUi(),
     artworkLoader: LibraryArtworkLoader? = null,
+    onSearchClick: () -> Unit = {},
 ) {
     // Keep each position alive while another tab or a Loading/Failed branch is composed.
     // Feeding a temporary one-item loading grid into these states would clamp their positions.
@@ -82,6 +84,8 @@ internal fun LibraryScreen(
         topBar = {
             Column {
                 NullWaveTopBar(stringResource(R.string.library_title), actions = {
+                    NullWaveIconButton(NullWaveIcons.Search, stringResource(R.string.library_search), onSearchClick,
+                        modifier = Modifier.testTag("library_search"))
                     // Same slot throughout refresh: no inserted list item or changing toolbar height.
                     if (ready?.refresh == RefreshState.Running) Box(
                         Modifier.size(NullWaveTheme.dimens.touchTarget), contentAlignment = Alignment.Center,

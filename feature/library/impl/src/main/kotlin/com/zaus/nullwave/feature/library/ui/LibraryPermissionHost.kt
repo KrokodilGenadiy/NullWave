@@ -27,15 +27,9 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.platform.AudioPermission
 import com.zaus.nullwave.feature.library.platform.libraryAccess
-import com.zaus.nullwave.feature.library.presentation.AccessAction
-import com.zaus.nullwave.feature.library.presentation.LibraryAccess
-
-internal data class LibraryAccessUi(
-    val busy: Boolean = false,
-    val launchFailed: Boolean = false,
-    val onAccess: () -> Unit = {},
-    val onAskAgain: () -> Unit = {},
-)
+import com.zaus.nullwave.feature.library.api.access.AccessAction
+import com.zaus.nullwave.feature.library.api.access.LibraryAccess
+import com.zaus.nullwave.feature.library.api.ui.LibraryAccessUi
 
 private enum class ExternalRequest { Permission, Settings }
 
@@ -131,6 +125,7 @@ internal fun LibraryPermissionHost(
     }
 
     content(LibraryAccessUi(
+        access = lastReported,
         busy = pending != null,
         launchFailed = launchFailed,
         onAccess = { accessAction(askAgain = false) },

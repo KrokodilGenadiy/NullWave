@@ -45,7 +45,7 @@ import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
 import com.zaus.nullwave.feature.library.api.model.track.TrackId
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.presentation.LibraryBody
-import com.zaus.nullwave.feature.library.presentation.AccessAction
+import com.zaus.nullwave.feature.library.api.access.AccessAction
 import com.zaus.nullwave.feature.library.presentation.LibraryIntent
 import com.zaus.nullwave.feature.library.presentation.LibraryState
 import com.zaus.nullwave.feature.library.presentation.LibraryTab

@@ -1,5 +1,9 @@
 package com.zaus.nullwave.feature.library.ui
 
+import com.zaus.nullwave.feature.library.api.ui.libraryMonogram
+import com.zaus.nullwave.feature.library.api.ui.librarySubtitle
+import com.zaus.nullwave.feature.library.api.ui.libraryDuration
+import com.zaus.nullwave.feature.library.api.ui.libraryAlbumCredit
 import android.text.format.Formatter
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints

@@ -1,4 +1,31 @@
 <resources>
     <string name="search_load_failed">Не удалось выполнить поиск в библиотеке. Попробуйте ещё раз.</string>
     <string name="search_refresh_failed">Не удалось обновить результаты поиска. Показаны предыдущие результаты.</string>
+    <string name="search_title">ПОИСК</string>
+    <string name="search_back">Назад в библиотеку</string>
+    <string name="search_input">Поиск по библиотеке</string>
+    <string name="search_idle_title">Найдите свою музыку</string>
+    <string name="search_idle_body">Ищите по названиям треков, исполнителям, альбомам и именам файлов.</string>
+    <string name="search_loading">Поиск в библиотеке…</string>
+    <string name="search_error_title">Поиск недоступен</string>
+    <string name="search_retry">Повторить</string>
+    <string name="search_no_matches">Ничего не найдено</string>
+    <string name="search_no_matches_body">Нет совпадений для «%1$s». Попробуйте другое название, исполнителя, альбом или имя файла.</string>
+    <string name="search_clear">Очистить запрос</string>
+    <string name="search_access_title">Доступ к аудио</string>
+    <string name="search_access_body">Разрешите доступ к аудиофайлам для поиска в библиотеке. Запрос сохранится.</string>
+    <string name="search_settings_body">Разрешите доступ к аудио в настройках приложения или запросите разрешение ещё раз.</string>
+    <string name="search_open_settings">Открыть настройки</string>
+    <string name="search_grant_access">Разрешить доступ</string>
+    <string name="search_check_access">Проверить доступ</string>
+    <string name="search_ask_again">Запросить снова</string>
+    <string name="search_access_launch_failed">Не удалось открыть запрос разрешения или настройки. Попробуйте ещё раз.</string>
+    <string name="search_unknown_artist">Неизвестный исполнитель</string>
+    <string name="search_unknown_album">Неизвестный альбом</string>
+    <string name="search_various_artists">Разные исполнители</string>
+    <string name="search_artist_match">Совпадение по исполнителю: %1$s</string>
+    <string name="search_metadata">%1$s · %2$s</string>
+    <plurals name="search_tracks"><item quantity="one">%d трек</item><item quantity="few">%d трека</item><item quantity="many">%d треков</item><item quantity="other">%d трека</item></plurals>
+    <plurals name="search_albums"><item quantity="one">%d альбом</item><item quantity="few">%d альбома</item><item quantity="many">%d альбомов</item><item quantity="other">%d альбома</item></plurals>
+    <plurals name="search_artists"><item quantity="one">%d исполнитель</item><item quantity="few">%d исполнителя</item><item quantity="many">%d исполнителей</item><item quantity="other">%d исполнителя</item></plurals>
 </resources>

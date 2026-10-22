@@ -3,6 +3,7 @@ package com.zaus.nullwave.feature.library.di
 import com.zaus.nullwave.core.navigation.EntryProviderInstaller
 import com.zaus.nullwave.core.navigation.navigateTo
 import com.zaus.nullwave.feature.about.api.AboutKey
+import com.zaus.nullwave.feature.search.api.SearchKey
 import com.zaus.nullwave.feature.library.ui.LibraryRoot
 import com.zaus.nullwave.feature.library.api.LibraryKey
 import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
@@ -19,7 +20,8 @@ object LibraryEntries {
     @IntoSet
     fun entries(artworkLoader: () -> LibraryArtworkLoader): EntryProviderInstaller = {
         entry<LibraryKey> {
-            LibraryRoot(onAboutClick = { navigateTo(AboutKey) }, artworkLoader = artworkLoader())
+            LibraryRoot(onAboutClick = { navigateTo(AboutKey) }, artworkLoader = artworkLoader(),
+                onSearchClick = { navigateTo(SearchKey) })
         }
     }
 }

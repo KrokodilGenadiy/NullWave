@@ -1,7 +1,7 @@
 package com.zaus.nullwave.feature.library.platform
 
-import com.zaus.nullwave.feature.library.presentation.AccessAction
-import com.zaus.nullwave.feature.library.presentation.LibraryAccess
+import com.zaus.nullwave.feature.library.api.access.AccessAction
+import com.zaus.nullwave.feature.library.api.access.LibraryAccess
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

@@ -1,4 +1,31 @@
 <resources>
     <string name="search_load_failed">Couldn’t search your library. Try again.</string>
     <string name="search_refresh_failed">Couldn’t update search results. Showing the previous results.</string>
+    <string name="search_title">SEARCH</string>
+    <string name="search_back">Back to library</string>
+    <string name="search_input">Search library</string>
+    <string name="search_idle_title">Find your music</string>
+    <string name="search_idle_body">Search titles, artists, albums and file names.</string>
+    <string name="search_loading">Searching library…</string>
+    <string name="search_error_title">Search unavailable</string>
+    <string name="search_retry">Retry</string>
+    <string name="search_no_matches">No matches</string>
+    <string name="search_no_matches_body">Nothing matches “%1$s”. Try a different title, artist, album or file name.</string>
+    <string name="search_clear">Clear query</string>
+    <string name="search_access_title">Allow audio access</string>
+    <string name="search_access_body">Allow access to audio files to search your library. Your query will stay here.</string>
+    <string name="search_settings_body">You can allow audio access in the app settings, or try requesting it again.</string>
+    <string name="search_open_settings">Open settings</string>
+    <string name="search_grant_access">Allow access</string>
+    <string name="search_check_access">Check access</string>
+    <string name="search_ask_again">Ask again</string>
+    <string name="search_access_launch_failed">Couldn’t open the permission request or settings. Try again.</string>
+    <string name="search_unknown_artist">Unknown artist</string>
+    <string name="search_unknown_album">Unknown album</string>
+    <string name="search_various_artists">Various artists</string>
+    <string name="search_artist_match">Matching artist: %1$s</string>
+    <string name="search_metadata">%1$s · %2$s</string>
+    <plurals name="search_tracks"><item quantity="one">%d track</item><item quantity="other">%d tracks</item></plurals>
+    <plurals name="search_albums"><item quantity="one">%d album</item><item quantity="other">%d albums</item></plurals>
+    <plurals name="search_artists"><item quantity="one">%d artist</item><item quantity="other">%d artists</item></plurals>
 </resources>
