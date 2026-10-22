@@ -9,6 +9,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.zaus.nullwave.core.di.dispatchers.IoDispatcher
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
+import com.zaus.nullwave.feature.library.api.repository.LibrarySearchRepository
 import com.zaus.nullwave.feature.library.api.repository.LibraryRepository
 import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
 import com.zaus.nullwave.feature.library.data.repository.MediaStoreLibraryRepository
@@ -45,6 +46,8 @@ class LibraryGraphInstrumentedTest {
         assertSame(first.repository, first.repository)
         assertSame(first.catalogRepository, first.repository)
         assertSame(first.catalogRepository, first.catalogRepository)
+        assertSame(first.catalogRepository, first.searchRepository)
+        assertNotSame(first.searchRepository, second.searchRepository)
         assertNotSame(first.repository, second.repository)
         assertNotSame(first.catalogRepository, second.catalogRepository)
         assertTrue(first.assistedFactories.containsKey(LibraryViewModel::class))
@@ -82,6 +85,7 @@ internal interface LibraryPlatformTestGraph : ViewModelGraph {
     @IoDispatcher val io: CoroutineDispatcher
     val repository: LibraryRepository
     val catalogRepository: LibraryCatalogRepository
+    val searchRepository: LibrarySearchRepository
     val artworkLoader: LibraryArtworkLoader
     val assistedFactories: Map<KClass<out ViewModel>, () -> ViewModelAssistedFactory>
 

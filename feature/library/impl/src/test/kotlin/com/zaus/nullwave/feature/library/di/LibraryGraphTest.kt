@@ -85,7 +85,7 @@ class LibraryGraphTest {
 
 @DependencyGraph(
     AppScope::class,
-    excludes = [LibraryPlatformBindings::class, LibraryEntries::class],
+    excludes = [LibraryPlatformBindings::class, LibraryRepositoryBindings::class, LibraryEntries::class],
 )
 internal interface LibraryTestGraph : ViewModelGraph {
     val assistedFactories: Map<KClass<out ViewModel>, () -> ViewModelAssistedFactory>

@@ -8,6 +8,8 @@ import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
+import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchQuery
+import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchResults
 import com.zaus.nullwave.feature.library.data.source.audioRow
 import com.zaus.nullwave.feature.library.data.source.FakeMediaStoreAudioSource
 import java.io.IOException
@@ -36,17 +38,22 @@ class MediaStoreLibraryRepositoryTest(private val kind: String) {
     private val dispatcher = StandardTestDispatcher()
     private val source = FakeMediaStoreAudioSource()
     private val repository = MediaStoreLibraryRepository(source, dispatcher)
-    private fun observe(localeTag: String = "en"): Flow<AppResult<List<Any>, DataError>> = when (kind) {
+    private fun observe(localeTag: String = "en"): Flow<AppResult<Any, DataError>> = when (kind) {
         "tracks" -> repository.observeTracks(LibraryTrackQuery(localeTag))
         "albums" -> repository.observeAlbums(LibraryAlbumQuery(localeTag))
         "artists" -> repository.observeArtists(LibraryArtistQuery(localeTag))
+        "search" -> repository.observeSearch(checkNotNull(LibrarySearchQuery.fromInput("nullwave", localeTag)))
         else -> error("Unknown test case: $kind")
     }
+
+    private fun emptyPayload(): Any = if (kind == "search") {
+        LibrarySearchResults(emptyList(), emptyList(), emptyList())
+    } else emptyList<Any>()
 
     companion object {
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")
-        fun catalogs(): List<String> = listOf("tracks", "albums", "artists")
+        fun catalogs(): List<String> = listOf("tracks", "albums", "artists", "search")
     }
 
     @Test
@@ -64,14 +71,15 @@ class MediaStoreLibraryRepositoryTest(private val kind: String) {
     fun `observer is installed before initial reading and cancellation unregisters it`() = runTest(dispatcher) {
         source.onRegister = { source.invalidate() }
         source.read = { listOf(audioRow()) }
-        val results = mutableListOf<AppResult<List<Any>, DataError>>()
+        val results = mutableListOf<AppResult<Any, DataError>>()
         val collector = backgroundScope.launch { observe().toList(results) }
         runCurrent()
         assertEquals(1, source.registrations)
         assertEquals(1, source.reads)
-        val item = (results.single() as AppResult.Success).value.single()
+        val payload = (results.single() as AppResult.Success).value
+        val item = if (payload is LibrarySearchResults) payload.tracks.single().track else (payload as List<*>).single()
         when (kind) {
-            "tracks" -> assertEquals("Low Orbit", (item as LibraryTrack).title)
+            "tracks", "search" -> assertEquals("Low Orbit", (item as LibraryTrack).title)
             "albums" -> assertEquals("Signals", (item as LibraryAlbum).title)
             "artists" -> assertEquals("Nullwave", (item as LibraryArtist).name)
         }
@@ -87,7 +95,7 @@ class MediaStoreLibraryRepositoryTest(private val kind: String) {
             if (source.reads == 1) gate.await()
             listOf(audioRow(id = source.reads.toLong()))
         }
-        val results = mutableListOf<AppResult<List<Any>, DataError>>()
+        val results = mutableListOf<AppResult<Any, DataError>>()
         backgroundScope.launch { observe().toList(results) }
         runCurrent()
         repeat(100) { source.invalidate() }
@@ -102,7 +110,7 @@ class MediaStoreLibraryRepositoryTest(private val kind: String) {
 
     @Test
     fun `empty provider success is empty data rather than failure`() = runTest(dispatcher) {
-        assertEquals(AppResult.Success(emptyList<Any>()), observe().first())
+        assertEquals(AppResult.Success(emptyPayload()), observe().first())
         assertEquals(1, source.closes)
     }
 
@@ -110,7 +118,7 @@ class MediaStoreLibraryRepositoryTest(private val kind: String) {
     fun `IO failure preserves original diagnostics and observation can recover`() = runTest(dispatcher) {
         val problem = IOException("provider unavailable")
         source.read = { throw problem }
-        val results = mutableListOf<AppResult<List<Any>, DataError>>()
+        val results = mutableListOf<AppResult<Any, DataError>>()
         backgroundScope.launch { observe().toList(results) }
         runCurrent()
         val failure = results.single() as AppResult.Failure
@@ -132,14 +140,14 @@ class MediaStoreLibraryRepositoryTest(private val kind: String) {
         assertEquals(DataError.Io, (observe().toList().single() as AppResult.Failure).error)
         assertEquals(0, source.reads)
         source.registrationFailure = null
-        assertEquals(AppResult.Success(emptyList<Any>()), observe().first())
+        assertEquals(AppResult.Success(emptyPayload()), observe().first())
         assertEquals(1, source.closes)
     }
 
     @Test
     fun `IO failure after access revocation terminates a live observation and retains diagnostics`() = runTest(dispatcher) {
         source.read = { listOf(audioRow()) }
-        val results = mutableListOf<AppResult<List<Any>, DataError>>()
+        val results = mutableListOf<AppResult<Any, DataError>>()
         val collector = backgroundScope.launch { observe().toList(results) }
         runCurrent()
         assertTrue(results.single() is AppResult.Success)
@@ -174,7 +182,7 @@ class MediaStoreLibraryRepositoryTest(private val kind: String) {
         val problem = IOException("Observer registration failed while access was revoked")
         source.beforeRegister = { source.granted = false }
         source.registrationFailure = problem
-        val results = mutableListOf<AppResult<List<Any>, DataError>>()
+        val results = mutableListOf<AppResult<Any, DataError>>()
         val collector = backgroundScope.launch { observe().toList(results) }
         runCurrent()
         val failure = results.single() as AppResult.Failure
@@ -203,7 +211,7 @@ class MediaStoreLibraryRepositoryTest(private val kind: String) {
             collector.cancel()
             throw IOException("Read interrupted")
         }
-        val results = mutableListOf<AppResult<List<Any>, DataError>>()
+        val results = mutableListOf<AppResult<Any, DataError>>()
         collector = backgroundScope.launch { observe().toList(results) }
         runCurrent()
         assertTrue(collector.isCancelled)
@@ -221,7 +229,7 @@ class MediaStoreLibraryRepositoryTest(private val kind: String) {
             collector.cancel()
         }
         source.registrationFailure = IOException("Registration interrupted")
-        val results = mutableListOf<AppResult<List<Any>, DataError>>()
+        val results = mutableListOf<AppResult<Any, DataError>>()
         collector = backgroundScope.launch { observe().toList(results) }
         runCurrent()
         assertTrue(collector.isCancelled)
@@ -235,7 +243,7 @@ class MediaStoreLibraryRepositoryTest(private val kind: String) {
 
     @Test
     fun `access revoked before the next query clears observation without reading again`() = runTest(dispatcher) {
-        val results = mutableListOf<AppResult<List<Any>, DataError>>()
+        val results = mutableListOf<AppResult<Any, DataError>>()
         val collector = backgroundScope.launch { observe().toList(results) }
         runCurrent()
         source.granted = false
@@ -303,7 +311,7 @@ class MediaStoreLibraryRepositoryTest(private val kind: String) {
         source.read = {
             try { awaitCancellation() } finally { cancelled = true }
         }
-        val results = mutableListOf<AppResult<List<Any>, DataError>>()
+        val results = mutableListOf<AppResult<Any, DataError>>()
         val collector = backgroundScope.launch { observe().toList(results) }
         runCurrent()
         collector.cancel()
