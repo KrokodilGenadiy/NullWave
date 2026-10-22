@@ -11,15 +11,18 @@ import kotlinx.coroutines.ensureActive
 internal suspend fun List<MediaStoreAudioRow>.toAlbums(query: LibraryAlbumQuery): List<LibraryAlbum> {
     val groups = catalogGroups { it.albumId }
     return groups.map { (id, members) ->
-        LibraryAlbum(
-            id = AlbumId(id),
-            title = members.catalogLabel { it.album },
-            artistCredit = members.artistCredit(),
-            trackCount = members.size,
-            artwork = members.albumArtwork(checkNotNull(members.first().artworkKey())),
-        )
+        members.toAlbum(id)
     }.sortedCatalog(query.localeTag, query.direction, LibraryAlbum::title) { it.id.value }
 }
+
+/** Receives one nonempty group from catalogGroups, before any search filtering. */
+internal suspend fun List<MediaStoreAudioRow>.toAlbum(id: String): LibraryAlbum = LibraryAlbum(
+    id = AlbumId(id),
+    title = catalogLabel { it.album },
+    artistCredit = artistCredit(),
+    trackCount = size,
+    artwork = albumArtwork(id),
+)
 
 private suspend fun List<MediaStoreAudioRow>.artistCredit(): AlbumArtistCredit {
     val context = currentCoroutineContext()

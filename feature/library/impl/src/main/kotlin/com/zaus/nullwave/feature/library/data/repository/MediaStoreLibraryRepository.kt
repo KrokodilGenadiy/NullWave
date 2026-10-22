@@ -12,10 +12,14 @@ import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
+import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchQuery
+import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchResults
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
+import com.zaus.nullwave.feature.library.api.repository.LibrarySearchRepository
 import com.zaus.nullwave.feature.library.data.mapping.toAlbums
 import com.zaus.nullwave.feature.library.data.mapping.toArtists
 import com.zaus.nullwave.feature.library.data.mapping.toTracks
+import com.zaus.nullwave.feature.library.data.search.toSearchResults
 import com.zaus.nullwave.feature.library.data.source.MediaStoreAudioRow
 import com.zaus.nullwave.feature.library.data.source.MediaStoreAudioSource
 import java.io.IOException
@@ -31,7 +35,7 @@ import kotlinx.coroutines.flow.flowOn
 internal class MediaStoreLibraryRepository(
     private val source: MediaStoreAudioSource,
     private val io: CoroutineDispatcher,
-) : LibraryCatalogRepository {
+) : LibraryCatalogRepository, LibrarySearchRepository {
     override fun observeTracks(query: LibraryTrackQuery): Flow<AppResult<List<LibraryTrack>, DataError>> =
         observe { it.toTracks(query) }
 
@@ -41,9 +45,12 @@ internal class MediaStoreLibraryRepository(
     override fun observeArtists(query: LibraryArtistQuery): Flow<AppResult<List<LibraryArtist>, DataError>> =
         observe { it.toArtists(query) }
 
+    override fun observeSearch(query: LibrarySearchQuery): Flow<AppResult<LibrarySearchResults, DataError>> =
+        observe { it.toSearchResults(query) }
+
     private fun <T> observe(
-        transform: suspend (List<MediaStoreAudioRow>) -> List<T>,
-    ): Flow<AppResult<List<T>, DataError>> = flow {
+        transform: suspend (List<MediaStoreAudioRow>) -> T,
+    ): Flow<AppResult<T, DataError>> = flow {
         val changes = Channel<Unit>(Channel.CONFLATED)
         try {
             val observation = readResult { source.observeChanges { changes.trySend(Unit) } }

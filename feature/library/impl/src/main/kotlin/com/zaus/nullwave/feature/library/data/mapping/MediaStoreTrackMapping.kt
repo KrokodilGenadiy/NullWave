@@ -1,6 +1,7 @@
 package com.zaus.nullwave.feature.library.data.mapping
 
 import com.zaus.nullwave.feature.library.api.model.SortDirection
+import com.zaus.nullwave.feature.library.api.model.ArtworkRef
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
@@ -19,19 +20,8 @@ internal suspend fun List<MediaStoreAudioRow>.toTracks(query: LibraryTrackQuery)
     val collator = Collator.getInstance(Locale.forLanguageTag(query.localeTag))
     val entries = map { row ->
         context.ensureActive()
-        val volume = row.validateAudioIdentityAndGetVolume()
-        val title = row.title.metadataOrNull() ?: row.displayName.metadataOrNull()
-            ?: throw IOException("MediaStore audio row has neither title nor display name")
         DatedTrack(
-            LibraryTrack(
-                id = TrackId("$volume:${row.id}"),
-                title = title,
-                artist = row.artist.metadataOrNull(),
-                album = row.album.metadataOrNull(),
-                durationMs = row.durationMs?.takeIf { it >= 0 },
-                sizeBytes = row.sizeBytes?.takeIf { it >= 0 },
-                artwork = artwork[row.artworkKey()],
-            ),
+            row.toTrack(artwork[row.artworkKey()]),
             row.dateAddedSeconds?.takeIf { it > 0 },
         )
     }
@@ -46,6 +36,22 @@ internal suspend fun List<MediaStoreAudioRow>.toTracks(query: LibraryTrackQuery)
         }
         if (order != 0) order else first.track.id.value.compareTo(second.track.id.value)
     }.map { it.track }
+}
+
+/** Shared entity mapping; callers supply artwork computed from the complete album membership. */
+internal fun MediaStoreAudioRow.toTrack(artwork: ArtworkRef?): LibraryTrack {
+    val volume = validateAudioIdentityAndGetVolume()
+    val title = title.metadataOrNull() ?: displayName.metadataOrNull()
+        ?: throw IOException("MediaStore audio row has neither title nor display name")
+    return LibraryTrack(
+        id = TrackId("$volume:$id"),
+        title = title,
+        artist = artist.metadataOrNull(),
+        album = album.metadataOrNull(),
+        durationMs = durationMs?.takeIf { it >= 0 },
+        sizeBytes = sizeBytes?.takeIf { it >= 0 },
+        artwork = artwork,
+    )
 }
 
 private data class DatedTrack(val track: LibraryTrack, val added: Long?)

@@ -1,24 +1,43 @@
 package com.zaus.nullwave.feature.search.presentation
 
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.createSavedStateHandle
+import androidx.lifecycle.viewmodel.CreationExtras
 import com.zaus.nullwave.core.mvi.BaseMviViewModel
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
 import com.zaus.nullwave.feature.library.api.repository.LibrarySearchRepository
+import com.zaus.nullwave.feature.search.di.SearchInitialLocale
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Assisted
+import dev.zacsweers.metro.AssistedFactory
+import dev.zacsweers.metro.AssistedInject
+import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactory
+import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactoryKey
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlin.time.Duration.Companion.milliseconds
 
 /** Presentation only. Root owns platform checks; the repository remains main-safe and cold. */
+@AssistedInject
 internal class SearchViewModel(
     private val repository: LibrarySearchRepository,
-    private val savedStateHandle: SavedStateHandle,
-    initialLocaleTag: String,
+    @Assisted private val savedStateHandle: SavedStateHandle,
+    @SearchInitialLocale initialLocaleTag: String,
 ) : BaseMviViewModel<SearchState, SearchIntent, Nothing>(
     savedStateHandle.restoreSearchState(initialLocaleTag),
     // Search is ephemeral: leaving the UI cancels pending debounce and observations immediately.
     sourceStopTimeoutMillis = 0,
 ) {
+    @AssistedFactory
+    @ViewModelAssistedFactoryKey(SearchViewModel::class)
+    @ContributesIntoMap(AppScope::class)
+    fun interface Factory : ViewModelAssistedFactory {
+        override fun create(extras: CreationExtras): SearchViewModel = create(extras.createSavedStateHandle())
+        fun create(@Assisted savedStateHandle: SavedStateHandle): SearchViewModel
+    }
+
     override fun MviDefinition<SearchState, SearchIntent, Nothing>.define() {
         source(
             name = "search.results",

@@ -1,5 +1,6 @@
 plugins {
     id("nullwave.android.library")
+    alias(libs.plugins.metro)
 }
 
 android {
