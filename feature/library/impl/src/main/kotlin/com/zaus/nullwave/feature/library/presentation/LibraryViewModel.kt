@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.zaus.nullwave.core.mvi.BaseMviViewModel
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.di.LibraryInitialLocale
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Assisted
@@ -20,10 +21,11 @@ import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactoryKey
 @AssistedInject
 internal class LibraryViewModel(
     private val repository: LibraryCatalogRepository,
-    @Assisted private val savedStateHandle: SavedStateHandle,
+    @Assisted savedStateHandle: SavedStateHandle,
     @LibraryInitialLocale initialLocaleTag: String,
 ) : BaseMviViewModel<LibraryState, LibraryIntent, Nothing>(
-    savedStateHandle.restoreLibraryState(initialLocaleTag),
+    initialState = LibraryState(LibraryTrackQuery(initialLocaleTag)),
+    savedState = librarySavedState(savedStateHandle),
 ) {
     @AssistedFactory
     @ViewModelAssistedFactoryKey(LibraryViewModel::class)
@@ -34,7 +36,7 @@ internal class LibraryViewModel(
     }
 
     override fun MviDefinition<LibraryState, LibraryIntent, Nothing>.define() {
-        source(
+        val catalog = source(
             name = "library.catalog",
             input = { catalogRequest },
             flow = repository::observe,
@@ -45,44 +47,34 @@ internal class LibraryViewModel(
         on<LibraryIntent.Refresh> {
             val ready = state.selectedBody as? LibraryBody.Ready<*> ?: return@on
             if (ready.refresh == RefreshState.Running) return@on
-            reduce { startReadingSelected() }
-            restartSources()
+            refresh(catalog) { startReadingSelected() }
         }
         on<LibraryIntent.Retry> {
             val current = state.selectedBody
             if (current !is LibraryBody.Failed &&
                 !(current is LibraryBody.Ready<*> && current.refresh is RefreshState.Failed)
             ) return@on
-            reduce { startReadingSelected() }
-            restartSources()
+            refresh(catalog) { startReadingSelected() }
         }
         on<LibraryIntent.AccessChecked> { intent ->
-            reduce {
+            refresh(catalog) {
                 when (val access = intent.access) {
                     LibraryAccess.Granted -> startReadingSelected()
                     is LibraryAccess.Required -> requireAccess(access.action)
                 }
             }
-            // A fresh OS check invalidates even an equal query/grant after returning to the screen.
-            // Publish the loading/gate state first: a synchronous Flow must have the final word.
-            restartSources()
         }
         on<LibraryIntent.SortChanged> { intent ->
             reduce { withInputs(copy(query = query.copy(sort = intent.sort, direction = intent.direction))) }
-            // Persist the current state, not captured intent fields that a reentrant UI may replace.
-            savedStateHandle.saveTrackSort(state)
         }
         on<LibraryIntent.TabSelected> { intent ->
             reduce { withInputs(copy(selectedTab = intent.tab)) }
-            savedStateHandle.saveTab(state)
         }
         on<LibraryIntent.AlbumSortChanged> { intent ->
             reduce { withInputs(copy(albumQuery = albumQuery.copy(direction = intent.direction))) }
-            savedStateHandle.saveAlbumSort(state)
         }
         on<LibraryIntent.ArtistSortChanged> { intent ->
             reduce { withInputs(copy(artistQuery = artistQuery.copy(direction = intent.direction))) }
-            savedStateHandle.saveArtistSort(state)
         }
         on<LibraryIntent.LocaleChanged> { intent ->
             reduce {
