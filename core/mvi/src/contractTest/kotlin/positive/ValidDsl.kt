@@ -26,13 +26,12 @@ class ValidDsl : BaseMviViewModel<ContractState, ContractIntent, ContractEffect>
             execute { 1 }
             onResult { _, result -> copy(value = result) }
         }
+        val counter = source("counter", flow = { flowOf(1) }) { value -> copy(value = value) }
         on<ContractIntent.Load> { intent -> submit(load, intent.value) }
         on<ContractIntent.Reset> {
             cancel(load)
-            reduce { copy(value = 0) }
+            refresh(counter) { copy(value = 0) }
             tryEffect(ContractEffect.Loaded(0))
-            restartSources()
         }
-        source("counter", flow = { flowOf(1) }) { value -> copy(value = value) }
     }
 }
