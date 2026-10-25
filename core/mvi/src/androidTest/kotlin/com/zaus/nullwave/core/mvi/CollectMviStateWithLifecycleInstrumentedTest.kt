@@ -4,7 +4,6 @@ import androidx.compose.runtime.AbstractApplier
 import androidx.compose.runtime.BroadcastFrameClock
 import androidx.compose.runtime.Composition
 import androidx.compose.runtime.Recomposer
-import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.lifecycle.Lifecycle
@@ -13,7 +12,8 @@ import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.ViewModelStore
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
-import com.zaus.nullwave.core.mvi.ui.collectMviStateWithLifecycle
+import com.zaus.nullwave.core.mvi.ui.MviUiState
+import com.zaus.nullwave.core.mvi.ui.collectMviUiWithLifecycle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
@@ -27,6 +27,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertSame
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -57,11 +59,11 @@ class CollectMviStateWithLifecycleInstrumentedTest {
         val secondOwner = TestOwner(Lifecycle.State.STARTED)
         val firstViewModel = ProbeViewModel().also {
             store.put("first", it)
-            it.write(11)
+            it.uiApi().onIntent(Write(11))
         }
         val secondViewModel = ProbeViewModel().also {
             store.put("second", it)
-            it.write(22)
+            it.uiApi().onIntent(Write(22))
         }
         // Intents enter the substituted Main dispatcher before the CREATED owner seeds its snapshot.
         runCurrent()
@@ -71,14 +73,15 @@ class CollectMviStateWithLifecycleInstrumentedTest {
         val recomposer = Recomposer(coroutineContext + frames)
         val composition = Composition(EmptyApplier(), recomposer)
         val runner = backgroundScope.launch(frames) { recomposer.runRecomposeAndApplyChanges() }
-        lateinit var rendered: State<TestState>
+        lateinit var rendered: MviUiState<TestState, Write>
 
         try {
             composition.setContent {
-                rendered = selectedViewModel.value.collectMviStateWithLifecycle(selectedOwner.value)
+                rendered = selectedViewModel.value.collectMviUiWithLifecycle(selectedOwner.value)
             }
             runCurrent()
-            assertEquals(TestState(11), rendered.value)
+            assertEquals(TestState(11), rendered.state)
+            val firstCallback = rendered.onIntent
             assertEquals(0, firstViewModel.starts)
 
             selectedViewModel.value = secondViewModel
@@ -86,20 +89,24 @@ class CollectMviStateWithLifecycleInstrumentedTest {
             runCurrent()
             frames.sendFrame(1L)
             runCurrent()
-            assertEquals(TestState(22), rendered.value)
+            assertEquals(TestState(22), rendered.state)
+            val secondCallback = rendered.onIntent
+            assertNotSame(firstCallback, secondCallback)
             assertEquals(0, secondViewModel.starts)
             assertEquals(1, firstOwner.registry.observerCount)
 
             // No collection while CREATED: a new owner must seed its snapshot afresh.
-            secondViewModel.write(23)
+            // Callback lifetime follows the VM, so a CREATED owner may still accept platform input.
+            rendered.onIntent(Write(23))
             runCurrent()
-            assertEquals(TestState(22), rendered.value)
+            assertEquals(TestState(22), rendered.state)
             selectedOwner.value = secondOwner
             Snapshot.sendApplyNotifications()
             runCurrent()
             frames.sendFrame(2L)
             runCurrent()
-            assertEquals(TestState(23), rendered.value)
+            assertEquals(TestState(23), rendered.state)
+            assertSame(secondCallback, rendered.onIntent)
             assertEquals(0, firstOwner.registry.observerCount)
             assertEquals(1, secondOwner.registry.observerCount)
             assertEquals(1, secondViewModel.activeSources)
@@ -109,8 +116,13 @@ class CollectMviStateWithLifecycleInstrumentedTest {
             runCurrent()
             frames.sendFrame(3L)
             runCurrent()
-            assertEquals(TestState(11), rendered.value)
+            assertEquals(TestState(11), rendered.state)
+            assertSame(firstCallback, rendered.onIntent)
             assertEquals(1, firstViewModel.activeSources)
+            rendered.onIntent(Write(12))
+            runCurrent()
+            assertEquals(TestState(12), rendered.state)
+            assertEquals(TestState(23), secondViewModel.state.value)
             advanceTimeBy(STOP_TIMEOUT)
             runCurrent()
             assertEquals(0, secondViewModel.activeSources)
@@ -161,7 +173,6 @@ class CollectMviStateWithLifecycleInstrumentedTest {
             }
         }
 
-        fun write(value: Int) = onIntent(Write(value))
     }
 
     private class TestOwner(initialState: Lifecycle.State) : LifecycleOwner {

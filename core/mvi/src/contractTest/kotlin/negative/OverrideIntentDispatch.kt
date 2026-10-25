@@ -1,4 +1,4 @@
-// EXPECT_DIAGNOSTIC: OVERRIDING_FINAL_MEMBER
+// EXPECT_DIAGNOSTIC: NOTHING_TO_OVERRIDE
 package contract
 
 import com.zaus.nullwave.core.mvi.BaseMviViewModel
