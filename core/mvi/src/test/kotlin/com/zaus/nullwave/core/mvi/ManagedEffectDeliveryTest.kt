@@ -2,6 +2,7 @@ package com.zaus.nullwave.core.mvi
 
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
+import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import com.zaus.nullwave.core.mvi.runtime.MviRuntime
 import com.zaus.nullwave.core.mvi.runtime.effect.EffectEpoch
 import com.zaus.nullwave.core.mvi.runtime.effect.EffectMailbox
@@ -57,7 +58,7 @@ class ManagedEffectDeliveryTest {
             on<Run> { submit(search, it.value) }
         }
         repeat(65) {
-            vm.onIntent(Run(it))
+            vm.ui.onIntent(Run(it))
             runCurrent()
         }
         val received = mutableListOf<Signal>()
@@ -84,11 +85,11 @@ class ManagedEffectDeliveryTest {
             on<Notify> { accepted += tryEffect(Signal(it.value)) }
         }
         repeat(64) {
-            vm.onIntent(Run(it))
+            vm.ui.onIntent(Run(it))
             runCurrent()
         }
-        vm.onIntent(Cancel)
-        vm.onIntent(Notify(100))
+        vm.ui.onIntent(Cancel)
+        vm.ui.onIntent(Notify(100))
         val received = mutableListOf<Signal>()
         backgroundScope.launch { vm.collectEffects { received += it } }
         runCurrent()
@@ -153,9 +154,9 @@ class ManagedEffectDeliveryTest {
             }
         }
         try {
-            vm.onIntent(Run(1))
+            vm.ui.onIntent(Run(1))
             runCurrent()
-            vm.onIntent(Run(2))
+            vm.ui.onIntent(Run(2))
             runCurrent()
 
             assertTrue(cleanupStarted)
@@ -192,9 +193,9 @@ class ManagedEffectDeliveryTest {
                 }
             }
         }
-        vm.onIntent(Run(1))
+        vm.ui.onIntent(Run(1))
         runCurrent()
-        vm.onIntent(Cancel)
+        vm.ui.onIntent(Cancel)
         runCurrent()
 
         assertEquals(listOf(false), cancellations)
@@ -263,20 +264,15 @@ class ManagedEffectDeliveryTest {
             consumer.cancel()
             runCurrent()
 
-            supervisorScope {
-                val competing = async {
-                    runCatching { mailbox.collect {} }.exceptionOrNull()
-                }
-                runCurrent()
-                assertTrue(competing.await() is IllegalStateException)
-            }
+            val replacement = backgroundScope.launch { mailbox.collect { received += it.value } }
+            runCurrent()
+            assertTrue(replacement.isActive)
+            assertEquals(listOf(1), received)
             assertFalse(consumer.isCompleted)
 
             cleanup.complete(Unit)
             runCurrent()
             assertTrue(consumer.isCompleted)
-            backgroundScope.launch { mailbox.collect { received += it.value } }
-            runCurrent()
             assertEquals(listOf(1, 2), received)
         } finally {
             cleanup.complete(Unit)
@@ -332,9 +328,9 @@ class ManagedEffectDeliveryTest {
             on<Run> { reduce { copy(value = it.value) } }
         }
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.collectEffects { vm.onIntent(Run(it.value)) }
+            vm.collectEffects { vm.ui.onIntent(Run(it.value)) }
         }
-        vm.onIntent(Notify(42))
+        vm.ui.onIntent(Notify(42))
         runCurrent()
 
         assertEquals(42, vm.state.value.value)
@@ -348,7 +344,7 @@ class ManagedEffectDeliveryTest {
             val search = latest<Int, Int>("search") {
                 execute { input ->
                     try {
-                        vm.collectEffects { vm.onIntent(Notify(it.value)) }
+                        vm.collectEffects { vm.ui.onIntent(Notify(it.value)) }
                     } catch (_: IllegalStateException) {
                         rejected = true
                     }
@@ -360,8 +356,8 @@ class ManagedEffectDeliveryTest {
             on<Notify> { reduce { copy(value = it.value) } }
             on<Cancel> { tryEffect(Signal(100)) }
         }
-        vm.onIntent(Cancel)
-        vm.onIntent(Run(7))
+        vm.ui.onIntent(Cancel)
+        vm.ui.onIntent(Run(7))
         runCurrent()
 
         assertTrue(rejected)
@@ -373,7 +369,7 @@ class ManagedEffectDeliveryTest {
     }
 
     @Test
-    fun `latest handler cleanup submitting newer work cannot be replaced by the outer submission`() = runTest(dispatcher) {
+    fun `latest handler cleanup intent runs after the current admission and wins next`() = runTest(dispatcher) {
         val accepted = mutableListOf<Pair<Int, Boolean>>()
         val received = mutableListOf<Int>()
         val vm = own {
@@ -391,20 +387,21 @@ class ManagedEffectDeliveryTest {
                     try {
                         awaitCancellation()
                     } finally {
-                        vm.onIntent(Run(3))
+                        vm.ui.onIntent(Run(3))
                     }
                 }
             }
         }
-        vm.onIntent(Run(1))
+        vm.ui.onIntent(Run(1))
         runCurrent()
-        vm.onIntent(Run(2))
+        vm.ui.onIntent(Run(2))
         runCurrent()
 
         assertEquals(3, vm.state.value.value)
-        assertEquals(listOf(1, 3), received)
-        assertTrue(accepted.contains(3 to true))
-        assertTrue(accepted.contains(2 to false))
+        // Run(3) from cleanup waits for Run(2)'s handler. Its synchronous work/effect may finish
+        // before the next intent starts; latest does not retroactively revoke delivered actions.
+        assertEquals(listOf(1, 2, 3), received)
+        assertEquals(listOf(1 to true, 2 to true, 3 to true), accepted)
     }
 
     @Test
@@ -431,15 +428,15 @@ class ManagedEffectDeliveryTest {
                     try {
                         awaitCancellation()
                     } finally {
-                        vm.onIntent(Run(2))
+                        vm.ui.onIntent(Run(2))
                     }
                 }
             }
         }
         try {
-            vm.onIntent(Run(1))
+            vm.ui.onIntent(Run(1))
             runCurrent()
-            vm.onIntent(Cancel)
+            vm.ui.onIntent(Cancel)
             runCurrent()
             assertEquals(listOf(false), cancellations)
 
@@ -452,8 +449,8 @@ class ManagedEffectDeliveryTest {
         }
     }
 
-    private fun own(definition: MviDefinition<Snapshot, Intent, Signal>.() -> Unit): ProbeViewModel =
-        ProbeViewModel(definition).also { store.put("managed-effect-${nextKey++}", it) }
+    private suspend fun own(definition: MviDefinition<Snapshot, Intent, Signal>.() -> Unit): ProbeViewModel =
+        ProbeViewModel(definition).also { store.put("managed-effect-${nextKey++}", it); it.ui = it.uiApi() }
 
     private data class Snapshot(val value: Int = 0) : UiState
     private sealed interface Intent : UiIntent
@@ -465,6 +462,8 @@ class ManagedEffectDeliveryTest {
     private class ProbeViewModel(
         private val definition: MviDefinition<Snapshot, Intent, Signal>.() -> Unit,
     ) : BaseMviViewModel<Snapshot, Intent, Signal>(Snapshot()) {
+        lateinit var ui: MviUiApi<Snapshot, Intent>
+
         override fun MviDefinition<Snapshot, Intent, Signal>.define() = definition()
     }
 }
