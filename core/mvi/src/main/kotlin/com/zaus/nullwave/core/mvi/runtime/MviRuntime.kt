@@ -27,13 +27,16 @@ import kotlinx.coroutines.withContext
 /** The shared, Main-confined engine behind the public definition-based contract. */
 internal class MviRuntime<S : UiState, E : UiEffect>(
     initialState: S,
-    private val scope: CoroutineScope,
+    scope: CoroutineScope,
     sourceStopTimeoutMillis: Long = 5_000,
     private val savedState: SavedStateBinding<S>? = null,
     observeSources: suspend () -> Unit,
 ) : AutoCloseable {
+    // Preserve the owner's Job/dispatcher. Every runtime child starts and resumes in a known phase;
+    // execute/source install their own Work context only around user work.
+    private val runtimeScope = CoroutineScope(scope.coroutineContext + MviAccess.neutralContext())
     private val mutableState = MutableStateFlow(initialState)
-    private val intentIngress = MainIntentIngress(scope)
+    private val intentIngress = MainIntentIngress(runtimeScope)
     val state: StateFlow<S> = mutableState.asStateFlow()
     private val activeUiBindings = MutableStateFlow(0)
     var sourceGeneration: Any = Any()
@@ -42,8 +45,8 @@ internal class MviRuntime<S : UiState, E : UiEffect>(
     private val effectMailbox = EffectMailbox<E>()
     private var closed = false
     private var writingSavedState = false
-    val isOpen: Boolean get() = !closed && scope.isActive
-    private val operations = OperationRunner<S>(scope, ::update)
+    val isOpen: Boolean get() = !closed && runtimeScope.isActive
+    private val operations = OperationRunner<S>(runtimeScope, ::update)
 
     /** Prepare input invalidation before publication; notify source collectors afterwards. */
     var prepareStateChange: ((S, String?, String?) -> PreparedSourceChanges)? = null
@@ -51,7 +54,7 @@ internal class MviRuntime<S : UiState, E : UiEffect>(
     suspend fun collectEffects(handler: suspend (E) -> Unit) = effectMailbox.collect(handler)
 
     private val sourceSharing = SharingStarted.WhileSubscribed(stopTimeoutMillis = sourceStopTimeoutMillis)
-    private val sourceController = scope.launch {
+    private val sourceController = runtimeScope.launch {
         sourceSharing.command(activeUiBindings).collectLatest { command ->
             if (command == SharingCommand.START) {
                 sourceRestarts.collectLatest { generation ->
@@ -178,9 +181,9 @@ internal class MviRuntime<S : UiState, E : UiEffect>(
     override fun close() {
         intentIngress.close()
         val main = Dispatchers.Main.immediate
-        if (main.isDispatchNeeded(scope.coroutineContext)) {
+        if (main.isDispatchNeeded(runtimeScope.coroutineContext)) {
             // VM clear has already cancelled its scope; cleanup must still be dispatched to Main.
-            CoroutineScope(main).launch { closeNow() }
+            CoroutineScope(main + MviAccess.neutralContext()).launch { closeNow() }
         } else {
             closeNow()
         }
