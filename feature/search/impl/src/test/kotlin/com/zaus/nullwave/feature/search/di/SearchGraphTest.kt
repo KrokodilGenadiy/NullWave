@@ -66,9 +66,10 @@ class SearchGraphTest {
         assertEquals(SearchAccess.Unchecked, first.state.value.access)
         assertEquals("", second.state.value.rawQuery)
         assertEquals(0, repository.calls.size)
+        val firstUi = first.uiApi()
 
         backgroundScope.launch { first.withUiBinding { awaitCancellation() } }
-        first.onIntent(SearchIntent.AccessChecked(true))
+        firstUi.onIntent(SearchIntent.AccessChecked(true))
         advanceTimeBy(250)
         runCurrent()
         assertTrue(first.state.value.body is SearchBody.Ready)

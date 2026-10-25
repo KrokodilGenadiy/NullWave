@@ -160,7 +160,7 @@ class SearchViewModelTest {
         val vm = search("first")
         reply(AppResult.Success(results))
         val old = repository.subscriptions.single()
-        vm.onIntent(SearchIntent.QueryChanged("second"))
+        vm.uiApi().onIntent(SearchIntent.QueryChanged("second"))
         old.respond(AppResult.Success(emptyResults))
         runCurrent()
         assertSame(SearchBody.Loading, vm.state.value.body)
@@ -405,7 +405,8 @@ class SearchViewModelTest {
         reply(AppResult.Success(results))
         send(vm, SearchIntent.AccessChecked(false))
         val saved = handle.keys().associateWith { handle.get<Any?>(it) }
-        assertEquals(mapOf("search.query" to "  Ёлка  "), saved)
+        assertEquals(setOf("search.inputs"), saved.keys)
+        assertTrue(saved.getValue("search.inputs") is String)
         store.clear()
         runCurrent()
         val restored = createVm(SavedStateHandle(saved), localeTag = "en-US")
@@ -427,9 +428,26 @@ class SearchViewModelTest {
         val handle = SavedStateHandle(mapOf("search.query" to "  saved  "))
         val vm = createVm(handle)
         send(vm, SearchIntent.ClearQuery)
-        assertEquals("", handle.get<String>("search.query"))
-        val restored = createVm(SavedStateHandle(mapOf("search.query" to handle.get<String>("search.query"))))
+        assertFalse(handle.contains("search.query"))
+        val restored = createVm(SavedStateHandle(handle.keys().associateWith { handle.get<Any?>(it) }))
+        assertEquals("", restored.state.value.rawQuery)
         assertSame(SearchBody.Idle, restored.state.value.body)
+    }
+
+    @Test
+    fun `versioned query wins over legacy and malformed payload never revives old text`() = runTest(dispatcher) {
+        val valid = createVm(SavedStateHandle(mapOf("search.inputs" to
+            """{"version":1,"payload":{"rawQuery":"  Ёлка  "}}""", "search.query" to "stale")), localeTag = "de")
+        assertEquals("  Ёлка  ", valid.state.value.rawQuery)
+        assertEquals("de", valid.state.value.localeTag)
+        assertSame(SearchAccess.Unchecked, valid.state.value.access)
+        assertSame(SearchBody.CheckingAccess, valid.state.value.body)
+        for (raw in listOf<Any>(42, "broken", """{"version":99,"payload":{"rawQuery":"future"}}""",
+            """{"version":1,"payload":{"rawQuery":{}}}""")) {
+            val vm = createVm(SavedStateHandle(mapOf("search.inputs" to raw, "search.query" to "stale")))
+            assertEquals("", vm.state.value.rawQuery)
+            assertSame(SearchBody.Idle, vm.state.value.body)
+        }
     }
 
     @Test
@@ -487,7 +505,7 @@ class SearchViewModelTest {
         settle()
         assertEquals(0, repository.activeCount)
         assertEquals(1, repository.calls.size)
-        assertEquals("signal", handle.get<String>("search.query"))
+        assertEquals("signal", createVm(SavedStateHandle(handle.keys().associateWith { handle.get<Any?>(it) })).state.value.rawQuery)
     }
 
     @Test
@@ -495,14 +513,15 @@ class SearchViewModelTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         val handle = SavedStateHandle()
         val vm = createVm(handle)
+        val ui = vm.uiApi()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             vm.state.collect {
-                if (it.rawQuery == "first") vm.onIntent(SearchIntent.QueryChanged("second"))
+                if (it.rawQuery == "first") ui.onIntent(SearchIntent.QueryChanged("second"))
             }
         }
         send(vm, SearchIntent.QueryChanged("first"))
         assertEquals("second", vm.state.value.rawQuery)
-        assertEquals("second", handle.get<String>("search.query"))
+        assertEquals("second", createVm(SavedStateHandle(handle.keys().associateWith { handle.get<Any?>(it) })).state.value.rawQuery)
     }
 
     @Test
@@ -529,8 +548,8 @@ class SearchViewModelTest {
     private fun TestScope.bind(vm: SearchViewModel): Job =
         backgroundScope.launch { vm.withUiBinding { awaitCancellation() } }.also { runCurrent() }
 
-    private fun TestScope.send(vm: SearchViewModel, intent: SearchIntent) {
-        vm.onIntent(intent)
+    private suspend fun TestScope.send(vm: SearchViewModel, intent: SearchIntent) {
+        vm.uiApi().onIntent(intent)
         runCurrent()
     }
 
@@ -539,12 +558,12 @@ class SearchViewModelTest {
         runCurrent()
     }
 
-    private fun TestScope.readyForInput(): SearchViewModel = createVm().also {
+    private suspend fun TestScope.readyForInput(): SearchViewModel = createVm().also {
         bind(it)
         send(it, SearchIntent.AccessChecked(true))
     }
 
-    private fun TestScope.search(text: String = "signal"): SearchViewModel = readyForInput().also {
+    private suspend fun TestScope.search(text: String = "signal"): SearchViewModel = readyForInput().also {
         send(it, SearchIntent.QueryChanged(text))
         settle()
     }
