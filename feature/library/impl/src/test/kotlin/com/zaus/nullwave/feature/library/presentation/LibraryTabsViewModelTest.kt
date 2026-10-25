@@ -322,8 +322,7 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
         success()
         send(vm, LibraryIntent.AccessChecked(LibraryAccess.Required(AccessAction.SettingsSuggested)))
         val saved = handle.keys().associateWith { handle.get<Any?>(it) }
-        assertEquals(setOf("library.sort", "library.direction", "library.tab",
-            "library.albums.direction", "library.artists.direction"), saved.keys)
+        assertEquals(setOf("library.inputs"), saved.keys)
         store.clear()
         runCurrent()
         val restored = createVm(SavedStateHandle(saved), "en-US")
@@ -388,6 +387,7 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         val handle = SavedStateHandle()
         val vm = createVm(handle)
+        val ui = vm.uiApi()
         send(vm, LibraryIntent.TabSelected(tab))
         var redirected = false
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
@@ -395,8 +395,8 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
                 val direction = if (tab == LibraryTab.Albums) state.albumQuery.direction else state.artistQuery.direction
                 if (!redirected && direction == SortDirection.Descending) {
                     redirected = true
-                    vm.onIntent(sortIntent(SortDirection.Ascending))
-                    vm.onIntent(LibraryIntent.TabSelected(LibraryTab.Songs))
+                    ui.onIntent(sortIntent(SortDirection.Ascending))
+                    ui.onIntent(LibraryIntent.TabSelected(LibraryTab.Songs))
                 }
             }
         }
@@ -426,7 +426,7 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
     private fun createVm(handle: SavedStateHandle = SavedStateHandle(), locale: String = "ru"): LibraryViewModel =
         LibraryViewModel(repository, handle, locale).also { store.put("tabs-${nextKey++}", it) }
 
-    private fun TestScope.selectedVm(): LibraryViewModel = createVm().also {
+    private suspend fun TestScope.selectedVm(): LibraryViewModel = createVm().also {
         send(it, LibraryIntent.TabSelected(tab))
         bind(it)
     }
@@ -434,8 +434,8 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
     private fun TestScope.bind(vm: LibraryViewModel): Job =
         backgroundScope.launch { vm.withUiBinding { awaitCancellation() } }.also { runCurrent() }
 
-    private fun TestScope.send(vm: LibraryViewModel, intent: LibraryIntent) {
-        vm.onIntent(intent)
+    private suspend fun TestScope.send(vm: LibraryViewModel, intent: LibraryIntent) {
+        vm.uiApi().onIntent(intent)
         runCurrent()
     }
 

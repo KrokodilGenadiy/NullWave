@@ -13,6 +13,7 @@ import androidx.activity.result.ActivityResultRegistryOwner
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -33,6 +34,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import com.zaus.nullwave.core.designsystem.theme.NullWaveEffects
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
+import com.zaus.nullwave.core.mvi.ui.rememberMviUiApi
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.DataError
 import com.zaus.nullwave.feature.library.api.model.SortDirection
@@ -82,7 +84,7 @@ class LibraryPermissionRecreationTest(private val settings: Boolean, private val
             oldActivity = it
             oldRegistry = it.results
             oldVm = it.model
-            it.model.onIntent(LibraryIntent.SortChanged(LibraryTrackSort.Artist, SortDirection.Descending))
+            it.onIntent(LibraryIntent.SortChanged(LibraryTrackSort.Artist, SortDirection.Descending))
         }
         activity.recreate()
         compose.onNodeWithTag("library_access_action").assertIsNotEnabled()
@@ -157,6 +159,7 @@ class LibraryPermissionRecreationTest(private val settings: Boolean, private val
 class LibraryPermissionTestActivity : ComponentActivity() {
     internal lateinit var results: ActivityResultRegistry
     internal lateinit var model: LibraryViewModel
+    internal lateinit var onIntent: (LibraryIntent) -> Unit
     internal var showRoot by mutableStateOf(true)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -177,6 +180,8 @@ class LibraryPermissionTestActivity : ComponentActivity() {
         })[LibraryViewModel::class.java]
         val registryOwner = object : ActivityResultRegistryOwner { override val activityResultRegistry = results }
         setContent {
+            val uiApi = rememberMviUiApi(model)
+            SideEffect { onIntent = uiApi.onIntent }
             CompositionLocalProvider(LocalActivityResultRegistryOwner provides registryOwner) {
                 NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
                     val holder = rememberSaveableStateHolder()

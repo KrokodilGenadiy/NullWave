@@ -412,7 +412,8 @@ class LibraryViewModelTest {
         reply(AppResult.Failure(DataError.Io))
         send(vm, LibraryIntent.AccessChecked(LibraryAccess.Required(AccessAction.SettingsSuggested)))
         val saved = handle.keys().associateWith { handle.get<Any?>(it) }
-        assertEquals(mapOf("library.sort" to "RecentlyAdded", "library.direction" to "Descending"), saved)
+        assertEquals(setOf("library.inputs"), saved.keys)
+        assertTrue(saved.getValue("library.inputs") is String)
         store.clear()
         runCurrent()
 
@@ -431,6 +432,22 @@ class LibraryViewModelTest {
         assertEquals(LibraryTrackQuery("ru"), malformed.state.value.query)
         val partial = createVm(SavedStateHandle(mapOf("library.sort" to "Artist", "library.direction" to false)))
         assertEquals(LibraryTrackQuery("ru", LibraryTrackSort.Artist), partial.state.value.query)
+    }
+
+    @Test
+    fun `versioned inputs restore valid enum fields and reject unsupported versions without legacy fallback`() = runTest(dispatcher) {
+        val handle = SavedStateHandle(mapOf("library.inputs" to
+            """{"version":1,"payload":{"tab":"Artists","sort":"Removed","direction":"Descending","albumDirection":"Removed","artistDirection":"Descending"}}"""))
+        val vm = createVm(handle, localeTag = "sv-SE")
+        assertEquals(LibraryTab.Artists, vm.state.value.selectedTab)
+        assertEquals(LibraryTrackQuery("sv-SE", LibraryTrackSort.Title, SortDirection.Descending), vm.state.value.query)
+        assertEquals(SortDirection.Ascending, vm.state.value.albumQuery.direction)
+        assertEquals(SortDirection.Descending, vm.state.value.artistQuery.direction)
+        assertSame(LibraryBody.Loading, vm.state.value.selectedBody)
+        for (raw in listOf<Any>(42, "broken", """{"version":99,"payload":{"tab":"Albums"}}""")) {
+            val restored = createVm(SavedStateHandle(mapOf("library.inputs" to raw, "library.tab" to "Artists")))
+            assertEquals(LibraryTab.Songs, restored.state.value.selectedTab)
+        }
     }
 
     @Test
@@ -463,10 +480,11 @@ class LibraryViewModelTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         val handle = SavedStateHandle()
         val vm = createVm(handle)
+        val ui = vm.uiApi()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             vm.state.collect {
                 if (it.query.sort == LibraryTrackSort.Artist) {
-                    vm.onIntent(LibraryIntent.SortChanged(LibraryTrackSort.RecentlyAdded, SortDirection.Descending))
+                    ui.onIntent(LibraryIntent.SortChanged(LibraryTrackSort.RecentlyAdded, SortDirection.Descending))
                 }
             }
         }
@@ -509,8 +527,8 @@ class LibraryViewModelTest {
     private fun TestScope.bind(vm: LibraryViewModel): Job =
         backgroundScope.launch { vm.withUiBinding { awaitCancellation() } }.also { runCurrent() }
 
-    private fun TestScope.send(vm: LibraryViewModel, intent: LibraryIntent) {
-        vm.onIntent(intent)
+    private suspend fun TestScope.send(vm: LibraryViewModel, intent: LibraryIntent) {
+        vm.uiApi().onIntent(intent)
         runCurrent()
     }
 

@@ -66,13 +66,14 @@ class LibraryGraphTest {
         assertEquals(LibraryTrackSort.Title, second.state.value.query.sort)
         assertEquals("ru", first.state.value.query.localeTag)
         assertEquals(0, source.reads)
+        val firstUi = first.uiApi()
 
         backgroundScope.launch { first.withUiBinding { awaitCancellation() } }
         backgroundScope.launch { second.withUiBinding { awaitCancellation() } }
         runCurrent()
         assertEquals(2, source.activeObservers)
         assertEquals("Low Orbit", (first.state.value.body as LibraryBody.Ready<LibraryTrack>).items.single().title)
-        first.onIntent(LibraryIntent.TabSelected(LibraryTab.Albums))
+        firstUi.onIntent(LibraryIntent.TabSelected(LibraryTab.Albums))
         runCurrent()
         assertEquals("Signals", (first.state.value.albums as LibraryBody.Ready<LibraryAlbum>).items.single().title)
         assertEquals(LibraryTab.Songs, second.state.value.selectedTab)
