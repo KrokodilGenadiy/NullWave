@@ -7,13 +7,15 @@ import kotlinx.coroutines.launch
 
 /**
  * Orders admission across Main and worker callers without making every Main callback asynchronous.
- * An empty queue permits immediate (including publication-reentrant) Main dispatch. A later Main
- * caller must join an already pending worker queue instead of overtaking it.
+ * An idle Main caller runs synchronously. Calls admitted during a handler or a deferred publication
+ * join the FIFO instead of entering that transition recursively. A later Main caller cannot overtake
+ * an earlier worker. Queued failures belong to the VM scope, not the caller that releases a turn.
  */
 internal class MainIntentIngress(private val scope: CoroutineScope) : AutoCloseable {
     private val lock = Any()
     private val pending = ArrayDeque<() -> Unit>()
     private var scheduled = false
+    private var running = false
     private var closed = false
     private var deferrals = 0
 
@@ -23,21 +25,28 @@ internal class MainIntentIngress(private val scope: CoroutineScope) : AutoClosea
         var schedule = false
         synchronized(lock) {
             if (closed || !scope.isActive) return
-            if (onMain && pending.isEmpty() && deferrals == 0) {
+            if (onMain && pending.isEmpty() && !running && !scheduled && deferrals == 0) {
                 inline = true
+                running = true
             } else {
                 pending.addLast(block)
-                if (!scheduled && deferrals == 0) {
+                if (!running && !scheduled && deferrals == 0) {
                     scheduled = true
                     schedule = true
                 }
             }
         }
-        if (inline) block()
+        if (inline) {
+            try {
+                block()
+            } finally {
+                finishRun()
+            }
+        }
         if (schedule) scheduleDrain()
     }
 
-    /** Main-only, non-suspending boundary: cleanup callbacks enter after cancellation commits. */
+    /** Main-only boundary for publication/cancellation; never hold it across suspension. */
     fun <T> deferDispatch(block: () -> T): T {
         synchronized(lock) { deferrals++ }
         return try {
@@ -46,7 +55,7 @@ internal class MainIntentIngress(private val scope: CoroutineScope) : AutoClosea
             val schedule = synchronized(lock) {
                 deferrals--
                 if (closed || !scope.isActive) pending.clear()
-                if (deferrals == 0 && pending.isNotEmpty() && !scheduled) {
+                if (deferrals == 0 && pending.isNotEmpty() && !running && !scheduled) {
                     scheduled = true
                     true
                 } else {
@@ -62,6 +71,13 @@ internal class MainIntentIngress(private val scope: CoroutineScope) : AutoClosea
     }
 
     private fun drain() {
+        synchronized(lock) {
+            if (running || deferrals > 0) {
+                scheduled = false
+                return
+            }
+            running = true
+        }
         try {
             while (true) {
                 val next = synchronized(lock) {
@@ -71,15 +87,20 @@ internal class MainIntentIngress(private val scope: CoroutineScope) : AutoClosea
                 next()
             }
         } finally {
-            // A throwing handler must not strand independently admitted callbacks. Their failures
-            // still belong to the VM scope, rather than to a later Main caller joining the queue.
-            val reschedule = synchronized(lock) {
-                if (closed || !scope.isActive) pending.clear()
-                scheduled = deferrals == 0 && pending.isNotEmpty()
-                scheduled
-            }
-            if (reschedule) scheduleDrain()
+            finishRun()
         }
+    }
+
+    private fun finishRun() {
+        val reschedule = synchronized(lock) {
+            running = false
+            if (closed || !scope.isActive) pending.clear()
+            scheduled = deferrals == 0 && pending.isNotEmpty()
+            scheduled
+        }
+        // A throwing callback must not strand independently admitted callbacks or replace the
+        // original caller's exception. The VM scope owns failures from the queued drain.
+        if (reschedule) scheduleDrain()
     }
 
     override fun close() {

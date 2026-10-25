@@ -2,6 +2,7 @@ package com.zaus.nullwave.core.mvi.runtime
 
 import com.zaus.nullwave.core.mvi.UiEffect
 import com.zaus.nullwave.core.mvi.UiState
+import com.zaus.nullwave.core.mvi.runtime.source.PreparedSourceChanges
 import com.zaus.nullwave.core.mvi.runtime.effect.EffectEpoch
 import com.zaus.nullwave.core.mvi.runtime.effect.EffectMailbox
 import com.zaus.nullwave.core.mvi.runtime.operation.MviOperation
@@ -41,7 +42,7 @@ internal class MviRuntime<S : UiState, E : UiEffect>(
     private val operations = OperationRunner<S>(scope, ::update)
 
     /** Prepare input invalidation before publication; notify source collectors afterwards. */
-    var prepareStateChange: ((S, String?) -> (() -> Unit))? = null
+    var prepareStateChange: ((S, String?, String?) -> PreparedSourceChanges)? = null
 
     suspend fun collectEffects(handler: suspend (E) -> Unit) = effectMailbox.collect(handler)
 
@@ -66,22 +67,30 @@ internal class MviRuntime<S : UiState, E : UiEffect>(
         publish(sourceName, reducer)
     }
 
-    private fun publish(sourceName: String?, reducer: S.() -> S) {
+    fun refreshSource(name: String, reducer: S.() -> S) {
+        publish(sourceName = null, reducer, refreshName = name)
+    }
+
+    private fun publish(sourceName: String?, reducer: S.() -> S, refreshName: String? = null) {
         MviAccess.checkMutationAllowed(this)
-        val next = MviAccess.reducing(this) { reducer(mutableState.value) }
-        val notify = MviAccess.reducing(this) { prepareStateChange?.invoke(next, sourceName) }
-        MviAccess.publishing(this) {
-            mutableState.value = next
-            notify?.invoke()
+        deferIntents {
+            val next = MviAccess.reducing(this) { reducer(mutableState.value) }
+            val sources = MviAccess.reducing(this) { prepareStateChange?.invoke(next, sourceName, refreshName) }
+            if (!isOpen) return@deferIntents
+            sources?.commit()
+            MviAccess.publishing(this) {
+                mutableState.value = next
+                if (isOpen) sources?.notifyCollectors()
+            }
         }
     }
 
-    /** Main is immediate only when no earlier caller is waiting in the shared ingress queue. */
+    /** Main is immediate only when the ingress is idle and no earlier caller is waiting. */
     fun dispatch(block: () -> Unit) {
         intentIngress.dispatch(block)
     }
 
-    /** Keep cleanup-triggered intents outside the current cancellation's state and job snapshot. */
+    /** Finish publication/cancellation before processing observer- or cleanup-triggered intents. */
     fun <T> deferIntents(block: () -> T): T = intentIngress.deferDispatch(block)
 
     suspend fun withUiBinding(block: suspend () -> Unit) = withContext(Dispatchers.Main.immediate) {
@@ -123,12 +132,16 @@ internal class MviRuntime<S : UiState, E : UiEffect>(
         isCurrent: () -> Boolean = { true },
     ): Boolean {
         if (!isOpen || !isCurrent()) return false
-        return MviAccess.publishing(this) {
-            effectMailbox.offer(effect, epoch) { isOpen && isCurrent() }
+        return deferIntents {
+            MviAccess.publishing(this) {
+                effectMailbox.offer(effect, epoch) { isOpen && isCurrent() }
+            }
         }
     }
 
-    fun revokeEffects(epoch: EffectEpoch) = MviAccess.publishing(this) { effectMailbox.revoke(epoch) }
+    fun revokeEffects(epoch: EffectEpoch) = deferIntents {
+        MviAccess.publishing(this) { effectMailbox.revoke(epoch) }
+    }
 
     override fun close() {
         intentIngress.close()

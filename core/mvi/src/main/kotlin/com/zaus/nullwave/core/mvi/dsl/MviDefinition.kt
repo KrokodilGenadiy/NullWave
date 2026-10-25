@@ -8,6 +8,7 @@ import com.zaus.nullwave.core.mvi.runtime.MviAccess
 import com.zaus.nullwave.core.mvi.runtime.MviRuntime
 import com.zaus.nullwave.core.mvi.runtime.operation.OperationPolicy
 import com.zaus.nullwave.core.mvi.runtime.source.MviSource
+import com.zaus.nullwave.core.mvi.runtime.source.PreparedSourceChanges
 import com.zaus.nullwave.core.mvi.runtime.source.keyedMviSource
 import java.lang.reflect.Modifier
 import kotlin.reflect.KClass
@@ -68,24 +69,26 @@ class MviDefinition<S : UiState, I : UiIntent, E : UiEffect> internal constructo
     }
 
     /** A subscription independent of State inputs, active only while the UI is bound. */
-    fun <T> source(name: String, flow: () -> Flow<T>, reducer: S.(T) -> S) {
+    fun <T> source(name: String, flow: () -> Flow<T>, reducer: S.(T) -> S): Source<S> =
         source<Unit, T>(name, input = {}, flow = { flow() }) { _, value -> reducer(value) }
-    }
 
     /**
      * A subscription keyed by immutable State inputs. Input changes immediately revoke old results,
      * including A -> B -> A, before asynchronous cancellation/collection catches up.
      * Select the complete request: [flow] must receive every State-dependent query argument in [K].
      * The [reducer] may update data, but cannot change any declared source's selected input.
+     * Retain the returned handle in this definition for IntentScope.refresh; ordinary input edits
+     * already restart collection and need no explicit refresh.
      */
     fun <K, T> source(
         name: String,
         input: S.() -> K,
         flow: (K) -> Flow<T>,
         reducer: S.(K, T) -> S,
-    ) {
+    ): Source<S> {
         registerName(name)
         sources += keyedMviSource(runtime, name, input, flow, reducer)
+        return Source(owner) { runtime.refreshSource(name, it) }
     }
 
     /** Optional screen invariant checked on the initial State and before every State publication. */
@@ -101,14 +104,15 @@ class MviDefinition<S : UiState, I : UiIntent, E : UiEffect> internal constructo
             validator?.invoke(runtime.state.value)
             sources.forEach { it.initialize(runtime.state.value) }
         }
-        runtime.prepareStateChange = { next, sourceName ->
+        runtime.prepareStateChange = { next, sourceName, refreshName ->
             validator?.invoke(next)
             // Evaluate all user selectors first, so a failing selector cannot partially invalidate
             // other sources while the previous State remains published.
-            val prepared = sources.map { it.prepare(next, sourceName) }
-            val notifications = prepared.map { it() }
-            val notify: () -> Unit = { notifications.forEach { it() } }
-            notify
+            val prepared = sources.map { it.prepare(next, sourceName, refreshName) }
+            PreparedSourceChanges(
+                commit = { prepared.forEach { it.commit() } },
+                notifyCollectors = { prepared.forEach { it.notifyCollectors() } },
+            )
         }
         open = false
     }

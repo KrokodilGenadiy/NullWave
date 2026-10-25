@@ -20,6 +20,11 @@ class IntentScope<S : UiState, E : UiEffect> internal constructor(
             return runtime.state.value
         }
 
+    /**
+     * Computes and validates the next State, then publishes it and notifies changed sources.
+     * Keep this transform pure and synchronous; submitting work belongs outside it.
+     * Intents from observers wait for this entire handler to return, including work after reduce.
+     */
     fun reduce(reducer: S.() -> S) {
         checkOpen()
         runtime.update(reducer)
@@ -28,8 +33,8 @@ class IntentScope<S : UiState, E : UiEffect> internal constructor(
     /** True means accepted, not completed; false means the queue is full or the idle slot is busy. */
     fun <A> submit(operation: Operation<A>, input: A): Boolean {
         checkOwner(operation)
-        // Main.immediate may drain queued UI observers before returning from the scheduler.
-        // They are external callers, even if execution began inside this intent handler.
+        // Main.immediate may invoke UI observers before the scheduler returns. They may enqueue
+        // external intents, even though this handler keeps ownership until it returns.
         return MviAccess.publishing(runtime) { operation.submit(input) }
     }
 
@@ -45,9 +50,16 @@ class IntentScope<S : UiState, E : UiEffect> internal constructor(
         return runtime.offerEffect(effect)
     }
 
-    fun restartSources() {
+    /**
+     * Updates State and invalidates this source in one publication, then notifies its collector.
+     * Use for Retry/Refresh/fresh access checks; ordinary input edits already restart automatically.
+     * A changed input plus refresh causes one invalidation. Stopped sources wait for a UI binding;
+     * a still-active stop grace period permits collection, just like ordinary input changes.
+     */
+    fun refresh(source: Source<S>, reducer: S.() -> S = { this }) {
         checkOpen()
-        MviAccess.publishing(runtime) { runtime.restartSources() }
+        check(source.owner === owner) { "An MVI source belongs to a different ViewModel." }
+        source.refresh(reducer)
     }
 
     internal fun close() {

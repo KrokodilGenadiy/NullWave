@@ -15,7 +15,7 @@ import kotlinx.coroutines.withContext
 /** A declared source owns its input revision and publishes only through the runtime. */
 internal abstract class MviSource<S : UiState> {
     abstract fun initialize(state: S)
-    abstract fun prepare(state: S, sourceName: String?): () -> (() -> Unit)
+    abstract fun prepare(state: S, sourceName: String?, refreshName: String?): PreparedSourceChanges
     abstract suspend fun collect()
 }
 
@@ -39,13 +39,13 @@ internal fun <S : UiState, E : UiEffect, K, T> keyedMviSource(
         revisions = MutableStateFlow(revision)
     }
 
-    override fun prepare(state: S, sourceName: String?): () -> (() -> Unit) {
+    override fun prepare(state: S, sourceName: String?, refreshName: String?): PreparedSourceChanges {
         val previous = checkNotNull(current) { "The MVI source has not been initialized." }
         val next = MviAccess.reducing(runtime) {
             val key = input(state)
-            if (key == previous.key) previous else MviSourceRevision(key)
+            if (key == previous.key && refreshName != name) previous else MviSourceRevision(key)
         }
-        if (next === previous) return { {} }
+        if (next === previous) return PreparedSourceChanges.None
         check(sourceName == null) {
             "Source '$sourceName' cannot change input of source '$name'. " +
                 "Update query inputs from an intent/operation or compose dependent repository flows."
@@ -53,14 +53,13 @@ internal fun <S : UiState, E : UiEffect, K, T> keyedMviSource(
 
         // Every selector is evaluated before any source commits its invalidation. A failing selector
         // therefore leaves the old State and every source revision intact.
-        return {
-            current = next
-            val notify: () -> Unit = {
-                // Publication may dispatch a newer intent; never restore its superseded input.
+        return PreparedSourceChanges(
+            commit = { current = next },
+            notifyCollectors = {
+                // Notify only the revision still owned by this source.
                 if (current === next) revisions.value = next
-            }
-            notify
-        }
+            },
+        )
     }
 
     override suspend fun collect() {
