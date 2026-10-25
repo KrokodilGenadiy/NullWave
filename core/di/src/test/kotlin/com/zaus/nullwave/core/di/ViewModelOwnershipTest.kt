@@ -86,7 +86,8 @@ class ViewModelOwnershipTest {
     fun `new owner using retained store receives the same ViewModel and state`() = runTest(dispatcher) {
         val originalOwner = owner()
         val first = provider(originalOwner)[OwnershipVm::class]
-        first.onIntent(Increment)
+        val ui = first.uiApi()
+        ui.onIntent(Increment)
         runCurrent()
 
         val recreatedOwner = Owner(originalOwner.viewModelStore)
@@ -103,10 +104,11 @@ class ViewModelOwnershipTest {
         val firstOwner = owner()
         val first = provider(firstOwner)[OwnershipVm::class]
         val other = provider(owner())[OwnershipVm::class]
+        val otherUi = other.uiApi()
 
         firstOwner.viewModelStore.clear()
         firstOwner.viewModelStore.clear()
-        other.onIntent(Increment)
+        otherUi.onIntent(Increment)
         runCurrent()
 
         assertEquals(1, first.clears)
@@ -119,8 +121,9 @@ class ViewModelOwnershipTest {
     fun `clear cancels MVI work and sources and ignores callbacks to the old instance`() = runTest(dispatcher) {
         val owner = owner()
         val vm = provider(owner)[OwnershipVm::class]
+        val ui = vm.uiApi()
         backgroundScope.launch { vm.withUiBinding { awaitCancellation() } }
-        vm.onIntent(Start)
+        ui.onIntent(Start)
         runCurrent()
         assertTrue(vm.state.value.loading)
         assertEquals(1, vm.sourceStarts)
@@ -128,7 +131,7 @@ class ViewModelOwnershipTest {
         owner.viewModelStore.clear()
         runCurrent()
         val frozen = vm.state.value
-        vm.onIntent(Increment)
+        ui.onIntent(Increment)
         vm.collectEffects { error("Cleared VM must not deliver") }
         runCurrent()
 

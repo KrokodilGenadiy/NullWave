@@ -38,10 +38,11 @@ class ViewModelRestorationInstrumentedTest {
         val graph = graph()
         val owner = RegistryOwner(defaultArgs = Bundle().apply { putString("query", "initial") })
         val first = owner.provider(graph)["screen", RestorationVm::class]
+        val firstUi = first.uiApi()
         assertEquals("initial", first.state.value.query)
-        first.onIntent(RestorationIntent.Edit("restored query", "track-42"))
-        first.onIntent(RestorationIntent.Start)
-        first.onIntent(RestorationIntent.Notify)
+        firstUi.onIntent(RestorationIntent.Edit("restored query", "track-42"))
+        firstUi.onIntent(RestorationIntent.Start)
+        firstUi.onIntent(RestorationIntent.Notify)
         yield()
         assertTrue(first.state.value.loading)
         assertEquals(1, first.workStarts)
@@ -59,6 +60,7 @@ class ViewModelRestorationInstrumentedTest {
         )
         try {
             val restored = restoredOwner.provider(newGraph)["screen", RestorationVm::class]
+            val restoredUi = restored.uiApi()
             assertNotSame(first, restored)
             assertNotSame(first.dependency, restored.dependency)
             assertEquals(RestorationState("restored query", "track-42"), restored.state.value)
@@ -69,7 +71,7 @@ class ViewModelRestorationInstrumentedTest {
             yield()
             assertTrue(effects.isEmpty())
             // Prove the collector was active, rather than mistaking an unstarted collector for no replay.
-            restored.onIntent(RestorationIntent.Notify)
+            restoredUi.onIntent(RestorationIntent.Notify)
             yield()
             assertEquals(listOf(RestorationEffect), effects)
             collector.cancelAndJoin()
@@ -82,8 +84,10 @@ class ViewModelRestorationInstrumentedTest {
     fun differentProviderKeysRestoreIndependentlyInReverseCreationOrder() = runBlocking(Dispatchers.Main.immediate) {
         val graph = graph()
         val owner = RegistryOwner()
-        owner.provider(graph)["first", RestorationVm::class].onIntent(RestorationIntent.Edit("alpha"))
-        owner.provider(graph)["second", RestorationVm::class].onIntent(RestorationIntent.Edit("beta"))
+        val firstUi = owner.provider(graph)["first", RestorationVm::class].uiApi()
+        val secondUi = owner.provider(graph)["second", RestorationVm::class].uiApi()
+        firstUi.onIntent(RestorationIntent.Edit("alpha"))
+        secondUi.onIntent(RestorationIntent.Edit("beta"))
         val saved = owner.save().parcelCopy()
         owner.destroy()
 
@@ -106,15 +110,18 @@ class ViewModelRestorationInstrumentedTest {
         val graph = graph()
         val owner = RegistryOwner()
         val first = owner.provider(graph)["screen", RestorationVm::class]
-        first.onIntent(RestorationIntent.Edit("before recreation"))
+        val firstUi = first.uiApi()
+        firstUi.onIntent(RestorationIntent.Edit("before recreation"))
         val saved = owner.save().parcelCopy()
         owner.destroy(clearStore = false)
 
         val replacement = RegistryOwner(restored = saved, viewModelStore = owner.viewModelStore)
         val retained = replacement.provider(graph)["screen", RestorationVm::class]
+        val retainedUi = retained.uiApi()
         assertSame(first, retained)
+        assertSame(firstUi, retainedUi)
         assertEquals(0, retained.clears)
-        retained.onIntent(RestorationIntent.Edit("after recreation", "track-7"))
+        retainedUi.onIntent(RestorationIntent.Edit("after recreation", "track-7"))
         val savedAgain = replacement.save().parcelCopy()
         replacement.destroy()
 

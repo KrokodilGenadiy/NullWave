@@ -5,18 +5,18 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
-import com.zaus.nullwave.core.mvi.ui.collectMviStateWithLifecycle
+import com.zaus.nullwave.core.mvi.ui.collectMviUiWithLifecycle
 import com.zaus.nullwave.core.navigation.EntryProviderInstaller
 import com.zaus.nullwave.core.navigation.navigateBack
 import com.zaus.nullwave.core.navigation.navigateTo
 import com.zaus.nullwave.di.RestorationGraph
 import com.zaus.nullwave.di.RestorationIntent
+import com.zaus.nullwave.di.RestorationState
 import com.zaus.nullwave.di.RestorationVm
 import com.zaus.nullwave.feature.about.api.AboutKey
 import com.zaus.nullwave.feature.library.api.LibraryKey
@@ -38,16 +38,19 @@ class NavigationViewModelInstrumentedTest {
         val graph = createGraph<RestorationGraph>()
         lateinit var root: RestorationVm
         lateinit var detail: RestorationVm
+        lateinit var detailIntents: (RestorationIntent) -> Unit
         val entries: Set<EntryProviderInstaller> = setOf({
             entry<LibraryKey> {
                 val vm = metroViewModel<RestorationVm>()
+                val ui = vm.collectMviUiWithLifecycle()
                 SideEffect { root = vm }
-                ProbeScreen("root", vm, "Open detail") { navigateTo(AboutKey) }
+                ProbeScreen("root", ui.state, ui.onIntent, "Open detail") { navigateTo(AboutKey) }
             }
             entry<AboutKey> {
                 val vm = metroViewModel<RestorationVm>()
-                SideEffect { detail = vm }
-                ProbeScreen("detail", vm, "Back") { navigateBack() }
+                val ui = vm.collectMviUiWithLifecycle()
+                SideEffect { detail = vm; detailIntents = ui.onIntent }
+                ProbeScreen("detail", ui.state, ui.onIntent, "Back") { navigateBack() }
             }
         })
         compose.setContent {
@@ -68,9 +71,10 @@ class NavigationViewModelInstrumentedTest {
             assertNotSame(root, detail)
             assertSame(root.dependency, detail.dependency)
             assertEquals(0, root.clears)
-            detail.onIntent(RestorationIntent.Start)
+            detailIntents(RestorationIntent.Start)
             detail
         }
+        val poppedIntents = compose.runOnIdle { detailIntents }
         compose.runOnIdle { assertEquals(1, popped.workStarts) }
 
         compose.onNodeWithText("Back").performClick()
@@ -81,7 +85,7 @@ class NavigationViewModelInstrumentedTest {
             assertEquals(1, popped.clears)
             assertEquals(1, popped.workStops)
             val frozen = popped.state.value
-            popped.onIntent(RestorationIntent.Edit("late callback"))
+            poppedIntents(RestorationIntent.Edit("late callback"))
             assertEquals(frozen, popped.state.value)
         }
 
@@ -96,11 +100,16 @@ class NavigationViewModelInstrumentedTest {
 }
 
 @Composable
-private fun ProbeScreen(name: String, vm: RestorationVm, action: String, onNavigate: () -> Unit) {
-    val state by vm.collectMviStateWithLifecycle()
+private fun ProbeScreen(
+    name: String,
+    state: RestorationState,
+    onIntent: (RestorationIntent) -> Unit,
+    action: String,
+    onNavigate: () -> Unit,
+) {
     Column {
         Text("$name:${state.query}")
-        Button(onClick = { vm.onIntent(RestorationIntent.Edit("edited")) }) { Text("Edit $name") }
+        Button(onClick = { onIntent(RestorationIntent.Edit("edited")) }) { Text("Edit $name") }
         Button(onClick = onNavigate) { Text(action) }
     }
 }
