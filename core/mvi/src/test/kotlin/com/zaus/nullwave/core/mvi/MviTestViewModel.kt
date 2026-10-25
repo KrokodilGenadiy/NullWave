@@ -3,6 +3,7 @@ package com.zaus.nullwave.core.mvi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zaus.nullwave.core.mvi.runtime.MviRuntime
+import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import com.zaus.nullwave.core.mvi.runtime.operation.MviOperation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +31,9 @@ internal abstract class MviTestViewModel<S : UiState, I : UiIntent, E : UiEffect
 
     final override val state: StateFlow<S> get() = runtime.state
     final override suspend fun collectEffects(onEffect: suspend (E) -> Unit) = runtime.collectEffects(onEffect)
+    // Low-level fixture dispatch is intentionally separate from production Base's public API.
+    abstract fun onIntent(intent: I)
+    final override suspend fun uiApi(): MviUiApi<S, I> = MviUiApi(state, ::onIntent)
     protected val currentState: S get() = runtime.state.value
 
     final override suspend fun withUiBinding(block: suspend () -> Unit) = runtime.withUiBinding(block)

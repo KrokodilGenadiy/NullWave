@@ -2,6 +2,8 @@ package com.zaus.nullwave.core.mvi
 
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
+import com.zaus.nullwave.core.mvi.dsl.Operation
+import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -52,8 +54,8 @@ class StrictMviContractTest {
         assertEquals(0, definitions)
         assertEquals(TestState(), vm.state.value)
 
-        vm.onIntent(Start)
-        vm.onIntent(Start)
+        vm.ui.onIntent(Start)
+        vm.ui.onIntent(Start)
 
         assertEquals(1, definitions)
         assertEquals(2, vm.state.value.value)
@@ -69,8 +71,8 @@ class StrictMviContractTest {
             throw failure
         }
 
-        val first = assertThrows(IllegalStateException::class.java) { vm.onIntent(Start) }
-        val second = assertThrows(IllegalStateException::class.java) { vm.onIntent(Start) }
+        val first = assertThrows(IllegalStateException::class.java) { vm.ui.onIntent(Start) }
+        val second = assertThrows(IllegalStateException::class.java) { vm.ui.onIntent(Start) }
 
         assertEquals(1, definitions)
         assertSame(failure, first)
@@ -81,9 +83,9 @@ class StrictMviContractTest {
     @Test
     fun `unregistered intent fails instead of silently doing nothing`() = runTest(dispatcher) {
         val vm = own { on<Start> {} }
-        vm.onIntent(Start)
+        vm.ui.onIntent(Start)
 
-        val failure = assertThrows(RuntimeException::class.java) { vm.onIntent(Stop) }
+        val failure = assertThrows(RuntimeException::class.java) { vm.ui.onIntent(Stop) }
 
         assertTrue(failure.message.orEmpty().contains("Stop"))
         assertEquals(TestState(), vm.state.value)
@@ -96,7 +98,7 @@ class StrictMviContractTest {
             on<Start> { reduce { copy(value = 1) } }
         }
 
-        assertThrows(RuntimeException::class.java) { vm.onIntent(Start) }
+        assertThrows(RuntimeException::class.java) { vm.ui.onIntent(Start) }
         assertEquals(TestState(), vm.state.value)
     }
 
@@ -108,7 +110,7 @@ class StrictMviContractTest {
             on<Start> {}
         }
 
-        assertThrows(RuntimeException::class.java) { vm.onIntent(Start) }
+        assertThrows(RuntimeException::class.java) { vm.ui.onIntent(Start) }
     }
 
     @Test
@@ -118,7 +120,7 @@ class StrictMviContractTest {
             on<Start> {}
         }
 
-        assertThrows(RuntimeException::class.java) { vm.onIntent(Start) }
+        assertThrows(RuntimeException::class.java) { vm.ui.onIntent(Start) }
     }
 
     @Test
@@ -129,7 +131,7 @@ class StrictMviContractTest {
             on<Start> { handled = true }
         }
 
-        assertThrows(RuntimeException::class.java) { vm.onIntent(Start) }
+        assertThrows(RuntimeException::class.java) { vm.ui.onIntent(Start) }
         assertFalse(handled)
     }
 
@@ -143,7 +145,7 @@ class StrictMviContractTest {
             on<Start> {}
         }
 
-        assertThrows(RuntimeException::class.java) { vm.onIntent(Start) }
+        assertThrows(RuntimeException::class.java) { vm.ui.onIntent(Start) }
     }
 
     @Test
@@ -157,7 +159,7 @@ class StrictMviContractTest {
             on<Start> {}
         }
 
-        assertThrows(RuntimeException::class.java) { vm.onIntent(Start) }
+        assertThrows(RuntimeException::class.java) { vm.ui.onIntent(Start) }
     }
 
     @Test
@@ -168,7 +170,7 @@ class StrictMviContractTest {
                 on<Start> {}
             }
 
-            assertThrows(RuntimeException::class.java) { vm.onIntent(Start) }
+            assertThrows(RuntimeException::class.java) { vm.ui.onIntent(Start) }
         }
     }
 
@@ -179,7 +181,7 @@ class StrictMviContractTest {
             registerLater = { on<Stop> {} }
             on<Start> {}
         }
-        vm.onIntent(Start)
+        vm.ui.onIntent(Start)
 
         assertThrows(IllegalStateException::class.java) { registerLater() }
     }
@@ -194,7 +196,7 @@ class StrictMviContractTest {
             }
             on<Start> {}
         }
-        vm.onIntent(Start)
+        vm.ui.onIntent(Start)
 
         assertThrows(IllegalStateException::class.java) { configureLater() }
         assertEquals(TestState(), vm.state.value)
@@ -210,7 +212,7 @@ class StrictMviContractTest {
             }
         }
 
-        assertThrows(IllegalStateException::class.java) { vm.onIntent(Start) }
+        assertThrows(IllegalStateException::class.java) { vm.ui.onIntent(Start) }
         assertThrows(IllegalStateException::class.java) { repairLater() }
     }
 
@@ -220,7 +222,7 @@ class StrictMviContractTest {
         val vm = own {
             on<Start> { mutateLater = { reduce { copy(value = 99) } } }
         }
-        vm.onIntent(Start)
+        vm.ui.onIntent(Start)
 
         assertThrows(IllegalStateException::class.java) { mutateLater() }
         assertEquals(TestState(), vm.state.value)
@@ -232,7 +234,7 @@ class StrictMviContractTest {
         val vm = own {
             on<Start> { sendLater = { tryEffect(TestEffect(99)) } }
         }
-        vm.onIntent(Start)
+        vm.ui.onIntent(Start)
 
         assertThrows(IllegalStateException::class.java) { sendLater() }
     }
@@ -247,54 +249,53 @@ class StrictMviContractTest {
             }
         }
 
-        assertThrows(IllegalStateException::class.java) { vm.onIntent(Start) }
+        assertThrows(IllegalStateException::class.java) { vm.ui.onIntent(Start) }
         assertThrows(IllegalStateException::class.java) { mutateLater() }
         assertEquals(TestState(), vm.state.value)
     }
 
     @Test
     fun `operation token from a different ViewModel cannot be submitted`() = runTest(dispatcher) {
-        lateinit var other: ProbeViewModel
+        lateinit var operation: Operation<Int>
         var executed = false
         val owner = own {
-            val operation = latest<Int, Unit>("owned") { execute { executed = true } }
-            other = own { on<Start> { submit(operation, 1) } }
+            operation = latest<Int, Unit>("owned") { execute { executed = true } }
             on<Start> {}
         }
-        owner.onIntent(Start)
+        owner.ui.onIntent(Start)
+        val other = own { on<Start> { submit(operation, 1) } }
 
-        assertThrows(IllegalStateException::class.java) { other.onIntent(Start) }
+        assertThrows(IllegalStateException::class.java) { other.ui.onIntent(Start) }
         runCurrent()
         assertFalse(executed)
     }
 
     @Test
     fun `operation token from a different ViewModel cannot be cancelled`() = runTest(dispatcher) {
-        lateinit var other: ProbeViewModel
+        lateinit var operation: Operation<Unit>
         val owner = own {
-            val operation = idle<Unit, Unit>("owned") { execute {} }
-            other = own { on<Start> { cancel(operation) } }
+            operation = idle<Unit, Unit>("owned") { execute {} }
             on<Start> {}
         }
-        owner.onIntent(Start)
+        owner.ui.onIntent(Start)
+        val other = own { on<Start> { cancel(operation) } }
 
-        assertThrows(IllegalStateException::class.java) { other.onIntent(Start) }
+        assertThrows(IllegalStateException::class.java) { other.ui.onIntent(Start) }
     }
 
     @Test
-    fun `intent dispatch from a reducer fails before it can publish partial state`() = runTest(dispatcher) {
-        lateinit var vm: ProbeViewModel
-        vm = own {
+    fun `captured handler cannot nest a reducer before partial state is published`() = runTest(dispatcher) {
+        val vm = own {
             on<Start> {
+                val mutateHandler = { reduce { copy(value = 2) } }
                 reduce {
-                    vm.onIntent(Stop)
+                    mutateHandler()
                     copy(value = 1)
                 }
             }
-            on<Stop> { reduce { copy(value = 2) } }
         }
 
-        assertThrows(IllegalStateException::class.java) { vm.onIntent(Start) }
+        assertThrows(IllegalStateException::class.java) { vm.ui.onIntent(Start) }
         assertEquals(TestState(), vm.state.value)
     }
 
@@ -308,11 +309,11 @@ class StrictMviContractTest {
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             vm.state.collect {
                 seen += it.value
-                if (it.value == 1) vm.onIntent(Stop)
+                if (it.value == 1) vm.ui.onIntent(Stop)
             }
         }
 
-        vm.onIntent(Start)
+        vm.ui.onIntent(Start)
 
         assertEquals(listOf(0, 1, 2), seen)
         assertEquals(2, vm.state.value.value)
@@ -337,10 +338,10 @@ class StrictMviContractTest {
             }
         }
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.state.collect { if (it.value == 1) vm.onIntent(Stop) }
+            vm.state.collect { if (it.value == 1) vm.ui.onIntent(Stop) }
         }
 
-        vm.onIntent(Start)
+        vm.ui.onIntent(Start)
 
         assertTrue(rejected)
         assertEquals(2, vm.state.value.value)
@@ -361,7 +362,7 @@ class StrictMviContractTest {
         val failure = AtomicReference<Throwable>()
         val worker = Thread {
             try {
-                vm.onIntent(Start)
+                vm.ui.onIntent(Start)
             } catch (error: Throwable) {
                 failure.set(error)
             }
@@ -393,16 +394,16 @@ class StrictMviContractTest {
             vm.state.collect { seen += it.value }
         }
 
-        assertThrows(IllegalStateException::class.java) { vm.onIntent(Start) }
+        assertThrows(IllegalStateException::class.java) { vm.ui.onIntent(Start) }
         assertEquals(listOf(0), seen)
         assertEquals(TestState(), vm.state.value)
-        vm.onIntent(Stop)
+        vm.ui.onIntent(Stop)
         assertEquals(listOf(0, 2), seen)
     }
 
-    private fun own(
+    private suspend fun own(
         definition: MviDefinition<TestState, TestIntent, TestEffect>.() -> Unit,
-    ): ProbeViewModel = ProbeViewModel(definition).also { store.put("strict-${nextKey++}", it) }
+    ): ProbeViewModel = ProbeViewModel(definition).also { store.put("strict-${nextKey++}", it); it.ui = it.uiApi() }
 
     private data class TestState(val value: Int = 0) : UiState
     private sealed interface TestIntent : UiIntent
@@ -415,6 +416,8 @@ class StrictMviContractTest {
     ) : BaseMviViewModel<TestState, TestIntent, TestEffect>(
         initialState = TestState(),
     ) {
+        lateinit var ui: MviUiApi<TestState, TestIntent>
+
         val constructed = true
 
         override fun MviDefinition<TestState, TestIntent, TestEffect>.define() = definition()

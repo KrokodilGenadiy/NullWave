@@ -2,6 +2,7 @@ package com.zaus.nullwave.core.mvi
 
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
+import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -49,8 +50,8 @@ class MainIntentIngressTest {
             on<Set> { submit(load, it.value) }
         }
 
-        onWorker { vm.onIntent(Set(1)) }
-        vm.onIntent(Set(2))
+        onWorker { vm.ui.onIntent(Set(1)) }
+        vm.ui.onIntent(Set(2))
         assertEquals(0, vm.state.value.value)
 
         runCurrent()
@@ -69,11 +70,11 @@ class MainIntentIngressTest {
             }
         }
 
-        onWorker { vm.onIntent(Set(1)) }
-        onWorker { vm.onIntent(Set(2)) }
-        vm.onIntent(Set(3))
+        onWorker { vm.ui.onIntent(Set(1)) }
+        onWorker { vm.ui.onIntent(Set(2)) }
+        vm.ui.onIntent(Set(3))
         runCurrent()
-        vm.onIntent(Set(4))
+        vm.ui.onIntent(Set(4))
 
         assertEquals(listOf(1, 2, 3, 4), handled)
         assertEquals(4, vm.state.value.value)
@@ -82,7 +83,7 @@ class MainIntentIngressTest {
     @Test
     fun `synchronous platform callback from another VM operation may dispatch`() = runTest(dispatcher) {
         val target = own { on<Set> { reduce { copy(value = it.value) } } }
-        val platform = SynchronousPlatformEvents { target.onIntent(Set(7)) }
+        val platform = SynchronousPlatformEvents { target.ui.onIntent(Set(7)) }
         val source = own {
             val changePlatform = idle<Unit, Unit>("platform") {
                 execute { platform.update() }
@@ -90,26 +91,26 @@ class MainIntentIngressTest {
             on<Set> { submit(changePlatform, Unit) }
         }
 
-        source.onIntent(Set(0))
+        source.ui.onIntent(Set(0))
         runCurrent()
 
         assertEquals(7, target.state.value.value)
     }
 
     @Test
-    fun `work still cannot dispatch into its own VM`() = runTest(dispatcher) {
+    fun `work cannot acquire its own UI dispatch capability`() = runTest(dispatcher) {
         lateinit var vm: ProbeVm
         var rejected = false
         vm = own {
             val work = idle<Unit, Unit>("work") {
                 execute {
-                    rejected = runCatching { vm.onIntent(Set(7)) }.exceptionOrNull() is IllegalStateException
+                    rejected = runCatching { vm.uiApi().onIntent(Set(7)) }.exceptionOrNull() is IllegalStateException
                 }
             }
             on<Set> { submit(work, Unit) }
         }
 
-        vm.onIntent(Set(0))
+        vm.ui.onIntent(Set(0))
         runCurrent()
 
         assertTrue(rejected)
@@ -117,26 +118,29 @@ class MainIntentIngressTest {
     }
 
     @Test
-    fun `a cross-VM callback does not erase its callers work restriction`() = runTest(dispatcher) {
+    fun `captured UI callbacks can cross VM operations without guessing caller provenance`() = runTest(dispatcher) {
         lateinit var source: ProbeVm
-        var rejected = false
+        var callbackFailure: Throwable? = null
         val target = own {
             on<Set> {
-                rejected = runCatching { source.onIntent(Set(7)) }.exceptionOrNull() is IllegalStateException
+                callbackFailure = runCatching { source.ui.onIntent(Set(7)) }.exceptionOrNull()
                 reduce { copy(value = it.value) }
             }
         }
         source = own {
             val work = idle<Unit, Unit>("work") {
-                execute { target.onIntent(Set(1)) }
+                execute { target.ui.onIntent(Set(1)) }
             }
-            on<Set> { submit(work, Unit) }
+            on<Set> {
+                if (it.value == 0) submit(work, Unit) else reduce { copy(value = it.value) }
+            }
         }
 
-        source.onIntent(Set(0))
+        source.ui.onIntent(Set(0))
         runCurrent()
 
-        assertTrue(rejected)
+        assertNull(callbackFailure)
+        assertEquals(7, source.state.value.value)
         assertEquals(1, target.state.value.value)
     }
 
@@ -152,12 +156,12 @@ class MainIntentIngressTest {
         val source = own {
             on<Set> {
                 mutateOuter = { reduce { copy(value = 99) } }
-                target.onIntent(Set(1))
+                target.ui.onIntent(Set(1))
                 reduce { copy(value = it.value) }
             }
         }
 
-        source.onIntent(Set(2))
+        source.ui.onIntent(Set(2))
 
         assertTrue(rejected)
         assertEquals(2, source.state.value.value)
@@ -174,13 +178,13 @@ class MainIntentIngressTest {
         val source = own {
             val work = idle<Unit, Unit>("work") {
                 configureOuter = { execute {} }
-                target.onIntent(Set(1))
+                target.ui.onIntent(Set(1))
                 execute {}
             }
             on<Set> { submit(work, Unit) }
         }
 
-        source.onIntent(Set(0))
+        source.ui.onIntent(Set(0))
         runCurrent()
 
         assertTrue(rejected)
@@ -189,11 +193,11 @@ class MainIntentIngressTest {
     @Test
     fun `cleared VM ignores Main and worker callbacks consistently`() = runTest(dispatcher) {
         val vm = own { on<Set> { reduce { copy(value = it.value) } } }
-        vm.onIntent(Set(1))
+        vm.ui.onIntent(Set(1))
         store.clear()
 
-        vm.onIntent(Set(2))
-        onWorker { vm.onIntent(Set(3)) }
+        vm.ui.onIntent(Set(2))
+        onWorker { vm.ui.onIntent(Set(3)) }
         runCurrent()
 
         assertEquals(1, vm.state.value.value)
@@ -211,7 +215,7 @@ class MainIntentIngressTest {
                         awaitCancellation()
                     } finally {
                         cleanupRan = true
-                        callbackFailure = runCatching { vm.onIntent(Set(7)) }.exceptionOrNull()
+                        callbackFailure = runCatching { vm.ui.onIntent(Set(7)) }.exceptionOrNull()
                     }
                 }
             }
@@ -219,7 +223,7 @@ class MainIntentIngressTest {
                 if (it.value == 0) submit(work, Unit) else reduce { copy(value = it.value) }
             }
         }
-        vm.onIntent(Set(0))
+        vm.ui.onIntent(Set(0))
         runCurrent()
 
         store.clear()
@@ -237,10 +241,10 @@ class MainIntentIngressTest {
             definitions++
             on<Set> { reduce { copy(value = it.value) } }
         }
-        onWorker { vm.onIntent(Set(1)) }
+        onWorker { vm.ui.onIntent(Set(1)) }
 
         store.clear()
-        vm.onIntent(Set(2))
+        vm.ui.onIntent(Set(2))
         runCurrent()
 
         assertEquals(0, definitions)
@@ -252,12 +256,12 @@ class MainIntentIngressTest {
         val failure = IllegalStateException("Invalid definition")
         val vm = own { throw failure }
 
-        assertSame(failure, assertThrows(IllegalStateException::class.java) { vm.onIntent(Set(1)) })
-        assertSame(failure, assertThrows(IllegalStateException::class.java) { vm.onIntent(Set(2)) })
+        assertSame(failure, assertThrows(IllegalStateException::class.java) { vm.ui.onIntent(Set(1)) })
+        assertSame(failure, assertThrows(IllegalStateException::class.java) { vm.ui.onIntent(Set(2)) })
 
         store.clear()
-        vm.onIntent(Set(3))
-        onWorker { vm.onIntent(Set(4)) }
+        vm.ui.onIntent(Set(3))
+        onWorker { vm.ui.onIntent(Set(4)) }
     }
 
     private fun onWorker(block: () -> Unit) {
@@ -274,14 +278,16 @@ class MainIntentIngressTest {
         assertNull(failure.get())
     }
 
-    private fun own(definition: MviDefinition<Snapshot, Set, Nothing>.() -> Unit): ProbeVm =
-        ProbeVm(definition).also { store.put("main-ingress-${nextId++}", it) }
+    private suspend fun own(definition: MviDefinition<Snapshot, Set, Nothing>.() -> Unit): ProbeVm =
+        ProbeVm(definition).also { store.put("main-ingress-${nextId++}", it); it.ui = it.uiApi() }
 
     private data class Snapshot(val value: Int = 0) : UiState
     private data class Set(val value: Int) : UiIntent
     private class ProbeVm(
         private val definition: MviDefinition<Snapshot, Set, Nothing>.() -> Unit,
     ) : BaseMviViewModel<Snapshot, Set, Nothing>(Snapshot()) {
+        lateinit var ui: MviUiApi<Snapshot, Set>
+
         override fun MviDefinition<Snapshot, Set, Nothing>.define() = definition()
     }
     private class SynchronousPlatformEvents(private val listener: () -> Unit) {

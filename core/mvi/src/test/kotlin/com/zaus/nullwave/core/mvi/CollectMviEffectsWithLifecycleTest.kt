@@ -5,6 +5,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
+import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import com.zaus.nullwave.core.mvi.ui.collectEffectsWithLifecycle
 import kotlin.coroutines.ContinuationInterceptor
 import kotlinx.coroutines.CompletableDeferred
@@ -58,7 +59,7 @@ class CollectMviEffectsWithLifecycleTest {
             }
         }
         runCurrent()
-        vm.onIntent(Notify(1))
+        vm.ui.onIntent(Notify(1))
         assertTrue(seen.isEmpty())
 
         owner.moveTo(Lifecycle.State.STARTED)
@@ -69,7 +70,7 @@ class CollectMviEffectsWithLifecycleTest {
         owner.moveTo(Lifecycle.State.CREATED)
         runCurrent()
         assertEquals(listOf(1), finished)
-        vm.onIntent(Notify(2))
+        vm.ui.onIntent(Notify(2))
         runCurrent()
         assertEquals(listOf(1), seen)
 
@@ -97,11 +98,11 @@ class CollectMviEffectsWithLifecycleTest {
         }
         runCurrent()
         try {
-            vm.onIntent(Notify(1))
+            vm.ui.onIntent(Notify(1))
             runCurrent()
             owner.moveTo(Lifecycle.State.CREATED)
             runCurrent()
-            vm.onIntent(Notify(2))
+            vm.ui.onIntent(Notify(2))
             owner.moveTo(Lifecycle.State.STARTED)
             runCurrent()
             assertEquals(listOf(1), seen)
@@ -123,7 +124,7 @@ class CollectMviEffectsWithLifecycleTest {
             vm.collectEffectsWithLifecycle(owner.lifecycle, Lifecycle.State.RESUMED) { seen += it.value }
         }
         runCurrent()
-        vm.onIntent(Notify(1))
+        vm.ui.onIntent(Notify(1))
         assertTrue(seen.isEmpty())
 
         owner.moveTo(Lifecycle.State.RESUMED)
@@ -131,7 +132,7 @@ class CollectMviEffectsWithLifecycleTest {
         assertEquals(listOf(1), seen)
         owner.moveTo(Lifecycle.State.STARTED)
         runCurrent()
-        vm.onIntent(Notify(2))
+        vm.ui.onIntent(Notify(2))
         runCurrent()
         assertEquals(listOf(1), seen)
         owner.moveTo(Lifecycle.State.RESUMED)
@@ -150,7 +151,7 @@ class CollectMviEffectsWithLifecycleTest {
             }
         }
         runCurrent()
-        vm.onIntent(Notify(1))
+        vm.ui.onIntent(Notify(1))
         runCurrent()
         owner.moveTo(Lifecycle.State.DESTROYED)
         runCurrent()
@@ -201,22 +202,24 @@ class CollectMviEffectsWithLifecycleTest {
             vm.collectEffectsWithLifecycle(owner.lifecycle) {
                 assertEquals(mainThread, Thread.currentThread())
                 assertEquals(Dispatchers.Main.immediate, currentCoroutineContext()[ContinuationInterceptor])
-                vm.onIntent(Handled)
+                vm.ui.onIntent(Handled)
             }
         }
         runCurrent()
-        vm.onIntent(Notify(1))
+        vm.ui.onIntent(Notify(1))
         runCurrent()
         assertEquals(1, vm.state.value.handled)
     }
 
-    private fun vm(): Vm = Vm().also { store.put("effects", it) }
+    private suspend fun vm(): Vm = Vm().also { store.put("effects", it); it.ui = it.uiApi() }
     private data class Snapshot(val handled: Int = 0) : UiState
     private sealed interface Intent : UiIntent
     private data class Notify(val value: Int) : Intent
     private data object Handled : Intent
     private data class Signal(val value: Int) : UiEffect
     private class Vm : BaseMviViewModel<Snapshot, Intent, Signal>(Snapshot(), sourceStopTimeoutMillis = 0) {
+        lateinit var ui: MviUiApi<Snapshot, Intent>
+
         var definitions = 0
         var sourceStarts = 0
         override fun MviDefinition<Snapshot, Intent, Signal>.define() {

@@ -2,6 +2,7 @@ package com.zaus.nullwave.core.mvi
 
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
+import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -69,10 +70,10 @@ class StrictMviPoliciesEffectsTest {
             on<Run> { accepted += submit(work, it.value) }
         }
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.collectEffects { effects += it } }
-        vm.onIntent(Run(1))
+        vm.ui.onIntent(Run(1))
         runCurrent()
 
-        vm.onIntent(Run(2))
+        vm.ui.onIntent(Run(2))
         runCurrent()
         assertEquals(listOf(1), started)
         assertEquals(2, vm.state.value.accepted)
@@ -106,10 +107,10 @@ class StrictMviPoliciesEffectsTest {
             }
             on<Run> { accepted += submit(work, it.value) }
         }
-        vm.onIntent(Run(1))
+        vm.ui.onIntent(Run(1))
         runCurrent()
-        vm.onIntent(Run(2))
-        vm.onIntent(Run(3))
+        vm.ui.onIntent(Run(2))
+        vm.ui.onIntent(Run(3))
 
         assertEquals(listOf(true, true, false), accepted)
         assertEquals(2, vm.state.value.accepted)
@@ -138,15 +139,15 @@ class StrictMviPoliciesEffectsTest {
             }
             on<Run> { accepted += submit(work, it.value) }
         }
-        vm.onIntent(Run(1))
-        vm.onIntent(Run(2))
+        vm.ui.onIntent(Run(1))
+        vm.ui.onIntent(Run(2))
         runCurrent()
         assertEquals(1, vm.state.value.accepted)
         assertTrue(vm.state.value.loading)
 
         first.complete(Unit)
         runCurrent()
-        vm.onIntent(Run(3))
+        vm.ui.onIntent(Run(3))
         runCurrent()
 
         assertEquals(listOf(true, false, true), accepted)
@@ -174,9 +175,9 @@ class StrictMviPoliciesEffectsTest {
         }
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.collectEffects { effects += it } }
 
-        vm.onIntent(Run(1))
+        vm.ui.onIntent(Run(1))
         runCurrent()
-        vm.onIntent(Run(2))
+        vm.ui.onIntent(Run(2))
         runCurrent()
 
         assertEquals(listOf(true, true), accepted)
@@ -200,12 +201,12 @@ class StrictMviPoliciesEffectsTest {
             on<Run> { accepted += submit(work, it.value) }
             on<Cancel> { cancelled += cancel(work) }
         }
-        vm.onIntent(Run(1))
+        vm.ui.onIntent(Run(1))
         runCurrent()
-        vm.onIntent(Run(2))
+        vm.ui.onIntent(Run(2))
 
-        vm.onIntent(Cancel)
-        vm.onIntent(Cancel)
+        vm.ui.onIntent(Cancel)
+        vm.ui.onIntent(Cancel)
         runCurrent()
 
         assertEquals(listOf(true, true), accepted)
@@ -225,9 +226,9 @@ class StrictMviPoliciesEffectsTest {
             }
             on<Run> { submit(work, it.value) }
         }
-        vm.onIntent(Run(1))
+        vm.ui.onIntent(Run(1))
         runCurrent()
-        vm.onIntent(Run(2))
+        vm.ui.onIntent(Run(2))
         runCurrent()
         val effects = mutableListOf<TestEffect>()
 
@@ -248,8 +249,8 @@ class StrictMviPoliciesEffectsTest {
             on<Run> { submit(work, it.value) }
             on<Cancel> { cancel(work) }
         }
-        vm.onIntent(Run(1))
-        vm.onIntent(Run(2))
+        vm.ui.onIntent(Run(1))
+        vm.ui.onIntent(Run(2))
         runCurrent()
         val effects = mutableListOf<TestEffect>()
         val consumer = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
@@ -259,11 +260,11 @@ class StrictMviPoliciesEffectsTest {
         consumer.cancel()
         runCurrent()
 
-        vm.onIntent(Run(4))
+        vm.ui.onIntent(Run(4))
         runCurrent()
-        vm.onIntent(Run(3))
+        vm.ui.onIntent(Run(3))
         runCurrent()
-        vm.onIntent(Cancel)
+        vm.ui.onIntent(Cancel)
         runCurrent()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.collectEffects { effects += it } }
         runCurrent()
@@ -282,17 +283,17 @@ class StrictMviPoliciesEffectsTest {
             on<Run> { submit(work, it.value) }
             on<Cancel> { cancellations += cancel(work) }
         }
-        vm.onIntent(Run(1))
+        vm.ui.onIntent(Run(1))
         runCurrent()
 
-        vm.onIntent(Cancel)
+        vm.ui.onIntent(Cancel)
         val effects = mutableListOf<TestEffect>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.collectEffects { effects += it } }
         runCurrent()
         assertEquals(listOf(false), cancellations)
         assertTrue(effects.isEmpty())
 
-        vm.onIntent(Run(2))
+        vm.ui.onIntent(Run(2))
         runCurrent()
         assertEquals(listOf(TestEffect(2)), effects)
     }
@@ -312,7 +313,7 @@ class StrictMviPoliciesEffectsTest {
         }
 
         repeat(100) {
-            vm.onIntent(Run(it))
+            vm.ui.onIntent(Run(it))
             runCurrent()
         }
 
@@ -344,7 +345,7 @@ class StrictMviPoliciesEffectsTest {
         runCurrent()
         val effects = mutableListOf<TestEffect>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.collectEffects { effects += it } }
-        vm.onIntent(Run(7))
+        vm.ui.onIntent(Run(7))
         runCurrent()
 
         assertEquals(listOf(TestEffect(7)), effects)
@@ -363,11 +364,11 @@ class StrictMviPoliciesEffectsTest {
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             vm.collectEffects {
                 effects += it
-                vm.onIntent(Query("from UI effect handler"))
+                vm.ui.onIntent(Query("from UI effect handler"))
             }
         }
 
-        vm.onIntent(Run(7))
+        vm.ui.onIntent(Run(7))
         runCurrent()
 
         assertEquals(listOf(TestEffect(7)), effects)
@@ -393,11 +394,11 @@ class StrictMviPoliciesEffectsTest {
             vm.state.collect {
                 if (it.result == 1 && !replaced) {
                     replaced = true
-                    vm.onIntent(Run(2))
+                    vm.ui.onIntent(Run(2))
                 }
             }
         }
-        vm.onIntent(Run(1))
+        vm.ui.onIntent(Run(1))
         runCurrent()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.collectEffects { effects += it } }
         runCurrent()
@@ -429,8 +430,8 @@ class StrictMviPoliciesEffectsTest {
         try {
             assertEquals(listOf("A"), requests.map { it.first })
 
-            vm.onIntent(Query("B"))
-            vm.onIntent(Query("A"))
+            vm.ui.onIntent(Query("B"))
+            vm.ui.onIntent(Query("A"))
             requests[0].second.complete(1)
             runCurrent()
 
@@ -448,21 +449,21 @@ class StrictMviPoliciesEffectsTest {
     fun `source restart invalidates late result before starting the replacement`() = runTest(dispatcher) {
         val requests = mutableListOf<CompletableDeferred<Int>>()
         val vm = own {
-            source(
+            val catalogue = source(
                 name = "catalogue",
                 flow = {
                     CompletableDeferred<Int>().also(requests::add).let(::cancellationIgnoringFlow)
                 },
                 reducer = { value -> copy(result = value) },
             )
-            on<Restart> { restartSources() }
+            on<Restart> { refresh(catalogue) }
         }
         backgroundScope.launch { vm.withUiBinding { awaitCancellation() } }
         runCurrent()
         try {
             assertEquals(1, requests.size)
 
-            vm.onIntent(Restart)
+            vm.ui.onIntent(Restart)
             requests[0].complete(1)
             runCurrent()
 
@@ -480,14 +481,14 @@ class StrictMviPoliciesEffectsTest {
     fun `source output after last UI binding stops cannot update state`() = runTest(dispatcher) {
         val requests = mutableListOf<CompletableDeferred<Int>>()
         val vm = own {
-            source(
+            val catalogue = source(
                 name = "catalogue",
                 flow = {
                     CompletableDeferred<Int>().also(requests::add).let(::cancellationIgnoringFlow)
                 },
                 reducer = { value -> copy(result = value) },
             )
-            on<Restart> { restartSources() }
+            on<Restart> { refresh(catalogue) }
         }
         val binding = backgroundScope.launch { vm.withUiBinding { awaitCancellation() } }
         runCurrent()
@@ -511,14 +512,14 @@ class StrictMviPoliciesEffectsTest {
     }
 
     @Test
-    fun `execute cannot bypass its result contract by directly dispatching another intent`() = runTest(dispatcher) {
+    fun `execute cannot acquire UI dispatch to bypass its result contract`() = runTest(dispatcher) {
         lateinit var vm: ProbeViewModel
         var rejected: IllegalStateException? = null
         vm = own {
             val work = latest<Int, Int>("work") {
                 execute { input ->
                     try {
-                        vm.onIntent(Query("illegal side channel"))
+                        vm.uiApi().onIntent(Query("illegal side channel"))
                     } catch (failure: IllegalStateException) {
                         rejected = failure
                     }
@@ -530,7 +531,7 @@ class StrictMviPoliciesEffectsTest {
             on<Query> { reduce { copy(query = it.value) } }
         }
 
-        vm.onIntent(Run(4))
+        vm.ui.onIntent(Run(4))
         runCurrent()
 
         assertNotNull(rejected)
@@ -539,7 +540,7 @@ class StrictMviPoliciesEffectsTest {
     }
 
     @Test
-    fun `nested state publication cannot roll source input back to the outer intent`() = runTest(dispatcher) {
+    fun `observer input runs after the publishing transition and cannot roll back`() = runTest(dispatcher) {
         val observedInputs = mutableListOf<String>()
         val vm = own {
             source(
@@ -557,21 +558,22 @@ class StrictMviPoliciesEffectsTest {
         runCurrent()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             vm.state.collect {
-                if (it.query == "B") vm.onIntent(Query("C"))
+                if (it.query == "B") vm.ui.onIntent(Query("C"))
             }
         }
 
-        vm.onIntent(Query("B"))
+        vm.ui.onIntent(Query("B"))
         runCurrent()
 
         assertEquals("C", vm.state.value.query)
         assertEquals('C'.code, vm.state.value.result)
-        assertEquals(listOf("A", "C"), observedInputs)
+        // B is a complete transition before the queued C intent, so its synchronous source may run.
+        assertEquals(listOf("A", "B", "C"), observedInputs)
     }
 
-    private fun own(
+    private suspend fun own(
         definition: MviDefinition<TestState, TestIntent, TestEffect>.() -> Unit,
-    ): ProbeViewModel = ProbeViewModel(definition).also { store.put("policy-${nextKey++}", it) }
+    ): ProbeViewModel = ProbeViewModel(definition).also { store.put("policy-${nextKey++}", it); it.ui = it.uiApi() }
 
     /** Models a callback adapter that ignores cooperative cancellation, without Flow builder checks. */
     private fun cancellationIgnoringFlow(response: CompletableDeferred<Int>): Flow<Int> = object : Flow<Int> {
@@ -602,6 +604,8 @@ class StrictMviPoliciesEffectsTest {
         initialState = TestState(),
         sourceStopTimeoutMillis = 0,
     ) {
+        lateinit var ui: MviUiApi<TestState, TestIntent>
+
         override fun MviDefinition<TestState, TestIntent, TestEffect>.define() = definition()
     }
 }

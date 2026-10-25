@@ -2,6 +2,7 @@ package com.zaus.nullwave.core.mvi
 
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
+import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -67,11 +68,11 @@ class EffectCancellationTransactionTest {
                 }
             }
         }
-        vm.onIntent(Run(1))
+        vm.ui.onIntent(Run(1))
         runCurrent()
-        vm.onIntent(Run(2))
+        vm.ui.onIntent(Run(2))
         runCurrent()
-        vm.onIntent(Cancel)
+        vm.ui.onIntent(Cancel)
         runCurrent()
 
         assertTrue(handlerCancelled)
@@ -98,15 +99,15 @@ class EffectCancellationTransactionTest {
                     awaitCancellation()
                 } finally {
                     events += "cleanup"
-                    vm.onIntent(Run(3))
+                    vm.ui.onIntent(Run(3))
                 }
             }
         }
-        vm.onIntent(Run(1))
+        vm.ui.onIntent(Run(1))
         runCurrent()
-        vm.onIntent(Run(2))
+        vm.ui.onIntent(Run(2))
         runCurrent()
-        vm.onIntent(Cancel)
+        vm.ui.onIntent(Cancel)
         runCurrent()
 
         assertEquals(listOf("accepted:1", "accepted:2", "cleanup", "cancelled", "accepted:3"), events)
@@ -129,16 +130,16 @@ class EffectCancellationTransactionTest {
         backgroundScope.launch {
             vm.collectEffects {
                 try { awaitCancellation() } finally {
-                    vm.onIntent(Run(3))
+                    vm.ui.onIntent(Run(3))
                     store.clear()
                 }
             }
         }
-        vm.onIntent(Run(1))
+        vm.ui.onIntent(Run(1))
         runCurrent()
-        vm.onIntent(Run(2))
+        vm.ui.onIntent(Run(2))
         runCurrent()
-        vm.onIntent(Cancel)
+        vm.ui.onIntent(Cancel)
         runCurrent()
 
         assertEquals(0, cancelReducerCalls)
@@ -166,15 +167,15 @@ class EffectCancellationTransactionTest {
         backgroundScope.launch {
             vm.collectEffects {
                 if (it.value == 1) {
-                    try { awaitCancellation() } finally { vm.onIntent(Run(3)) }
+                    try { awaitCancellation() } finally { vm.ui.onIntent(Run(3)) }
                 }
             }
         }
-        vm.onIntent(Run(1))
+        vm.ui.onIntent(Run(1))
         runCurrent()
-        vm.onIntent(Run(2))
+        vm.ui.onIntent(Run(2))
         runCurrent()
-        assertSame(expected, assertThrows(IllegalArgumentException::class.java) { vm.onIntent(Cancel) })
+        assertSame(expected, assertThrows(IllegalArgumentException::class.java) { vm.ui.onIntent(Cancel) })
         runCurrent()
 
         assertTrue(secondCancelled)
@@ -200,12 +201,12 @@ class EffectCancellationTransactionTest {
         }
         backgroundScope.launch {
             vm.collectEffects {
-                try { awaitCancellation() } finally { vm.onIntent(Run(2)) }
+                try { awaitCancellation() } finally { vm.ui.onIntent(Run(2)) }
             }
         }
-        vm.onIntent(Run(1))
+        vm.ui.onIntent(Run(1))
         runCurrent()
-        vm.onIntent(Cancel)
+        vm.ui.onIntent(Cancel)
         runCurrent()
 
         assertEquals(listOf(false), results)
@@ -234,11 +235,11 @@ class EffectCancellationTransactionTest {
                 try { awaitCancellation() } finally { finishWork.complete(2) }
             }
         }
-        vm.onIntent(Run(1))
+        vm.ui.onIntent(Run(1))
         runCurrent()
-        vm.onIntent(Run(2))
+        vm.ui.onIntent(Run(2))
         runCurrent()
-        vm.onIntent(Cancel)
+        vm.ui.onIntent(Cancel)
         runCurrent()
 
         assertTrue(finishWork.isCompleted)
@@ -247,8 +248,8 @@ class EffectCancellationTransactionTest {
         assertEquals(-1, vm.state.value.value)
     }
 
-    private fun own(definition: MviDefinition<Snapshot, Intent, Signal>.() -> Unit): Vm =
-        Vm(definition).also { store.put("cancel-transaction-${nextKey++}", it) }
+    private suspend fun own(definition: MviDefinition<Snapshot, Intent, Signal>.() -> Unit): Vm =
+        Vm(definition).also { store.put("cancel-transaction-${nextKey++}", it); it.ui = it.uiApi() }
     private data class Snapshot(val value: Int = 0, val loading: Boolean = false) : UiState
     private sealed interface Intent : UiIntent
     private data class Run(val value: Int) : Intent
@@ -256,6 +257,8 @@ class EffectCancellationTransactionTest {
     private data class Signal(val value: Int) : UiEffect
     private class Vm(private val definition: MviDefinition<Snapshot, Intent, Signal>.() -> Unit) :
         BaseMviViewModel<Snapshot, Intent, Signal>(Snapshot()) {
+        lateinit var ui: MviUiApi<Snapshot, Intent>
+
         override fun MviDefinition<Snapshot, Intent, Signal>.define() = definition()
     }
 }

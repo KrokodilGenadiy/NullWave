@@ -2,6 +2,7 @@ package com.zaus.nullwave.core.mvi
 
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
+import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import com.zaus.nullwave.core.mvi.ui.UiText
 import com.zaus.nullwave.core.mvi.ui.toUiText
 import com.zaus.nullwave.core.result.AppResult
@@ -52,14 +53,14 @@ class TypedResultMviIntegrationTest {
         val second = CompletableDeferred<AppResult<String, DataError>>()
         val vm = operation { input -> if (input == 1) first.await() else second.await() }
 
-        vm.onIntent(Load(1))
+        vm.ui.onIntent(Load(1))
         runCurrent()
         assertTrue(vm.state.value.loading)
         first.complete(AppResult.Failure(DataError.AccessDenied, SecurityException("private file path")))
         runCurrent()
         assertEquals(ScreenState(error = DataError.AccessDenied.toUiText()), vm.state.value)
 
-        vm.onIntent(Load(2))
+        vm.ui.onIntent(Load(2))
         runCurrent()
         assertTrue(vm.state.value.loading)
         assertNull(vm.state.value.error)
@@ -87,9 +88,9 @@ class TypedResultMviIntegrationTest {
             on<Load> { submit(load, it.id) }
         }
 
-        vm.onIntent(Load(1))
+        vm.ui.onIntent(Load(1))
         runCurrent()
-        vm.onIntent(Load(2))
+        vm.ui.onIntent(Load(2))
         runCurrent()
         old.complete(AppResult.Failure(DataError.Io, IllegalStateException("obsolete")))
         runCurrent()
@@ -106,7 +107,7 @@ class TypedResultMviIntegrationTest {
             throw CancellationException("repository cancelled")
         }
 
-        vm.onIntent(Load(1))
+        vm.ui.onIntent(Load(1))
         runCurrent()
 
         assertTrue(entered)
@@ -138,7 +139,7 @@ class TypedResultMviIntegrationTest {
         assertEquals(ScreenState(value = "available again"), vm.state.value)
     }
 
-    private fun operation(work: suspend (Int) -> AppResult<String, DataError>): ProbeViewModel = own {
+    private suspend fun operation(work: suspend (Int) -> AppResult<String, DataError>): ProbeViewModel = own {
         val load = latest<Int, AppResult<String, DataError>>("load") {
             execute(work)
             onAccepted { copy(loading = true, error = null) }
@@ -148,8 +149,8 @@ class TypedResultMviIntegrationTest {
         on<Load> { submit(load, it.id) }
     }
 
-    private fun own(definition: MviDefinition<ScreenState, Load, Signal>.() -> Unit): ProbeViewModel =
-        ProbeViewModel(definition).also { store.put("typed-result", it) }
+    private suspend fun own(definition: MviDefinition<ScreenState, Load, Signal>.() -> Unit): ProbeViewModel =
+        ProbeViewModel(definition).also { store.put("typed-result", it); it.ui = it.uiApi() }
 
     private data class ScreenState(
         val value: String? = null,
@@ -168,6 +169,8 @@ class TypedResultMviIntegrationTest {
     private class ProbeViewModel(
         private val definition: MviDefinition<ScreenState, Load, Signal>.() -> Unit,
     ) : BaseMviViewModel<ScreenState, Load, Signal>(ScreenState(), sourceStopTimeoutMillis = 0) {
+        lateinit var ui: MviUiApi<ScreenState, Load>
+
         override fun MviDefinition<ScreenState, Load, Signal>.define() = definition()
     }
 }

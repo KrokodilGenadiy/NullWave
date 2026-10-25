@@ -2,6 +2,7 @@ package com.zaus.nullwave.core.mvi
 
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
+import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
@@ -64,7 +65,7 @@ class MviUiEntryContractTest {
             on<Start> { submit(work, Unit) }
         }
 
-        vm.onIntent(Start)
+        vm.ui.onIntent(Start)
         runCurrent()
 
         assertNotNull(rejected)
@@ -98,7 +99,7 @@ class MviUiEntryContractTest {
             on<Start> { submit(work, Unit) }
         }
 
-        caller.onIntent(Start)
+        caller.ui.onIntent(Start)
         runCurrent()
 
         assertNotNull(rejected)
@@ -127,13 +128,13 @@ class MviUiEntryContractTest {
             on<Notify> { tryEffect(Signal(7)) }
         }
 
-        vm.onIntent(Start)
+        vm.ui.onIntent(Start)
         runCurrent()
         assertNotNull(rejected)
 
         val received = mutableListOf<Signal>()
         backgroundScope.launch { vm.collectEffects { received += it } }
-        vm.onIntent(Notify)
+        vm.ui.onIntent(Notify)
         runCurrent()
         assertEquals(listOf(Signal(7)), received)
     }
@@ -147,7 +148,7 @@ class MviUiEntryContractTest {
             val work = idle<Unit, Unit>("work") {
                 execute {
                     try {
-                        target.collectEffects { caller.onIntent(Change(it.value)) }
+                        target.collectEffects { caller.ui.onIntent(Change(it.value)) }
                     } catch (failure: IllegalStateException) {
                         rejected = failure
                     }
@@ -156,16 +157,16 @@ class MviUiEntryContractTest {
             on<Start> { submit(work, Unit) }
             on<Change> { reduce { copy(value = it.value) } }
         }
-        target.onIntent(Notify)
+        target.ui.onIntent(Notify)
 
-        caller.onIntent(Start)
+        caller.ui.onIntent(Start)
         runCurrent()
 
         assertNotNull(rejected)
         assertEquals(0, caller.state.value.value)
 
         // An actual external UI handler may dispatch into either VM, using the untouched signal.
-        backgroundScope.launch { target.collectEffects { caller.onIntent(Change(it.value)) } }
+        backgroundScope.launch { target.collectEffects { caller.ui.onIntent(Change(it.value)) } }
         runCurrent()
         assertEquals(99, caller.state.value.value)
     }
@@ -191,14 +192,14 @@ class MviUiEntryContractTest {
             on<Start> { submit(work, Unit) }
         }
 
-        caller.onIntent(Start)
+        caller.ui.onIntent(Start)
         runCurrent()
 
         assertEquals(2, rejected)
         assertEquals(0, targetDefinitions)
         val received = mutableListOf<Signal>()
         backgroundScope.launch { target.collectEffects { received += it } }
-        target.onIntent(Notify)
+        target.ui.onIntent(Notify)
         runCurrent()
         assertEquals(listOf(Signal(7)), received)
     }
@@ -248,8 +249,8 @@ class MviUiEntryContractTest {
         assertEquals(0, definitions)
     }
 
-    private fun own(definition: MviDefinition<Snapshot, Intent, Signal>.() -> Unit): ProbeViewModel =
-        ProbeViewModel(definition).also { store.put("ui-entry-${nextKey++}", it) }
+    private suspend fun own(definition: MviDefinition<Snapshot, Intent, Signal>.() -> Unit): ProbeViewModel =
+        ProbeViewModel(definition).also { store.put("ui-entry-${nextKey++}", it); it.ui = it.uiApi() }
 
     private data class Snapshot(val value: Int = 0) : UiState
     private sealed interface Intent : UiIntent
@@ -259,6 +260,8 @@ class MviUiEntryContractTest {
     private data class Signal(val value: Int) : UiEffect
     private class ProbeViewModel(private val definition: MviDefinition<Snapshot, Intent, Signal>.() -> Unit) :
         BaseMviViewModel<Snapshot, Intent, Signal>(Snapshot(), sourceStopTimeoutMillis = 0) {
+        lateinit var ui: MviUiApi<Snapshot, Intent>
+
         override fun MviDefinition<Snapshot, Intent, Signal>.define() = definition()
     }
 }

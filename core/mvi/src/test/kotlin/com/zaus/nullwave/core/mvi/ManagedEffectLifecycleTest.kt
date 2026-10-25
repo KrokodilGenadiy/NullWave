@@ -2,6 +2,7 @@ package com.zaus.nullwave.core.mvi
 
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
+import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -60,7 +61,7 @@ class ManagedEffectLifecycleTest {
     @Test
     fun `worker collection after initialized VM clear returns without buffered signals`() = runTest(dispatcher) {
         val vm = own()
-        vm.onIntent(Notify(1))
+        vm.ui.onIntent(Notify(1))
         assertEquals(1, vm.definitions)
         store.clear()
 
@@ -80,7 +81,7 @@ class ManagedEffectLifecycleTest {
         for (initialized in listOf(false, true)) {
             val vm = own()
             if (initialized) {
-                vm.onIntent(Notify(1))
+                vm.ui.onIntent(Notify(1))
                 runCurrent()
             }
             var returned = false
@@ -118,9 +119,9 @@ class ManagedEffectLifecycleTest {
             }
         }
         try {
-            vm.onIntent(Notify(1))
+            vm.ui.onIntent(Notify(1))
             runCurrent()
-            vm.onIntent(Notify(2))
+            vm.ui.onIntent(Notify(2))
             store.clear()
             runCurrent()
             assertTrue(cleanupStarted)
@@ -153,7 +154,7 @@ class ManagedEffectLifecycleTest {
 
         val received = mutableListOf<Signal>()
         val collector = backgroundScope.launch { vm.collectEffects(received::add) }
-        vm.onIntent(Notify(7))
+        vm.ui.onIntent(Notify(7))
         runCurrent()
         assertEquals(listOf(Signal(7)), received)
         collector.cancelAndJoin()
@@ -162,8 +163,8 @@ class ManagedEffectLifecycleTest {
     @Test
     fun `handler failure escapes and releases the consumer for pending signals`() = runTest(dispatcher) {
         val vm = own()
-        vm.onIntent(Notify(1))
-        vm.onIntent(Notify(2))
+        vm.ui.onIntent(Notify(1))
+        vm.ui.onIntent(Notify(2))
         val expected = IllegalStateException("UI handler failed")
 
         val failure = runCatching { vm.collectEffects { throw expected } }.exceptionOrNull()
@@ -177,13 +178,15 @@ class ManagedEffectLifecycleTest {
         collector.cancelAndJoin()
     }
 
-    private fun own(): ProbeViewModel = ProbeViewModel().also { store.put("effect-lifecycle-${nextKey++}", it) }
+    private suspend fun own(): ProbeViewModel = ProbeViewModel().also { store.put("effect-lifecycle-${nextKey++}", it); it.ui = it.uiApi() }
 
     private data class Snapshot(val value: Int = 0) : UiState
     private data class Notify(val value: Int) : UiIntent
     private data class Signal(val value: Int) : UiEffect
 
     private class ProbeViewModel : BaseMviViewModel<Snapshot, Notify, Signal>(Snapshot()) {
+        lateinit var ui: MviUiApi<Snapshot, Notify>
+
         var definitions = 0
 
         override fun MviDefinition<Snapshot, Notify, Signal>.define() {

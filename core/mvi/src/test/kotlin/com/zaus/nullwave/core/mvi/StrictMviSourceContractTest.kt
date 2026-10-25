@@ -2,6 +2,7 @@ package com.zaus.nullwave.core.mvi
 
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
+import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -137,10 +138,10 @@ class StrictMviSourceContractTest {
         val filter = sort.copy(favouritesOnly = true)
 
         listOf(query, sort, filter).forEach {
-            vm.onIntent(ChangeRequest(it))
+            vm.ui.onIntent(ChangeRequest(it))
             runCurrent()
         }
-        vm.onIntent(ChangeRequest(filter.copy()))
+        vm.ui.onIntent(ChangeRequest(filter.copy()))
         runCurrent()
         repository.requests.last().respond(42)
         runCurrent()
@@ -167,7 +168,7 @@ class StrictMviSourceContractTest {
         runCurrent()
         val restored = Request(query = "restored", sort = Sort.Artist, favouritesOnly = true)
 
-        vm.onIntent(ChangeRequest(restored))
+        vm.ui.onIntent(ChangeRequest(restored))
         runCurrent()
         repository.requests.last().respond(7)
         runCurrent()
@@ -186,7 +187,7 @@ class StrictMviSourceContractTest {
         }
 
         val failure = assertThrows(IllegalArgumentException::class.java) {
-            vm.onIntent(ChangeRequest(Request()))
+            vm.ui.onIntent(ChangeRequest(Request()))
         }
 
         assertTrue(failure.message.orEmpty().contains("ScreenIntent"))
@@ -199,16 +200,16 @@ class StrictMviSourceContractTest {
         val vm = own { on<AbstractIntent> {} }
 
         val failure = assertThrows(IllegalArgumentException::class.java) {
-            vm.onIntent(ConcreteIntent)
+            vm.ui.onIntent(ConcreteIntent)
         }
 
         assertTrue(failure.message.orEmpty().contains("AbstractIntent"))
         assertTrue(failure.message.orEmpty().contains("exact runtime types"))
     }
 
-    private fun own(
+    private suspend fun own(
         definition: MviDefinition<ScreenState, ScreenIntent, ScreenEffect>.() -> Unit,
-    ): ProbeViewModel = ProbeViewModel(definition).also { store.put("source-${nextKey++}", it) }
+    ): ProbeViewModel = ProbeViewModel(definition).also { store.put("source-${nextKey++}", it); it.ui = it.uiApi() }
 
     private enum class Sort { Title, Artist }
 
@@ -234,6 +235,8 @@ class StrictMviSourceContractTest {
     private class ProbeViewModel(
         private val definition: MviDefinition<ScreenState, ScreenIntent, ScreenEffect>.() -> Unit,
     ) : BaseMviViewModel<ScreenState, ScreenIntent, ScreenEffect>(ScreenState(), sourceStopTimeoutMillis = 0) {
+        lateinit var ui: MviUiApi<ScreenState, ScreenIntent>
+
         override fun MviDefinition<ScreenState, ScreenIntent, ScreenEffect>.define() = definition()
     }
 

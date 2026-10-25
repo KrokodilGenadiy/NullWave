@@ -2,6 +2,7 @@ package com.zaus.nullwave.core.mvi
 
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
+import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import com.zaus.nullwave.core.mvi.runtime.MviRuntime
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CompletableDeferred
@@ -105,18 +106,18 @@ class MviRuntimeBoundaryTest {
                 reducer = { _, _ -> this },
             )
             on<Change> { intent -> reduce { copy(first = intent.first, second = intent.second) } }
-        }.also { store.put("sources", it) }
+        }.also { store.put("sources", it); it.ui = it.uiApi() }
         backgroundScope.launch { vm.withUiBinding { awaitCancellation() } }
         runCurrent()
         assertEquals(listOf("A"), observedKeys)
 
-        assertThrows(IllegalStateException::class.java) { vm.onIntent(Change("B", "invalid")) }
+        assertThrows(IllegalStateException::class.java) { vm.ui.onIntent(Change("B", "invalid")) }
         assertEquals(Snapshot(), vm.state.value)
         assertTrue(sourceValues.tryEmit(42))
         runCurrent()
         assertEquals(Snapshot(value = 42), vm.state.value)
 
-        vm.onIntent(Change("B", "B"))
+        vm.ui.onIntent(Change("B", "B"))
         runCurrent()
         assertEquals(listOf("A", "B"), observedKeys)
     }
@@ -173,6 +174,8 @@ class MviRuntimeBoundaryTest {
     private class ProbeViewModel(
         private val definition: MviDefinition<Snapshot, Change, Nothing>.() -> Unit,
     ) : BaseMviViewModel<Snapshot, Change, Nothing>(Snapshot(), sourceStopTimeoutMillis = 0) {
+        lateinit var ui: MviUiApi<Snapshot, Change>
+
         override fun MviDefinition<Snapshot, Change, Nothing>.define() = definition()
     }
 
