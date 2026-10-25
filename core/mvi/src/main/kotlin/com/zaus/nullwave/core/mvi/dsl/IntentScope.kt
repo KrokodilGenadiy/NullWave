@@ -21,8 +21,9 @@ class IntentScope<S : UiState, E : UiEffect> internal constructor(
         }
 
     /**
-     * Computes and validates the next State, then publishes it and notifies changed sources.
-     * Keep this transform pure and synchronous; submitting work belongs outside it.
+     * Computes and validates the next State, saves selected inputs if configured, then publishes it
+     * and notifies changed sources. Keep this transform pure and synchronous; submitting work belongs
+     * outside it. Configure BaseMviViewModel.savedState once instead of manually saving in handlers.
      * Intents from observers wait for this entire handler to return, including work after reduce.
      */
     fun reduce(reducer: S.() -> S) {

@@ -3,6 +3,7 @@ package com.zaus.nullwave.core.mvi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
+import com.zaus.nullwave.core.mvi.persistence.MviSavedState
 import com.zaus.nullwave.core.mvi.runtime.MviAccess
 import com.zaus.nullwave.core.mvi.runtime.MviRuntime
 import kotlinx.coroutines.Dispatchers
@@ -19,20 +20,25 @@ import kotlinx.coroutines.withContext
  * The definition is initialized on first intent, effect collection or UI binding, after subclass
  * construction. Reading [state] does not initialize it or start sources. Definition errors are sticky.
  * Commands outlive UI bindings; sources share one group until the last binding's stop grace expires.
+ * Optional [savedState] restores selected inputs before the initial State is exposed and saves each
+ * validated transition before publication. It is independent of UI binding and owns its handle key.
  */
 abstract class BaseMviViewModel<S : UiState, I : UiIntent, E : UiEffect>(
     initialState: S,
     sourceStopTimeoutMillis: Long = 5_000,
+    savedState: MviSavedState<S>? = null,
 ) : ViewModel(), MviViewModel<S, I, E> {
     private var definition: MviDefinition<S, I, E>? = null
     @Volatile private var definitionFailure: Throwable? = null
     @Volatile private var cleared = false
     private var defining = false
+    private val persistence = savedState?.attach(initialState)
     private val runtimeScope = viewModelScope
     private val runtime = MviRuntime<S, E>(
-        initialState = initialState,
+        initialState = persistence?.initialState ?: initialState,
         scope = runtimeScope,
         sourceStopTimeoutMillis = sourceStopTimeoutMillis,
+        savedState = persistence,
         observeSources = { requireDefinition().observe() },
     )
 
@@ -44,7 +50,6 @@ abstract class BaseMviViewModel<S : UiState, I : UiIntent, E : UiEffect>(
     }
 
     final override val state: StateFlow<S> = runtime.state
-
     final override suspend fun collectEffects(onEffect: suspend (E) -> Unit) {
         if (cleared || !runtimeScope.isActive) return
         MviAccess.checkUiEntryAllowed()
@@ -67,6 +72,7 @@ abstract class BaseMviViewModel<S : UiState, I : UiIntent, E : UiEffect>(
         runtime.dispatch {
             if (cleared) return@dispatch
             val schema = requireDefinition()
+            if (!runtime.isOpen) return@dispatch
             schema.dispatch(intent)
         }
     }
@@ -90,11 +96,14 @@ abstract class BaseMviViewModel<S : UiState, I : UiIntent, E : UiEffect>(
         defining = true
         val candidate = MviDefinition<S, I, E>(runtime)
         try {
-            MviAccess.defining(runtime) {
-                with(candidate) { define() }
-                candidate.seal()
+            runtime.deferIntents {
+                MviAccess.defining(runtime) {
+                    with(candidate) { define() }
+                    candidate.seal()
+                    runtime.initializeSavedState()
+                }
+                definition = candidate
             }
-            definition = candidate
             return candidate
         } catch (failure: Throwable) {
             definitionFailure = failure

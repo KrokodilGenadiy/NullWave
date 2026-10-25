@@ -2,6 +2,8 @@ package com.zaus.nullwave.core.mvi.runtime
 
 import com.zaus.nullwave.core.mvi.UiEffect
 import com.zaus.nullwave.core.mvi.UiState
+import com.zaus.nullwave.core.mvi.persistence.PreparedSavedState
+import com.zaus.nullwave.core.mvi.persistence.SavedStateBinding
 import com.zaus.nullwave.core.mvi.runtime.source.PreparedSourceChanges
 import com.zaus.nullwave.core.mvi.runtime.effect.EffectEpoch
 import com.zaus.nullwave.core.mvi.runtime.effect.EffectMailbox
@@ -27,6 +29,7 @@ internal class MviRuntime<S : UiState, E : UiEffect>(
     initialState: S,
     private val scope: CoroutineScope,
     sourceStopTimeoutMillis: Long = 5_000,
+    private val savedState: SavedStateBinding<S>? = null,
     observeSources: suspend () -> Unit,
 ) : AutoCloseable {
     private val mutableState = MutableStateFlow(initialState)
@@ -38,6 +41,7 @@ internal class MviRuntime<S : UiState, E : UiEffect>(
     private val sourceRestarts = MutableStateFlow(sourceGeneration)
     private val effectMailbox = EffectMailbox<E>()
     private var closed = false
+    private var writingSavedState = false
     val isOpen: Boolean get() = !closed && scope.isActive
     private val operations = OperationRunner<S>(scope, ::update)
 
@@ -73,15 +77,43 @@ internal class MviRuntime<S : UiState, E : UiEffect>(
 
     private fun publish(sourceName: String?, reducer: S.() -> S, refreshName: String? = null) {
         MviAccess.checkMutationAllowed(this)
+        check(!writingSavedState) { "Saved-state observers cannot publish MVI State during persistence." }
         deferIntents {
             val next = MviAccess.reducing(this) { reducer(mutableState.value) }
             val sources = MviAccess.reducing(this) { prepareStateChange?.invoke(next, sourceName, refreshName) }
+            val saved = MviAccess.reducing(this) { savedState?.prepare(next) }
+            writeSavedState(saved)
             if (!isOpen) return@deferIntents
             sources?.commit()
             MviAccess.publishing(this) {
                 mutableState.value = next
                 if (isOpen) sources?.notifyCollectors()
             }
+        }
+    }
+
+    /** Called only after definition validation, before any sources or handlers can run. */
+    fun initializeSavedState() {
+        val prepared = MviAccess.reducing(this) { savedState?.prepare(mutableState.value) }
+        writeSavedState(prepared)
+    }
+
+    private fun writeSavedState(prepared: PreparedSavedState?) {
+        if (prepared == null) return
+        writingSavedState = true
+        try {
+            MviAccess.publishing(this) { prepared.write() }
+        } catch (failure: Throwable) {
+            // A storage observer may throw after the handle has already changed. There is no safe
+            // two-object rollback: stop this runtime rather than continue with divergent snapshots.
+            try {
+                close()
+            } catch (cleanup: Throwable) {
+                if (cleanup !== failure) failure.addSuppressed(cleanup)
+            }
+            throw failure
+        } finally {
+            writingSavedState = false
         }
     }
 
