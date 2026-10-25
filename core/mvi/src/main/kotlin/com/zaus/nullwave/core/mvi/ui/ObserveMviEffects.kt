@@ -24,6 +24,7 @@ import kotlinx.coroutines.withContext
  * the active handler; it is not replayed. Operation replacement/cancellation can also revoke its
  * handler. Detached work and completed external actions cannot be cancelled by this adapter.
  * Switching the owner, ViewModel or active state waits for the previous handler's cleanup.
+ * Recreating composition with the same ViewModel also waits for its cancelled consumer to release.
  * This does not bind sources: pair it with collectMviStateWithLifecycle when rendering State.
  */
 @Composable
@@ -38,7 +39,8 @@ fun <E : UiEffect> ObserveMviEffects(
     val collectionHandoff = remember { Mutex() }
     LaunchedEffect(viewModel, lifecycleOwner, minActiveState) {
         // LaunchedEffect cancels its predecessor without joining non-cancellable cleanup.
-        // Keep one collection lease through key changes, including a return to the same VM.
+        // Serialize slot changes even across different VMs. The VM's mailbox handles replacement
+        // across compositions, which cannot share this remembered mutex.
         collectionHandoff.withLock {
             viewModel.collectEffectsWithLifecycle(lifecycleOwner.lifecycle, minActiveState) {
                 currentHandler(it)
@@ -47,7 +49,10 @@ fun <E : UiEffect> ObserveMviEffects(
     }
 }
 
-/** Lifecycle adapter for non-Compose hosts; requires STARTED or RESUMED and handles on Main. */
+/**
+ * Lifecycle adapter for non-Compose hosts; requires STARTED or RESUMED and handles on Main.
+ * Cancel the old host before replacing it; the VM waits for its cleanup. Concurrent live hosts fail.
+ */
 suspend fun <E : UiEffect> MviViewModel<*, *, E>.collectEffectsWithLifecycle(
     lifecycle: Lifecycle,
     minActiveState: Lifecycle.State = Lifecycle.State.STARTED,

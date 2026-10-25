@@ -1,6 +1,9 @@
 package com.zaus.nullwave.core.mvi.runtime.effect
 
 import com.zaus.nullwave.core.mvi.runtime.MviAccess
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -8,6 +11,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -22,9 +26,18 @@ internal class EffectMailbox<E>(private val capacity: Int = 64) {
 
     private class ActiveHandler(val epoch: EffectEpoch?, val job: Job)
 
+    private class Consumer(
+        val job: Job,
+        key: CoroutineContext.Key<Consumer>,
+    ) : AbstractCoroutineContextElement(key) {
+        // Also opened on terminal mailbox closure so a waiting host can return promptly.
+        val released = CompletableDeferred<Unit>()
+    }
+
     private val pending = ArrayDeque<Envelope<E>>()
     private val changed = Channel<Unit>(Channel.CONFLATED)
-    private var consumerActive = false
+    private val consumerKey = object : CoroutineContext.Key<Consumer> {}
+    private var consumer: Consumer? = null
     private var activeHandler: ActiveHandler? = null
     private var closed = false
 
@@ -49,6 +62,7 @@ internal class EffectMailbox<E>(private val capacity: Int = 64) {
      * Runs handlers sequentially on Main. Revocation cancels the matching handler and waits for its
      * structured cleanup before delivering another signal. Cancellation remains cooperative.
      * A signal already handed to a stopped/cancelled consumer is not replayed.
+     * A replacement waits for a cancelled consumer's cleanup; two active consumers are an error.
      */
     suspend fun collect(handler: suspend (E) -> Unit): Unit = withContext(Dispatchers.Main.immediate) {
         withConsumer {
@@ -80,6 +94,7 @@ internal class EffectMailbox<E>(private val capacity: Int = 64) {
         pending.clear()
         activeHandler?.job?.cancel()
         changed.close()
+        consumer?.released?.complete(Unit)
     }
 
     private suspend fun next(): Envelope<E>? {
@@ -94,14 +109,29 @@ internal class EffectMailbox<E>(private val capacity: Int = 64) {
         return null
     }
 
-    /** Entire collection stays on Main; coroutineScope joins handler cleanup before release. */
+    /** Main confines admission; the inner coroutineScope joins all handler cleanup before release. */
     private suspend fun withConsumer(block: suspend () -> Unit) {
-        check(!consumerActive) { "MVI effects allow only one active collector." }
-        consumerActive = true
+        val caller = currentCoroutineContext()
+        caller.ensureActive()
+        // A cancelled handler's NonCancellable cleanup cannot wait for its own lease to release.
+        // A per-mailbox context key also preserves this check through another VM's UI handler.
+        check(caller[consumerKey] == null) { "MVI effects allow only one active collector." }
+        while (!closed) {
+            val previous = consumer ?: break
+            check(previous.job.isCancelled) { "MVI effects allow only one active collector." }
+            previous.released.await()
+            // Another host may have acquired the lease while we were suspended. Recheck rather
+            // than silently queue multiple live UI consumers behind that host.
+        }
+        caller.ensureActive()
+        if (closed) return
+        val acquired = Consumer(caller.job, consumerKey)
+        consumer = acquired
         try {
-            block()
+            withContext(acquired) { block() }
         } finally {
-            consumerActive = false
+            if (consumer === acquired) consumer = null
+            acquired.released.complete(Unit)
         }
     }
 }
