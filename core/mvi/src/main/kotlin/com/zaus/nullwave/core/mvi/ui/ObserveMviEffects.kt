@@ -11,6 +11,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.zaus.nullwave.core.mvi.MviViewModel
 import com.zaus.nullwave.core.mvi.UiEffect
+import com.zaus.nullwave.core.mvi.runtime.MviAccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -53,7 +54,8 @@ suspend fun <E : UiEffect> MviViewModel<*, *, E>.collectEffectsWithLifecycle(
     onEffect: suspend (E) -> Unit,
 ) {
     requireVisibleState(minActiveState)
-    withContext(Dispatchers.Main.immediate) {
+    MviAccess.checkUiEntryAllowed()
+    withContext(Dispatchers.Main.immediate + MviAccess.neutralContext()) {
         lifecycle.repeatOnLifecycle(minActiveState) {
             collectEffects(onEffect)
         }

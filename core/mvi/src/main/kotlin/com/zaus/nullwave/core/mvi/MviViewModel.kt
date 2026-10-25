@@ -1,6 +1,7 @@
 package com.zaus.nullwave.core.mvi
 
 import com.zaus.nullwave.core.mvi.ui.ObserveMviEffects
+import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import com.zaus.nullwave.core.mvi.ui.collectMviStateWithLifecycle
 import kotlinx.coroutines.flow.StateFlow
 
@@ -35,6 +36,12 @@ interface MviViewModel<S : UiState, I : UiIntent, E : UiEffect> {
      */
     suspend fun withUiBinding(block: suspend () -> Unit)
 
-    /** Admits intents in order for Main processing; background callers cannot await the outcome. */
-    fun onIntent(intent: I)
+    /**
+     * Acquires the UI capability from an external coroutine, without initializing the definition
+     * or binding sources. MVI work and its structured children cannot acquire it. Keep this object
+     * at the UI/platform boundary; its ordinary callback remains usable across lifecycle pauses
+     * and becomes a no-op when this ViewModel is cleared. Acquisition checks caller cancellation.
+     * Compose uses collectMviUiWithLifecycle or rememberMviUiApi instead.
+     */
+    suspend fun uiApi(): MviUiApi<S, I>
 }

@@ -58,7 +58,7 @@ internal class EffectMailbox<E>(private val capacity: Int = 64) {
                     currentCoroutineContext().ensureActive()
                     if (closed || !envelope.isCurrent()) continue
                     // Install ownership before starting: a handler may synchronously revoke itself.
-                    val job = launch(MviAccess.uiContext(), start = CoroutineStart.LAZY) {
+                    val job = launch(MviAccess.neutralContext(), start = CoroutineStart.LAZY) {
                         if (!closed && envelope.isCurrent()) handler(envelope.value)
                     }
                     val active = ActiveHandler(envelope.epoch, job)

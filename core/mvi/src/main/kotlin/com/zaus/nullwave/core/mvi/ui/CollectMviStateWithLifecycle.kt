@@ -11,6 +11,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.zaus.nullwave.core.mvi.MviViewModel
 import com.zaus.nullwave.core.mvi.UiState
+import com.zaus.nullwave.core.mvi.runtime.MviAccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -49,7 +50,8 @@ internal suspend fun <S : UiState> MviViewModel<S, *, *>.collectStateWithUiBindi
     onState: (S) -> Unit,
 ) {
     requireVisibleState(minActiveState)
-    withContext(Dispatchers.Main.immediate) {
+    MviAccess.checkUiEntryAllowed()
+    withContext(Dispatchers.Main.immediate + MviAccess.neutralContext()) {
         lifecycle.repeatOnLifecycle(minActiveState) {
             withUiBinding {
                 state.collect { onState(it) }

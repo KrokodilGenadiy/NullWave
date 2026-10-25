@@ -1,7 +1,9 @@
 package com.zaus.nullwave.core.mvi.runtime
 
+import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.asContextElement
+import kotlinx.coroutines.currentCoroutineContext
 
 /** Runtime counterpart of the DSL boundary, including explicitly captured receivers. */
 internal object MviAccess {
@@ -14,6 +16,11 @@ internal object MviAccess {
     )
     private val access = ThreadLocal<Access?>()
 
+    // Unlike a ThreadLocal value left by an inline resume, this belongs to the actual caller.
+    private class WorkContext : AbstractCoroutineContextElement(Key) {
+        companion object Key : CoroutineContext.Key<WorkContext>
+    }
+
     fun checkMutationAllowed(owner: Any) {
         val phase = access.get().find(owner)?.phase
         check(phase == null || phase == Phase.Intent) {
@@ -21,16 +28,10 @@ internal object MviAccess {
         }
     }
 
-    fun checkDispatchAllowed(owner: Any) {
-        check(access.get().find(owner) == null) {
-            "Dispatch an intent from the UI/platform boundary, not from an MVI handler, reducer or work block."
-        }
-    }
-
-    /** UI lifetimes cannot be created by any VM's work, including through another VM. */
-    fun checkUiEntryAllowed() {
-        check(access.get() == null) {
-            "Bind UI and collect effects from the UI/platform boundary, not from an MVI declaration, handler, reducer or work block."
+    /** Structured work cannot acquire a UI capability or lifetime, even through another VM. */
+    suspend fun checkUiEntryAllowed() {
+        check(currentCoroutineContext()[WorkContext] == null) {
+            "Acquire UI API, bind UI and collect effects from the UI/platform boundary, not from MVI work."
         }
     }
 
@@ -56,10 +57,15 @@ internal object MviAccess {
     fun <T> publishing(owner: Any, block: () -> T): T = withAccess(access.get().without(owner), block)
 
     /** An operation/source belongs to its VM scope, independently of another VM's caller stack. */
-    fun workContext(owner: Any): CoroutineContext = access.asContextElement(Access(owner, Phase.Work))
+    fun workContext(owner: Any): CoroutineContext =
+        access.asContextElement(Access(owner, Phase.Work)) + WorkContext()
 
-    /** Managed UI collectors run as external callers even when resumed by MVI publication. */
-    fun uiContext(): CoroutineContext = access.asContextElement(null)
+    /**
+     * Runtime scheduling and UI collection must not inherit an inline caller's ThreadLocal phase.
+     * This only sets the synchronous access phase; it does not remove a coroutine's WorkContext.
+     * Public UI entries must still check work ownership before entering this context.
+     */
+    fun neutralContext(): CoroutineContext = access.asContextElement(null)
 
     private fun <T> within(owner: Any, phase: Phase, intent: Any? = null, block: () -> T): T =
         withAccess(Access(owner, phase, intent, access.get().without(owner)), block)

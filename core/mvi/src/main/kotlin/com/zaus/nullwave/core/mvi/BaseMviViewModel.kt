@@ -6,6 +6,7 @@ import com.zaus.nullwave.core.mvi.dsl.MviDefinition
 import com.zaus.nullwave.core.mvi.persistence.MviSavedState
 import com.zaus.nullwave.core.mvi.runtime.MviAccess
 import com.zaus.nullwave.core.mvi.runtime.MviRuntime
+import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -50,10 +51,21 @@ abstract class BaseMviViewModel<S : UiState, I : UiIntent, E : UiEffect>(
     }
 
     final override val state: StateFlow<S> = runtime.state
+    private val ui = MviUiApi(state, ::dispatchFromUi)
+
+    final override suspend fun uiApi(): MviUiApi<S, I> {
+        currentCoroutineContext().ensureActive()
+        MviAccess.checkUiEntryAllowed()
+        return ui
+    }
+
+    /** Only the core Compose adapter may acquire the capability without a suspend boundary. */
+    internal fun uiApiForCompose(): MviUiApi<S, I> = ui
+
     final override suspend fun collectEffects(onEffect: suspend (E) -> Unit) {
         if (cleared || !runtimeScope.isActive) return
         MviAccess.checkUiEntryAllowed()
-        withContext(Dispatchers.Main.immediate) {
+        withContext(Dispatchers.Main.immediate + MviAccess.neutralContext()) {
             currentCoroutineContext().ensureActive()
             if (!runtime.isOpen) return@withContext
             requireDefinition()
@@ -63,11 +75,10 @@ abstract class BaseMviViewModel<S : UiState, I : UiIntent, E : UiEffect>(
 
     protected abstract fun MviDefinition<S, I, E>.define()
 
-    final override fun onIntent(intent: I) {
+    private fun dispatchFromUi(intent: I) {
         // Lifecycle cancels this scope before invoking our unkeyed closeable. Cleanup callbacks
         // can reenter here during that interval, before the explicit cleared flag becomes true.
         if (cleared || !runtimeScope.isActive) return
-        MviAccess.checkDispatchAllowed(runtime)
         definitionFailure?.let { throw it }
         runtime.dispatch {
             if (cleared) return@dispatch
@@ -80,7 +91,7 @@ abstract class BaseMviViewModel<S : UiState, I : UiIntent, E : UiEffect>(
     final override suspend fun withUiBinding(block: suspend () -> Unit) {
         if (cleared || !runtimeScope.isActive) return
         MviAccess.checkUiEntryAllowed()
-        withContext(Dispatchers.Main.immediate) {
+        withContext(Dispatchers.Main.immediate + MviAccess.neutralContext()) {
             currentCoroutineContext().ensureActive()
             if (!runtime.isOpen) return@withContext
             requireDefinition()
