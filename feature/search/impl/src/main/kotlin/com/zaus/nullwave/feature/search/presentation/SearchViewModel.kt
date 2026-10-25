@@ -23,10 +23,11 @@ import kotlin.time.Duration.Companion.milliseconds
 @AssistedInject
 internal class SearchViewModel(
     private val repository: LibrarySearchRepository,
-    @Assisted private val savedStateHandle: SavedStateHandle,
+    @Assisted savedStateHandle: SavedStateHandle,
     @SearchInitialLocale initialLocaleTag: String,
 ) : BaseMviViewModel<SearchState, SearchIntent, Nothing>(
-    savedStateHandle.restoreSearchState(initialLocaleTag),
+    initialState = SearchState(initialLocaleTag),
+    savedState = searchSavedState(savedStateHandle),
     // Search is ephemeral: leaving the UI cancels pending debounce and observations immediately.
     sourceStopTimeoutMillis = 0,
 ) {
@@ -39,7 +40,7 @@ internal class SearchViewModel(
     }
 
     override fun MviDefinition<SearchState, SearchIntent, Nothing>.define() {
-        source(
+        val results = source(
             name = "search.results",
             input = { request },
             flow = { query ->
@@ -55,30 +56,23 @@ internal class SearchViewModel(
 
         on<SearchIntent.QueryChanged> { intent ->
             reduce { withInput(rawQuery = intent.value) }
-            // A reentrant UI may already have replaced the text during publication.
-            savedStateHandle.saveSearchQuery(state)
         }
         on<SearchIntent.ClearQuery> {
             reduce { withInput(rawQuery = "") }
-            savedStateHandle.saveSearchQuery(state)
         }
         on<SearchIntent.LocaleChanged> { intent ->
             reduce { withInput(localeTag = intent.localeTag) }
         }
         on<SearchIntent.AccessChecked> { intent ->
-            val previous = state.request
-            reduce { withAccess(intent.granted) }
-            // Equal granted inputs still need a fresh read after returning from settings/resume.
-            // Changed inputs already invalidate and restart the keyed source.
-            if (state.request != null && previous == state.request) restartSources()
+            // Fresh access checks re-read even an unchanged query; null input still performs no I/O.
+            refresh(results) { withAccess(intent.granted) }
         }
         on<SearchIntent.Retry> {
             val body = state.body
             if (body !is SearchBody.Failed &&
                 !(body is SearchBody.Ready && body.refresh is SearchRefresh.Failed)
             ) return@on
-            reduce { copy(body = body.startReading()) }
-            restartSources()
+            refresh(results) { copy(body = body.startReading()) }
         }
     }
 }

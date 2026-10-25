@@ -1,15 +1,19 @@
 package com.zaus.nullwave.feature.search.presentation
 
 import androidx.lifecycle.SavedStateHandle
+import com.zaus.nullwave.core.mvi.persistence.MviSavedState
+import com.zaus.nullwave.core.mvi.persistence.savedState
+import kotlinx.serialization.Serializable
 
-private const val QUERY_KEY = "search.query"
+@Serializable
+private data class SearchInputs(val rawQuery: String = "")
 
-/** Restore only editable text. Locale is fresh; access, results and errors are not persisted. */
-internal fun SavedStateHandle.restoreSearchState(localeTag: String): SearchState {
-    val rawQuery = get<Any?>(QUERY_KEY) as? String ?: ""
-    return SearchState(localeTag).withInput(rawQuery)
-}
-
-internal fun SavedStateHandle.saveSearchQuery(state: SearchState) {
-    this[QUERY_KEY] = state.rawQuery
-}
+/** Restore text only; fresh defaults still require a new access check and use the new locale. */
+internal fun searchSavedState(handle: SavedStateHandle): MviSavedState<SearchState> = savedState(
+    handle = handle,
+    key = "search.inputs",
+    serializer = SearchInputs.serializer(),
+    select = { SearchInputs(rawQuery) },
+    restore = { inputs -> withInput(inputs.rawQuery) },
+    legacy = { SearchInputs(string("search.query") ?: "") },
+)

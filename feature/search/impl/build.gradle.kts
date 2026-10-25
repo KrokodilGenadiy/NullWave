@@ -2,6 +2,7 @@ plugins {
     id("nullwave.android.library")
     alias(libs.plugins.metro)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
