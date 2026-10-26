@@ -12,8 +12,10 @@ import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.ViewModelStore
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
+import com.zaus.nullwave.core.mvi.dsl.OperationKey
 import com.zaus.nullwave.core.mvi.ui.MviUiState
 import com.zaus.nullwave.core.mvi.ui.collectMviUiWithLifecycle
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
@@ -122,7 +124,7 @@ class CollectMviStateWithLifecycleInstrumentedTest {
             rendered.onIntent(Write(12))
             runCurrent()
             assertEquals(TestState(12), rendered.state)
-            assertEquals(TestState(23), secondViewModel.state.value)
+            assertEquals(TestState(23), secondViewModel.snapshot.value.state)
             advanceTimeBy(STOP_TIMEOUT)
             runCurrent()
             assertEquals(0, secondViewModel.activeSources)
@@ -140,8 +142,72 @@ class CollectMviStateWithLifecycleInstrumentedTest {
         }
     }
 
+    @Test
+    fun operationActivityRecomposesWithoutFeatureChangesAndResumesWithLatestSnapshot() = runTest {
+        val response = CompletableDeferred<Int>()
+        val vm = OperationViewModel(response).also { store.put("operation", it) }
+        val owner = TestOwner(Lifecycle.State.STARTED)
+        val frames = BroadcastFrameClock()
+        val recomposer = Recomposer(coroutineContext + frames)
+        val composition = Composition(EmptyApplier(), recomposer)
+        val runner = backgroundScope.launch(frames) { recomposer.runRecomposeAndApplyChanges() }
+        lateinit var ui: MviUiState<TestState, Write>
+        var rendered = Triple(0, false, false)
+        var frame = 0L
+        fun renderFrame() {
+            runCurrent()
+            Snapshot.sendApplyNotifications()
+            runCurrent()
+            frames.sendFrame(++frame)
+            runCurrent()
+        }
+        try {
+            composition.setContent {
+                ui = vm.collectMviUiWithLifecycle(owner)
+                val activity = ui.operations[OperationViewModel.Work]
+                rendered = Triple(ui.state.value, activity.isBusy, activity.canSubmit)
+            }
+            renderFrame()
+            assertEquals(Triple(0, false, true), rendered)
+            val unchangedData = ui.state
+            ui.onIntent(Write(1))
+            renderFrame()
+            assertSame(unchangedData, ui.state)
+            assertEquals(Triple(0, true, false), rendered)
+
+            owner.registry.currentState = Lifecycle.State.CREATED
+            runCurrent()
+            response.complete(9)
+            renderFrame()
+            assertEquals(Triple(0, true, false), rendered)
+            owner.registry.currentState = Lifecycle.State.STARTED
+            renderFrame()
+            assertEquals(Triple(9, false, true), rendered)
+            assertSame(vm.snapshot.value, ui.snapshot)
+        } finally {
+            composition.dispose()
+            recomposer.cancel()
+            runner.cancel()
+        }
+    }
+
     private data class TestState(val value: Int = 0) : UiState
     private data class Write(val value: Int) : UiIntent
+
+    private class OperationViewModel(private val response: CompletableDeferred<Int>) :
+        BaseMviViewModel<TestState, Write, Nothing>(TestState()) {
+        override fun MviDefinition<TestState, Write, Nothing>.define() {
+            val work = idle<Int, Int>(Work) {
+                execute { response.await() }
+                onResult { _, value -> copy(value = value) }
+            }
+            on<Write> { submit(work, it.value) }
+        }
+
+        companion object {
+            val Work = OperationKey<Int>("work")
+        }
+    }
 
     private class ProbeViewModel :
         BaseMviViewModel<TestState, Write, Nothing>(
