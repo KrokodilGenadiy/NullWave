@@ -1,6 +1,9 @@
 package com.zaus.nullwave.core.mvi.runtime.operation
 
 import com.zaus.nullwave.core.mvi.UiState
+import com.zaus.nullwave.core.mvi.dsl.OperationKey
+import com.zaus.nullwave.core.mvi.state.OperationStates
+import com.zaus.nullwave.core.mvi.state.OperationStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -11,34 +14,58 @@ import kotlinx.coroutines.launch
 internal class OperationRunner<S : UiState>(
     private val scope: CoroutineScope,
     private val setState: (S.() -> S) -> Unit,
+    private val onActivityChanged: () -> Unit = {},
 ) : AutoCloseable {
     private class Request {
         lateinit var job: Job
         var valid = true
     }
 
-    private class Slot(val policy: OperationPolicy, val maxPending: Int) {
+    private class Slot(val key: OperationKey<*>, val policy: OperationPolicy, val maxPending: Int) {
         var active: Request? = null
         val pending = ArrayDeque<Request>()
         var pumping = false
         var admissions = 0
+
+        /** The first pending input reserves execution when no active request occupies the slot. */
+        fun hasQueueCapacity(hasActiveRequest: Boolean, pendingCount: Int): Boolean {
+            val reservedForExecution = if (!hasActiveRequest && pendingCount > 0) 1 else 0
+            return pendingCount - reservedForExecution < maxPending
+        }
     }
 
     private val slots = mutableListOf<Slot>()
     private var closed = false
     private val isOpen: Boolean get() = !closed && scope.isActive
 
-    fun latestOperation(): MviOperation<S> = operation(OperationPolicy.Latest)
+    fun latestOperation(key: OperationKey<*> = OperationKey<Unit>("latest")): MviOperation<S> =
+        operation(key, OperationPolicy.Latest)
 
-    fun queuedOperation(maxPending: Int): MviOperation<S> {
+    fun queuedOperation(maxPending: Int, key: OperationKey<*> = OperationKey<Unit>("queued")): MviOperation<S> {
         require(maxPending > 0) { "maxPending must be positive" }
-        return operation(OperationPolicy.Queued, maxPending)
+        return operation(key, OperationPolicy.Queued, maxPending)
     }
 
-    fun idleOperation(): MviOperation<S> = operation(OperationPolicy.Idle)
+    fun idleOperation(key: OperationKey<*> = OperationKey<Unit>("idle")): MviOperation<S> =
+        operation(key, OperationPolicy.Idle)
 
-    private fun operation(policy: OperationPolicy, maxPending: Int = 0): MviOperation<S> {
-        val slot = Slot(policy, maxPending)
+    fun activity(): OperationStates = OperationStates(true, slots.associate { slot ->
+        val active = slot.active?.takeUnless { it.job.isCompleted }
+        val pending = slot.pending.count { it.valid && !it.job.isCancelled && !it.job.isCompleted }
+        slot.key to OperationStatus(
+            isBusy = isOpen && (active != null || pending > 0),
+            isExecuting = isOpen && active?.let { it.valid && it.job.isActive } == true,
+            pendingCount = if (isOpen) pending else 0,
+            canSubmit = isOpen && when (slot.policy) {
+                OperationPolicy.Latest -> true
+                OperationPolicy.Queued -> slot.hasQueueCapacity(active != null, pending)
+                OperationPolicy.Idle -> active == null && pending == 0
+            },
+        )
+    })
+
+    private fun operation(key: OperationKey<*>, policy: OperationPolicy, maxPending: Int = 0): MviOperation<S> {
+        val slot = Slot(key, policy, maxPending)
         if (isOpen) slots.add(slot)
         return MviOperation(
             submitRequest = { onAccepted, block ->
@@ -81,9 +108,7 @@ internal class OperationRunner<S : UiState>(
         block: suspend OperationScope<S>.() -> Unit,
     ): Boolean {
         pruneCompleted(slot)
-        // With no active job, the first pending request reserves the execution slot, not capacity.
-        val waiting = slot.pending.size - if (slot.active == null) 1 else 0
-        if (waiting >= slot.maxPending) return false
+        if (!slot.hasQueueCapacity(slot.active != null, slot.pending.size)) return false
         val request = request(slot, block)
         slot.pending.addLast(request)
         accept(slot, request, onAccepted)
@@ -131,6 +156,7 @@ internal class OperationRunner<S : UiState>(
                 requests.forEach { it.job.cancel() }
             } finally {
                 slot.admissions--
+                onActivityChanged()
                 pump(slot)
             }
         }
@@ -157,6 +183,7 @@ internal class OperationRunner<S : UiState>(
                 cancelPrevious()
             } finally {
                 slot.admissions--
+                onActivityChanged()
                 pump(slot)
             }
         }
@@ -177,6 +204,9 @@ internal class OperationRunner<S : UiState>(
                 },
                 canCommit = canCommit,
             )
+            onActivityChanged()
+            // A status observer can cancel/clear before execute, even without onStarted.
+            if (!canCommit()) return@launch
             operation.block()
         }
         request.job.invokeOnCompletion {
@@ -186,6 +216,7 @@ internal class OperationRunner<S : UiState>(
                     request.valid = false
                     if (slot.active === request) slot.active = null
                     slot.pending.remove(request)
+                    onActivityChanged()
                     pump(slot)
                 }
             }
@@ -227,8 +258,9 @@ internal class OperationRunner<S : UiState>(
             it.active = null
             it.pending.clear()
         }
-        slots.clear()
+        // Retain stable keys for the terminal snapshot; no request/Job stays in these slots.
         requests.forEach { it.valid = false }
         requests.forEach { it.job.cancel() }
+        onActivityChanged()
     }
 }

@@ -2,13 +2,16 @@ package com.zaus.nullwave.core.mvi.runtime
 
 import com.zaus.nullwave.core.mvi.UiEffect
 import com.zaus.nullwave.core.mvi.UiState
+import com.zaus.nullwave.core.mvi.dsl.OperationKey
 import com.zaus.nullwave.core.mvi.persistence.PreparedSavedState
 import com.zaus.nullwave.core.mvi.persistence.SavedStateBinding
-import com.zaus.nullwave.core.mvi.runtime.source.PreparedSourceChanges
 import com.zaus.nullwave.core.mvi.runtime.effect.EffectEpoch
 import com.zaus.nullwave.core.mvi.runtime.effect.EffectMailbox
 import com.zaus.nullwave.core.mvi.runtime.operation.MviOperation
 import com.zaus.nullwave.core.mvi.runtime.operation.OperationRunner
+import com.zaus.nullwave.core.mvi.runtime.source.PreparedSourceChanges
+import com.zaus.nullwave.core.mvi.state.MviSnapshot
+import com.zaus.nullwave.core.mvi.state.OperationStates
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
@@ -35,15 +38,17 @@ internal class MviRuntime<S : UiState, E : UiEffect>(
     // Preserve the owner's Job/dispatcher. Every runtime child starts and resumes in a known phase;
     // execute/source install their own Work context only around user work.
     private val runtimeScope = CoroutineScope(scope.coroutineContext + MviAccess.neutralContext())
-    private val mutableState = MutableStateFlow(initialState)
+    private val mutableSnapshot = MutableStateFlow(MviSnapshot(initialState, OperationStates.Uninitialized))
     private val intentIngress = MainIntentIngress(runtimeScope)
-    val state: StateFlow<S> = mutableState.asStateFlow()
+    val snapshot: StateFlow<MviSnapshot<S>> = mutableSnapshot.asStateFlow()
+    val state: S get() = mutableSnapshot.value.state
     private val activeUiBindings = MutableStateFlow(0)
     private val effectMailbox = EffectMailbox<E>()
     private var closed = false
     private var writingSavedState = false
     val isOpen: Boolean get() = !closed && runtimeScope.isActive
-    private val operations = OperationRunner<S>(runtimeScope, ::update)
+    private var definitionReady = false
+    private val operations = OperationRunner<S>(runtimeScope, ::update, ::publishActivity)
 
     /** Prepare input invalidation before publication; notify source collectors afterwards. */
     var prepareStateChange: ((S, String?, String?) -> PreparedSourceChanges)? = null
@@ -78,14 +83,14 @@ internal class MviRuntime<S : UiState, E : UiEffect>(
         MviAccess.checkMutationAllowed(this)
         check(!writingSavedState) { "Saved-state observers cannot publish MVI State during persistence." }
         deferIntents {
-            val next = MviAccess.reducing(this) { reducer(mutableState.value) }
+            val next = MviAccess.reducing(this) { reducer(state) }
             val sources = MviAccess.reducing(this) { prepareStateChange?.invoke(next, sourceName, refreshName) }
             val saved = MviAccess.reducing(this) { savedState?.prepare(next) }
             writeSavedState(saved)
             if (!isOpen) return@deferIntents
             sources?.commit()
             MviAccess.publishing(this) {
-                mutableState.value = next
+                mutableSnapshot.value = MviSnapshot(next, activity())
                 if (isOpen) sources?.notifyCollectors()
             }
         }
@@ -93,8 +98,27 @@ internal class MviRuntime<S : UiState, E : UiEffect>(
 
     /** Called only after definition validation, before any sources or handlers can run. */
     fun initializeSavedState() {
-        val prepared = MviAccess.reducing(this) { savedState?.prepare(mutableState.value) }
+        val prepared = MviAccess.reducing(this) { savedState?.prepare(state) }
         writeSavedState(prepared)
+    }
+
+    /** Called after the complete definition is installed; UI observers can safely enter it now. */
+    fun activateOperations() {
+        definitionReady = true
+        publishActivity()
+    }
+
+    private fun activity(): OperationStates =
+        if (definitionReady) operations.activity() else OperationStates.Uninitialized
+
+    /** Activity-only transitions never run feature reducers, source selectors or persistence. */
+    private fun publishActivity() {
+        if (!definitionReady) return
+        deferIntents {
+            MviAccess.publishing(this) {
+                mutableSnapshot.value = MviSnapshot(state, activity())
+            }
+        }
     }
 
     private fun writeSavedState(prepared: PreparedSavedState?) {
@@ -135,11 +159,14 @@ internal class MviRuntime<S : UiState, E : UiEffect>(
         }
     }
 
-    fun latestOperation(): MviOperation<S> = operations.latestOperation()
+    fun latestOperation(key: OperationKey<*> = OperationKey<Unit>("latest")): MviOperation<S> =
+        operations.latestOperation(key)
 
-    fun queuedOperation(maxPending: Int = 16): MviOperation<S> = operations.queuedOperation(maxPending)
+    fun queuedOperation(maxPending: Int = 16, key: OperationKey<*> = OperationKey<Unit>("queued")): MviOperation<S> =
+        operations.queuedOperation(maxPending, key)
 
-    fun idleOperation(): MviOperation<S> = operations.idleOperation()
+    fun idleOperation(key: OperationKey<*> = OperationKey<Unit>("idle")): MviOperation<S> =
+        operations.idleOperation(key)
 
     suspend fun sendEffect(
         effect: E,

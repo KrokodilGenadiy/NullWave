@@ -6,6 +6,7 @@ import com.zaus.nullwave.core.mvi.dsl.MviDefinition
 import com.zaus.nullwave.core.mvi.persistence.MviSavedState
 import com.zaus.nullwave.core.mvi.runtime.MviAccess
 import com.zaus.nullwave.core.mvi.runtime.MviRuntime
+import com.zaus.nullwave.core.mvi.state.MviSnapshot
 import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -19,7 +20,7 @@ import kotlinx.coroutines.withContext
  * operation policies and source lifetimes; feature code receives only scoped DSL capabilities.
  *
  * The definition is initialized on first intent, effect collection or UI binding, after subclass
- * construction. Reading [state] does not initialize it or start sources. Definition errors are sticky.
+ * construction. Reading [snapshot] does not initialize it or start sources. Definition errors are sticky.
  * Commands outlive UI bindings; sources share one group until the last binding's stop grace expires.
  * Optional [savedState] restores selected inputs before the initial State is exposed and saves each
  * validated transition before publication. It is independent of UI binding and owns its handle key.
@@ -50,8 +51,8 @@ abstract class BaseMviViewModel<S : UiState, I : UiIntent, E : UiEffect>(
         }
     }
 
-    final override val state: StateFlow<S> = runtime.state
-    private val ui = MviUiApi(state, ::dispatchFromUi)
+    final override val snapshot: StateFlow<MviSnapshot<S>> = runtime.snapshot
+    private val ui = MviUiApi(snapshot, ::dispatchFromUi)
 
     final override suspend fun uiApi(): MviUiApi<S, I> {
         currentCoroutineContext().ensureActive()
@@ -114,6 +115,7 @@ abstract class BaseMviViewModel<S : UiState, I : UiIntent, E : UiEffect>(
                     runtime.initializeSavedState()
                 }
                 definition = candidate
+                runtime.activateOperations()
             }
             return candidate
         } catch (failure: Throwable) {

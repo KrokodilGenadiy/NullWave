@@ -35,7 +35,10 @@ class MviDefinition<S : UiState, I : UiIntent, E : UiEffect> internal constructo
     fun <A, R> latest(
         name: String,
         block: OperationBuilder<S, E, A, R>.() -> Unit,
-    ): Operation<A> = operation(name, OperationPolicy.Latest, 0, block)
+    ): Operation<A> = latest(OperationKey(name), block)
+
+    fun <A, R> latest(key: OperationKey<A>, block: OperationBuilder<S, E, A, R>.() -> Unit): Operation<A> =
+        operation(key, OperationPolicy.Latest, 0, block)
 
     /** FIFO with a bounded waiting queue, excluding the executing/reserved request. */
     fun <A, R> queued(
@@ -43,15 +46,24 @@ class MviDefinition<S : UiState, I : UiIntent, E : UiEffect> internal constructo
         maxPending: Int = 16,
         block: OperationBuilder<S, E, A, R>.() -> Unit,
     ): Operation<A> {
+        return queued(OperationKey(name), maxPending, block)
+    }
+
+    fun <A, R> queued(
+        key: OperationKey<A>, maxPending: Int = 16, block: OperationBuilder<S, E, A, R>.() -> Unit,
+    ): Operation<A> {
         require(maxPending > 0) { "maxPending must be positive." }
-        return operation(name, OperationPolicy.Queued, maxPending, block)
+        return operation(key, OperationPolicy.Queued, maxPending, block)
     }
 
     /** Rejects new inputs until the previous execution and its cleanup have completed. */
     fun <A, R> idle(
         name: String,
         block: OperationBuilder<S, E, A, R>.() -> Unit,
-    ): Operation<A> = operation(name, OperationPolicy.Idle, 0, block)
+    ): Operation<A> = idle(OperationKey(name), block)
+
+    fun <A, R> idle(key: OperationKey<A>, block: OperationBuilder<S, E, A, R>.() -> Unit): Operation<A> =
+        operation(key, OperationPolicy.Idle, 0, block)
 
     /** Exact runtime type matching: every concrete intent needs one handler. */
     inline fun <reified T : I> on(noinline handler: IntentScope<S, E>.(T) -> Unit) {
@@ -101,8 +113,8 @@ class MviDefinition<S : UiState, I : UiIntent, E : UiEffect> internal constructo
     internal fun seal() {
         checkOpen()
         MviAccess.reducing(runtime) {
-            validator?.invoke(runtime.state.value)
-            sources.forEach { it.initialize(runtime.state.value) }
+            validator?.invoke(runtime.state)
+            sources.forEach { it.initialize(runtime.state) }
         }
         runtime.prepareStateChange = { next, sourceName, refreshName ->
             validator?.invoke(next)
@@ -139,16 +151,16 @@ class MviDefinition<S : UiState, I : UiIntent, E : UiEffect> internal constructo
     }
 
     private fun <A, R> operation(
-        name: String,
+        key: OperationKey<A>,
         policy: OperationPolicy,
         maxPending: Int,
         block: OperationBuilder<S, E, A, R>.() -> Unit,
     ): Operation<A> {
-        registerName(name)
+        registerName(key.name)
         val builder = OperationBuilder<S, E, A, R>(runtime)
         return try {
             builder.block()
-            builder.build(owner, runtime, policy, maxPending)
+            builder.build(owner, key, runtime, policy, maxPending)
         } finally {
             builder.close()
         }

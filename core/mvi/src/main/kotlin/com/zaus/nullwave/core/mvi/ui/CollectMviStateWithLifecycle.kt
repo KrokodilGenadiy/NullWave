@@ -3,6 +3,7 @@ package com.zaus.nullwave.core.mvi.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.lifecycle.Lifecycle
@@ -12,13 +13,16 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.zaus.nullwave.core.mvi.MviViewModel
 import com.zaus.nullwave.core.mvi.UiState
 import com.zaus.nullwave.core.mvi.runtime.MviAccess
+import com.zaus.nullwave.core.mvi.state.MviSnapshot
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 /**
  * Collects screen state and keeps this ViewModel's sources active while the UI is visible.
  *
- * Use this once in a screen. Reading [MviViewModel.state] alone does not start sources.
+ * Use this once in a screen. Reading [MviViewModel.snapshot] alone does not start sources.
  * Leaving composition, stopping the owner or switching ViewModels releases this UI binding;
  * the ViewModel applies its source stop timeout after the last binding leaves. Commands keep
  * their independent ViewModel lifetime.
@@ -28,15 +32,25 @@ import kotlinx.coroutines.withContext
  * A different ViewModel or owner gets its own snapshot immediately, before collection starts.
  */
 @Composable
-@Suppress("StateFlowValueCalledInComposition") // Seed the lifecycle-aware collection.
 fun <S : UiState> MviViewModel<S, *, *>.collectMviStateWithLifecycle(
     lifecycleOwner: LifecycleOwner = LocalLifecycleOwner.current,
     minActiveState: Lifecycle.State = Lifecycle.State.STARTED,
 ): State<S> {
+    val snapshot = collectMviSnapshotWithLifecycle(lifecycleOwner, minActiveState)
+    return remember(snapshot) { derivedStateOf { snapshot.value.state } }
+}
+
+/** Collects data and operation activity from one canonical snapshot under one UI binding. */
+@Composable
+@Suppress("StateFlowValueCalledInComposition") // Seed the lifecycle-aware collection.
+fun <S : UiState> MviViewModel<S, *, *>.collectMviSnapshotWithLifecycle(
+    lifecycleOwner: LifecycleOwner = LocalLifecycleOwner.current,
+    minActiveState: Lifecycle.State = Lifecycle.State.STARTED,
+): State<MviSnapshot<S>> {
     requireVisibleState(minActiveState)
-    val collected = remember(this, lifecycleOwner, minActiveState) { mutableStateOf(state.value) }
+    val collected = remember(this, lifecycleOwner, minActiveState) { mutableStateOf(snapshot.value) }
     LaunchedEffect(this, lifecycleOwner, minActiveState) {
-        collectStateWithUiBinding(lifecycleOwner.lifecycle, minActiveState) {
+        collectSnapshotWithUiBinding(lifecycleOwner.lifecycle, minActiveState) {
             collected.value = it
         }
     }
@@ -49,12 +63,30 @@ internal suspend fun <S : UiState> MviViewModel<S, *, *>.collectStateWithUiBindi
     minActiveState: Lifecycle.State = Lifecycle.State.STARTED,
     onState: (S) -> Unit,
 ) {
+    collectWithUiBinding(lifecycle, minActiveState) {
+        snapshot.map { it.state }.distinctUntilChanged().collect(onState)
+    }
+}
+
+internal suspend fun <S : UiState> MviViewModel<S, *, *>.collectSnapshotWithUiBinding(
+    lifecycle: Lifecycle,
+    minActiveState: Lifecycle.State = Lifecycle.State.STARTED,
+    onSnapshot: (MviSnapshot<S>) -> Unit,
+) {
+    collectWithUiBinding(lifecycle, minActiveState) { snapshot.collect(onSnapshot) }
+}
+
+private suspend fun MviViewModel<*, *, *>.collectWithUiBinding(
+    lifecycle: Lifecycle,
+    minActiveState: Lifecycle.State,
+    collect: suspend () -> Unit,
+) {
     requireVisibleState(minActiveState)
     MviAccess.checkUiEntryAllowed()
     withContext(Dispatchers.Main.immediate + MviAccess.neutralContext()) {
         lifecycle.repeatOnLifecycle(minActiveState) {
             withUiBinding {
-                state.collect { onState(it) }
+                collect()
             }
         }
     }

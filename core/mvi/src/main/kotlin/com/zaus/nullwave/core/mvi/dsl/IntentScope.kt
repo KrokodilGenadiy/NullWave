@@ -17,7 +17,7 @@ class IntentScope<S : UiState, E : UiEffect> internal constructor(
     val state: S
         get() {
             checkOpen()
-            return runtime.state.value
+            return runtime.state
         }
 
     /**

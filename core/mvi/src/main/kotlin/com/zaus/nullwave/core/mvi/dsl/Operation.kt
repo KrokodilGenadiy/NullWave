@@ -7,6 +7,7 @@ package com.zaus.nullwave.core.mvi.dsl
  * The owning ViewModel is checked at dispatch; a handle cannot be used by another ViewModel.
  */
 class Operation<A> internal constructor(
+    val key: OperationKey<A>,
     internal val owner: Any,
     private val submitRequest: (A) -> Boolean,
     private val cancelRequests: () -> Boolean,

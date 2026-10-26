@@ -17,6 +17,8 @@ import kotlinx.coroutines.withContext
  * Execution has no mutable-state receiver. It receives an input and returns a result; the runtime
  * applies pure reducers only while the request still owns its slot. Expected domain failures can
  * be represented by the result type. Cancellation and unexpected exceptions propagate.
+ * These reducers describe feature data; busy/pending activity is maintained by the runtime and
+ * does not need an onStarted/onFinished/onCancelled reducer.
  */
 @MviDsl
 class OperationBuilder<S : UiState, E : UiEffect, A, R> internal constructor(private val scopeOwner: Any) {
@@ -83,6 +85,7 @@ class OperationBuilder<S : UiState, E : UiEffect, A, R> internal constructor(pri
 
     internal fun build(
         owner: Any,
+        key: OperationKey<A>,
         runtime: MviRuntime<S, E>,
         policy: OperationPolicy,
         maxPending: Int,
@@ -102,12 +105,13 @@ class OperationBuilder<S : UiState, E : UiEffect, A, R> internal constructor(pri
         built = true
 
         val scheduled = when (policy) {
-            OperationPolicy.Latest -> runtime.latestOperation()
-            OperationPolicy.Queued -> runtime.queuedOperation(maxPending)
-            OperationPolicy.Idle -> runtime.idleOperation()
+            OperationPolicy.Latest -> runtime.latestOperation(key)
+            OperationPolicy.Queued -> runtime.queuedOperation(maxPending, key)
+            OperationPolicy.Idle -> runtime.idleOperation(key)
         }
         var effectEpoch = EffectEpoch()
         return Operation(
+            key = key,
             owner = owner,
             submitRequest = request@ { input ->
                 // Rotate before admission can publish state and synchronously submit newer work.

@@ -10,14 +10,18 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.zaus.nullwave.core.mvi.BaseMviViewModel
 import com.zaus.nullwave.core.mvi.UiIntent
 import com.zaus.nullwave.core.mvi.UiState
+import com.zaus.nullwave.core.mvi.state.MviSnapshot
+import com.zaus.nullwave.core.mvi.state.OperationStates
 
 /** Observable screen snapshot and stable callback; neither owns the ViewModel. */
 @Stable
 class MviUiState<S : UiState, I : UiIntent> internal constructor(
-    private val collected: State<S>,
+    private val collected: State<MviSnapshot<S>>,
     val onIntent: (I) -> Unit,
 ) {
-    val state: S get() = collected.value
+    val snapshot: MviSnapshot<S> get() = collected.value
+    val state: S get() = snapshot.state
+    val operations: OperationStates get() = snapshot.operations
 }
 
 /**
@@ -31,9 +35,9 @@ fun <S : UiState, I : UiIntent> rememberMviUiApi(
 ): MviUiApi<S, I> = remember(viewModel) { viewModel.uiApiForCompose() }
 
 /**
- * Renders State using the existing lifecycle binding and exposes the UI intent callback.
+ * Collects one canonical data/activity snapshot and exposes the UI intent callback.
  * Leaving composition or stopping the owner releases observation, not the ViewModel's commands.
- * Reading [MviUiState.state] participates in Compose snapshot observation.
+ * Reading [MviUiState.state] or [MviUiState.operations] participates in Compose snapshot observation.
  */
 @Composable
 fun <S : UiState, I : UiIntent> BaseMviViewModel<S, I, *>.collectMviUiWithLifecycle(
@@ -41,6 +45,6 @@ fun <S : UiState, I : UiIntent> BaseMviViewModel<S, I, *>.collectMviUiWithLifecy
     minActiveState: Lifecycle.State = Lifecycle.State.STARTED,
 ): MviUiState<S, I> {
     val api = rememberMviUiApi(this)
-    val collected = collectMviStateWithLifecycle(lifecycleOwner, minActiveState)
+    val collected = collectMviSnapshotWithLifecycle(lifecycleOwner, minActiveState)
     return remember(api, collected) { MviUiState(collected, api.onIntent) }
 }

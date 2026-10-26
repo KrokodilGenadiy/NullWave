@@ -1,7 +1,8 @@
 package com.zaus.nullwave.core.mvi
 
-import com.zaus.nullwave.core.mvi.ui.ObserveMviEffects
+import com.zaus.nullwave.core.mvi.state.MviSnapshot
 import com.zaus.nullwave.core.mvi.ui.MviUiApi
+import com.zaus.nullwave.core.mvi.ui.ObserveMviEffects
 import com.zaus.nullwave.core.mvi.ui.collectMviStateWithLifecycle
 import kotlinx.coroutines.flow.StateFlow
 
@@ -16,13 +17,13 @@ interface UiEffect
 
 interface MviViewModel<S : UiState, I : UiIntent, E : UiEffect> {
     /** Reading or collecting this flow does not activate source observations. */
-    val state: StateFlow<S>
+    val snapshot: StateFlow<MviSnapshot<S>>
 
     /**
      * Handles optional signals sequentially on Main. Revoking an operation's effects cancels its
      * active handler and waits for cleanup before the next signal; unrelated effects do not cancel
      * one another. Cancellation is cooperative and cannot undo an already performed UI action.
-     * Important results belong in [state] or persistent data, not this best-effort delivery.
+     * Important results belong in snapshot data or persistent data, not this best-effort delivery.
      * Only one active collector is allowed. Cancel the old host before replacing it: the new host
      * waits for its cleanup, including across composition recreation. A cancelled waiter consumes
      * nothing. A cleared ViewModel returns normally without invoking [onEffect] or initializing its
