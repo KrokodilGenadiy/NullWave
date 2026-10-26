@@ -39,12 +39,12 @@ class ViewModelRestorationInstrumentedTest {
         val owner = RegistryOwner(defaultArgs = Bundle().apply { putString("query", "initial") })
         val first = owner.provider(graph)["screen", RestorationVm::class]
         val firstUi = first.uiApi()
-        assertEquals("initial", first.state.value.query)
+        assertEquals("initial", first.snapshot.value.state.query)
         firstUi.onIntent(RestorationIntent.Edit("restored query", "track-42"))
         firstUi.onIntent(RestorationIntent.Start)
         firstUi.onIntent(RestorationIntent.Notify)
         yield()
-        assertTrue(first.state.value.loading)
+        assertTrue(first.snapshot.value.state.loading)
         assertEquals(1, first.workStarts)
 
         val saved = owner.save().parcelCopy()
@@ -63,7 +63,7 @@ class ViewModelRestorationInstrumentedTest {
             val restoredUi = restored.uiApi()
             assertNotSame(first, restored)
             assertNotSame(first.dependency, restored.dependency)
-            assertEquals(RestorationState("restored query", "track-42"), restored.state.value)
+            assertEquals(RestorationState("restored query", "track-42"), restored.snapshot.value.state)
             assertEquals(0, restored.workStarts)
 
             val effects = mutableListOf<RestorationEffect>()
@@ -96,8 +96,8 @@ class ViewModelRestorationInstrumentedTest {
             val restoredGraph = graph()
             val second = restoredOwner.provider(restoredGraph)["second", RestorationVm::class]
             val first = restoredOwner.provider(restoredGraph)["first", RestorationVm::class]
-            assertEquals("beta", second.state.value.query)
-            assertEquals("alpha", first.state.value.query)
+            assertEquals("beta", second.snapshot.value.state.query)
+            assertEquals("alpha", first.snapshot.value.state.query)
             assertNotSame(first, second)
             assertSame(first.dependency, second.dependency)
         } finally {
@@ -128,7 +128,7 @@ class ViewModelRestorationInstrumentedTest {
         val restoredOwner = RegistryOwner(restored = savedAgain)
         try {
             val restored = restoredOwner.provider(graph())["screen", RestorationVm::class]
-            assertEquals(RestorationState("after recreation", "track-7"), restored.state.value)
+            assertEquals(RestorationState("after recreation", "track-7"), restored.snapshot.value.state)
             assertEquals(1, first.clears)
         } finally {
             restoredOwner.destroy()
@@ -147,7 +147,7 @@ class ViewModelRestorationInstrumentedTest {
             }
             assertTrue(failure.message.orEmpty().contains("SAVED_STATE_REGISTRY_OWNER_KEY"))
             val valid = owner.provider(graph)["screen", RestorationVm::class]
-            assertFalse(valid.state.value.loading)
+            assertFalse(valid.snapshot.value.state.loading)
             assertEquals(1, graph.dependency.created)
         } finally {
             owner.destroy()

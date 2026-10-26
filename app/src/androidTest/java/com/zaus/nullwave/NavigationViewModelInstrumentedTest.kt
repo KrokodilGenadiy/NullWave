@@ -84,9 +84,9 @@ class NavigationViewModelInstrumentedTest {
             assertEquals(0, root.clears)
             assertEquals(1, popped.clears)
             assertEquals(1, popped.workStops)
-            val frozen = popped.state.value
+            val frozen = popped.snapshot.value.state
             poppedIntents(RestorationIntent.Edit("late callback"))
-            assertEquals(frozen, popped.state.value)
+            assertEquals(frozen, popped.snapshot.value.state)
         }
 
         compose.onNodeWithText("Open detail").performClick()

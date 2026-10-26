@@ -94,7 +94,7 @@ class ViewModelOwnershipTest {
         val restored = provider(recreatedOwner)[OwnershipVm::class]
 
         assertSame(first, restored)
-        assertEquals(1, restored.state.value.value)
+        assertEquals(1, restored.snapshot.value.state.value)
         assertEquals(0, first.clears)
         assertEquals(1, graph.dependency.created)
     }
@@ -113,7 +113,7 @@ class ViewModelOwnershipTest {
 
         assertEquals(1, first.clears)
         assertEquals(0, other.clears)
-        assertEquals(1, other.state.value.value)
+        assertEquals(1, other.snapshot.value.state.value)
         assertSame(graph.dependency, other.dependency)
     }
 
@@ -125,12 +125,12 @@ class ViewModelOwnershipTest {
         backgroundScope.launch { vm.withUiBinding { awaitCancellation() } }
         ui.onIntent(Start)
         runCurrent()
-        assertTrue(vm.state.value.loading)
+        assertTrue(vm.snapshot.value.state.loading)
         assertEquals(1, vm.sourceStarts)
 
         owner.viewModelStore.clear()
         runCurrent()
-        val frozen = vm.state.value
+        val frozen = vm.snapshot.value.state
         ui.onIntent(Increment)
         vm.collectEffects { error("Cleared VM must not deliver") }
         runCurrent()
@@ -138,11 +138,11 @@ class ViewModelOwnershipTest {
         assertEquals(1, vm.workStops)
         assertEquals(1, vm.sourceStops)
         assertEquals(1, vm.clears)
-        assertEquals(frozen, vm.state.value)
+        assertEquals(frozen, vm.snapshot.value.state)
         val fresh = provider(owner)[OwnershipVm::class]
         assertNotSame(vm, fresh)
-        assertFalse(fresh.state.value.loading)
-        assertEquals(0, fresh.state.value.value)
+        assertFalse(fresh.snapshot.value.state.loading)
+        assertEquals(0, fresh.snapshot.value.state.value)
     }
 
     @Test
