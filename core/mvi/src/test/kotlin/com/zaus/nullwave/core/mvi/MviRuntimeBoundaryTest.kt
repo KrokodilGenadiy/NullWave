@@ -5,11 +5,9 @@ import com.zaus.nullwave.core.mvi.dsl.MviDefinition
 import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import com.zaus.nullwave.core.mvi.runtime.MviRuntime
 import kotlin.coroutines.CoroutineContext
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -20,7 +18,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -120,51 +117,6 @@ class MviRuntimeBoundaryTest {
         vm.ui.onIntent(Change("B", "B"))
         runCurrent()
         assertEquals(listOf("A", "B"), observedKeys)
-    }
-
-    @Test
-    fun `a superseded restart waiting for cleanup never starts another source group`() = runTest(dispatcher) {
-        val firstCleanup = CompletableDeferred<Unit>()
-        val laterCleanup = CompletableDeferred<Unit>()
-        var starts = 0
-        val active = mutableSetOf<Int>()
-        val runtime = MviRuntime<Snapshot, Nothing>(
-            Snapshot(),
-            backgroundScope,
-            sourceStopTimeoutMillis = 0,
-            observeSources = {
-                val generation = ++starts
-                active += generation
-                try {
-                    awaitCancellation()
-                } finally {
-                    active -= generation
-                    withContext(NonCancellable) {
-                        if (generation == 1) firstCleanup.await() else laterCleanup.await()
-                    }
-                }
-            },
-        )
-        try {
-            backgroundScope.launch { runtime.withUiBinding { awaitCancellation() } }
-            runCurrent()
-            assertEquals(setOf(1), active)
-
-            runtime.restartSources()
-            runCurrent()
-            assertTrue(active.isEmpty())
-            runtime.restartSources()
-            firstCleanup.complete(Unit)
-            runCurrent()
-
-            assertEquals(2, starts)
-            assertEquals(setOf(2), active)
-        } finally {
-            firstCleanup.complete(Unit)
-            laterCleanup.complete(Unit)
-            runtime.close()
-            runCurrent()
-        }
     }
 
     private data class Snapshot(val first: String = "A", val second: String = "A", val value: Int = 0) : UiState

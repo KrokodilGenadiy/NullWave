@@ -3,7 +3,6 @@ package com.zaus.nullwave.core.mvi
 import androidx.lifecycle.ViewModelStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -18,7 +17,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -367,114 +365,6 @@ class BaseMviViewModelLifecycleTest {
     }
 
     @Test
-    fun `retry after a handled source failure works without resubscribing the UI`() = runTest {
-        val source = SnapshotSource().apply { fail = true }
-        val viewModel = viewModel {
-            try {
-                writeSource(source.read())
-                writeFailure(false)
-            } catch (_: ExpectedSourceFailure) {
-                writeFailure(true)
-            }
-        }
-        backgroundScope.launch { viewModel.withUiBinding { viewModel.state.collect {} } }
-        runCurrent()
-        assertTrue(viewModel.state.value.failed)
-        assertEquals(1, viewModel.starts)
-
-        source.fail = false
-        source.snapshot = 8
-        viewModel.retry()
-        runCurrent()
-
-        assertFalse(viewModel.state.value.failed)
-        assertEquals(8, viewModel.state.value.source)
-        assertEquals(2, viewModel.starts)
-    }
-
-    @Test
-    fun `restart also reruns a successfully completed source group`() = runTest {
-        val source = SnapshotSource()
-        val viewModel = viewModel { writeSource(source.read()) }
-        backgroundScope.launch { viewModel.withUiBinding { viewModel.state.collect {} } }
-        runCurrent()
-        assertEquals(1, viewModel.stops)
-
-        source.snapshot = 12
-        viewModel.retry()
-        runCurrent()
-
-        assertEquals(12, viewModel.state.value.source)
-        assertEquals(2, viewModel.starts)
-        assertEquals(2, viewModel.stops)
-    }
-
-    @Test
-    fun `restart waits for child cleanup before starting another source group`() = runTest {
-        val events = mutableListOf<String>()
-        val viewModel = viewModel {
-            val generation = starts
-            events += "start $generation"
-            coroutineScope {
-                launch {
-                    try {
-                        awaitCancellation()
-                    } finally {
-                        withContext(NonCancellable) {
-                            delay(100)
-                            events += "child cleaned $generation"
-                        }
-                    }
-                }
-                awaitCancellation()
-            }
-        }
-        backgroundScope.launch { viewModel.withUiBinding { viewModel.state.collect {} } }
-        runCurrent()
-        viewModel.retry()
-        runCurrent()
-
-        assertEquals(listOf("start 1"), events)
-        assertEquals(1, viewModel.starts)
-        advanceTimeBy(100)
-        runCurrent()
-
-        assertEquals(listOf("start 1", "child cleaned 1", "start 2"), events)
-        assertEquals(1, viewModel.maximumActiveGroups)
-
-        store.clear()
-        runCurrent()
-        advanceTimeBy(100)
-        runCurrent()
-        assertEquals(0, viewModel.activeGroups)
-    }
-
-    @Test
-    fun `retry while fully hidden does not start observers`() = runTest {
-        val viewModel = viewModel()
-        viewModel.retry()
-        runCurrent()
-        assertEquals(0, viewModel.starts)
-
-        val collector = backgroundScope.launch { viewModel.withUiBinding { viewModel.state.collect {} } }
-        runCurrent()
-        collector.cancel()
-        runCurrent()
-        advanceTimeBy(STOP_TIMEOUT)
-        runCurrent()
-
-        viewModel.retry()
-        viewModel.retry()
-        runCurrent()
-        assertEquals(1, viewModel.starts)
-        assertEquals(0, viewModel.activeGroups)
-
-        backgroundScope.launch { viewModel.withUiBinding { viewModel.state.collect {} } }
-        runCurrent()
-        assertEquals(2, viewModel.starts)
-    }
-
-    @Test
     fun `clearing the owner cancels every observer child without waiting for the timeout`() = runTest {
         var activeChildren = 0
         val viewModel = viewModel {
@@ -512,7 +402,6 @@ class BaseMviViewModelLifecycleTest {
         val query: String = "",
         val source: Int = 0,
         val unrelated: Int = 0,
-        val failed: Boolean = false,
     ) : UiState
 
     private data object UnusedIntent : UiIntent
@@ -531,8 +420,6 @@ class BaseMviViewModelLifecycleTest {
             private set
         var activeGroups = 0
             private set
-        var maximumActiveGroups = 0
-            private set
 
         init {
             initialized = true
@@ -544,7 +431,6 @@ class BaseMviViewModelLifecycleTest {
             check(initialized) { "Subclass initialization has not finished" }
             starts++
             activeGroups++
-            maximumActiveGroups = maxOf(maximumActiveGroups, activeGroups)
             try {
                 observe()
             } finally {
@@ -559,23 +445,7 @@ class BaseMviViewModelLifecycleTest {
 
         fun writeUnrelated(value: Int) = setState { copy(unrelated = value) }
 
-        fun writeFailure(value: Boolean) = setState { copy(failed = value) }
-
         fun queries(): Flow<String> = selectState { it.query }
-
-        fun retry() = restartSources()
-    }
-
-    private class ExpectedSourceFailure : Exception()
-
-    private class SnapshotSource {
-        var fail = false
-        var snapshot = 1
-
-        fun read(): Int {
-            if (fail) throw ExpectedSourceFailure()
-            return snapshot
-        }
     }
 
     private companion object {

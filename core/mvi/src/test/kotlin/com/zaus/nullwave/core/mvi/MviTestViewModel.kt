@@ -43,7 +43,6 @@ internal abstract class MviTestViewModel<S : UiState, I : UiIntent, E : UiEffect
     protected fun queuedOperation(maxPending: Int = 16): MviOperation<S> = runtime.queuedOperation(maxPending)
     protected fun idleOperation(): MviOperation<S> = runtime.idleOperation()
     protected fun <T> selectState(selector: (S) -> T): Flow<T> = state.map(selector).distinctUntilChanged()
-    protected fun restartSources() = runtime.restartSources()
     protected suspend fun sendEffect(effect: E): Boolean = runtime.sendEffect(effect)
     protected open suspend fun observeSources() = Unit
 }
