@@ -21,6 +21,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -61,7 +63,7 @@ class SearchViewModelTest {
     @Test
     fun `state collectors and intents without binding never start a search`() = runTest(dispatcher) {
         val vm = createVm()
-        backgroundScope.launch { vm.state.collect {} }
+        backgroundScope.launch { vm.snapshot.map { it.state }.distinctUntilChanged().collect {} }
         send(vm, SearchIntent.QueryChanged("Signal"))
         send(vm, SearchIntent.AccessChecked(true))
         settle()
@@ -81,8 +83,8 @@ class SearchViewModelTest {
         )) {
             send(vm, intent)
             settle()
-            assertSame(SearchBody.Idle, vm.state.value.body)
-            assertNull(vm.state.value.query)
+            assertSame(SearchBody.Idle, vm.snapshot.value.state.body)
+            assertNull(vm.snapshot.value.state.query)
         }
         assertTrue(repository.calls.isEmpty())
     }
@@ -93,10 +95,10 @@ class SearchViewModelTest {
         bind(vm)
         send(vm, SearchIntent.QueryChanged("Signal"))
         settle()
-        assertSame(SearchBody.CheckingAccess, vm.state.value.body)
+        assertSame(SearchBody.CheckingAccess, vm.snapshot.value.state.body)
         assertTrue(repository.calls.isEmpty())
         send(vm, SearchIntent.AccessChecked(true))
-        assertSame(SearchBody.Loading, vm.state.value.body)
+        assertSame(SearchBody.Loading, vm.snapshot.value.state.body)
         settle()
         assertEquals(1, repository.calls.size)
     }
@@ -111,7 +113,7 @@ class SearchViewModelTest {
         send(vm, SearchIntent.LocaleChanged("en"))
         send(vm, SearchIntent.Retry)
         settle()
-        assertSame(SearchBody.AccessRequired, vm.state.value.body)
+        assertSame(SearchBody.AccessRequired, vm.snapshot.value.state.body)
         assertTrue(repository.calls.isEmpty())
     }
 
@@ -139,7 +141,7 @@ class SearchViewModelTest {
         send(vm, SearchIntent.QueryChanged("  ЕЛКА\u00A0"))
         advanceTimeBy(50)
         runCurrent()
-        assertEquals("  ЕЛКА\u00A0", vm.state.value.rawQuery)
+        assertEquals("  ЕЛКА\u00A0", vm.snapshot.value.state.rawQuery)
         assertEquals("елка", repository.calls.single().text)
     }
 
@@ -150,8 +152,8 @@ class SearchViewModelTest {
         val before = ready(vm)
         send(vm, SearchIntent.QueryChanged(" SIGNAL  "))
         settle()
-        assertSame(before, vm.state.value.body)
-        assertEquals(" SIGNAL  ", vm.state.value.rawQuery)
+        assertSame(before, vm.snapshot.value.state.body)
+        assertEquals(" SIGNAL  ", vm.snapshot.value.state.rawQuery)
         assertEquals(1, repository.subscriptions.size)
     }
 
@@ -163,7 +165,7 @@ class SearchViewModelTest {
         vm.uiApi().onIntent(SearchIntent.QueryChanged("second"))
         old.respond(AppResult.Success(emptyResults))
         runCurrent()
-        assertSame(SearchBody.Loading, vm.state.value.body)
+        assertSame(SearchBody.Loading, vm.snapshot.value.state.body)
         assertTrue(old.closed)
         assertEquals(1, repository.calls.size)
         settle()
@@ -182,7 +184,7 @@ class SearchViewModelTest {
         assertTrue(old.cleanupStarted)
         assertFalse(old.closed)
         assertEquals(1, repository.calls.size)
-        assertSame(SearchBody.Loading, vm.state.value.body)
+        assertSame(SearchBody.Loading, vm.snapshot.value.state.body)
         repository.releaseCleanup()
         runCurrent()
         settle()
@@ -198,7 +200,7 @@ class SearchViewModelTest {
         send(vm, SearchIntent.QueryChanged("signal"))
         advanceTimeBy(200)
         send(vm, SearchIntent.ClearQuery)
-        assertSame(SearchBody.Idle, vm.state.value.body)
+        assertSame(SearchBody.Idle, vm.snapshot.value.state.body)
         settle()
         assertTrue(repository.calls.isEmpty())
     }
@@ -210,7 +212,7 @@ class SearchViewModelTest {
         val old = repository.subscriptions.single()
         old.cleanupGate = CompletableDeferred()
         send(vm, SearchIntent.QueryChanged(" \n "))
-        assertSame(SearchBody.Idle, vm.state.value.body)
+        assertSame(SearchBody.Idle, vm.snapshot.value.state.body)
         assertTrue(old.cleanupStarted)
         repository.releaseCleanup()
         runCurrent()
@@ -223,7 +225,7 @@ class SearchViewModelTest {
     fun `success publishes all groups and empty updates mean no matches without another search`() = runTest(dispatcher) {
         val vm = search()
         reply(AppResult.Success(results))
-        assertEquals(SearchBody.Ready(results), vm.state.value.body)
+        assertEquals(SearchBody.Ready(results), vm.snapshot.value.state.body)
         assertFalse(ready(vm).isEmpty)
         reply(AppResult.Success(emptyResults))
         assertTrue(ready(vm).isEmpty)
@@ -235,15 +237,15 @@ class SearchViewModelTest {
         repository.initialResult = AppResult.Failure(DataError.Io, IllegalArgumentException("private metadata"))
         repository.completeAfterInitial = true
         val vm = search()
-        assertEquals(SearchBody.Failed(loadError), vm.state.value.body)
+        assertEquals(SearchBody.Failed(loadError), vm.snapshot.value.state.body)
         assertTrue(repository.subscriptions.single().closed)
         repository.initialResult = AppResult.Success(results)
         repository.completeAfterInitial = false
         send(vm, SearchIntent.Retry)
         send(vm, SearchIntent.Retry)
-        assertSame(SearchBody.Loading, vm.state.value.body)
+        assertSame(SearchBody.Loading, vm.snapshot.value.state.body)
         settle()
-        assertEquals(SearchBody.Ready(results), vm.state.value.body)
+        assertEquals(SearchBody.Ready(results), vm.snapshot.value.state.body)
         assertEquals(2, repository.calls.size)
     }
 
@@ -252,9 +254,9 @@ class SearchViewModelTest {
         val vm = search()
         reply(AppResult.Success(results))
         reply(AppResult.Failure(DataError.Io))
-        assertEquals(SearchBody.Ready(results, SearchRefresh.Failed(refreshError)), vm.state.value.body)
+        assertEquals(SearchBody.Ready(results, SearchRefresh.Failed(refreshError)), vm.snapshot.value.state.body)
         reply(AppResult.Success(emptyResults))
-        assertEquals(SearchBody.Ready(emptyResults), vm.state.value.body)
+        assertEquals(SearchBody.Ready(emptyResults), vm.snapshot.value.state.body)
         assertEquals(1, repository.calls.size)
     }
 
@@ -267,11 +269,11 @@ class SearchViewModelTest {
         reply(AppResult.Failure(DataError.Io))
         send(vm, SearchIntent.Retry)
         send(vm, SearchIntent.Retry)
-        assertEquals(SearchBody.Ready(emptyResults, SearchRefresh.Running), vm.state.value.body)
+        assertEquals(SearchBody.Ready(emptyResults, SearchRefresh.Running), vm.snapshot.value.state.body)
         settle()
         assertEquals(2, repository.calls.size)
         reply(AppResult.Success(results))
-        assertEquals(SearchBody.Ready(results), vm.state.value.body)
+        assertEquals(SearchBody.Ready(results), vm.snapshot.value.state.body)
     }
 
     @Test
@@ -281,8 +283,8 @@ class SearchViewModelTest {
         send(vm, SearchIntent.QueryChanged("B"))
         settle()
         reply(AppResult.Failure(DataError.Io))
-        assertEquals(SearchBody.Failed(loadError), vm.state.value.body)
-        assertEquals("B", vm.state.value.rawQuery)
+        assertEquals(SearchBody.Failed(loadError), vm.snapshot.value.state.body)
+        assertEquals("B", vm.snapshot.value.state.rawQuery)
     }
 
     @Test
@@ -290,8 +292,8 @@ class SearchViewModelTest {
         val vm = search()
         reply(AppResult.Success(results))
         send(vm, SearchIntent.AccessChecked(false))
-        assertSame(SearchBody.AccessRequired, vm.state.value.body)
-        assertNull(vm.state.value.request)
+        assertSame(SearchBody.AccessRequired, vm.snapshot.value.state.body)
+        assertNull(vm.snapshot.value.state.request)
         assertEquals(0, repository.activeCount)
         send(vm, SearchIntent.QueryChanged("new"))
         settle()
@@ -305,7 +307,7 @@ class SearchViewModelTest {
         advanceTimeBy(200)
         send(vm, SearchIntent.AccessChecked(false))
         settle()
-        assertSame(SearchBody.AccessRequired, vm.state.value.body)
+        assertSame(SearchBody.AccessRequired, vm.snapshot.value.state.body)
         assertTrue(repository.calls.isEmpty())
     }
 
@@ -314,14 +316,14 @@ class SearchViewModelTest {
         val vm = search()
         reply(AppResult.Success(results))
         reply(AppResult.Failure(DataError.AccessDenied))
-        assertSame(SearchBody.AccessRequired, vm.state.value.body)
+        assertSame(SearchBody.AccessRequired, vm.snapshot.value.state.body)
         assertTrue(repository.subscriptions.single().closed)
         send(vm, SearchIntent.QueryChanged(" SIGNAL "))
         send(vm, SearchIntent.Retry)
         send(vm, SearchIntent.ClearQuery)
         send(vm, SearchIntent.QueryChanged("Another"))
         settle()
-        assertSame(SearchBody.AccessRequired, vm.state.value.body)
+        assertSame(SearchBody.AccessRequired, vm.snapshot.value.state.body)
         assertEquals(1, repository.calls.size)
         send(vm, SearchIntent.AccessChecked(true))
         settle()
@@ -336,7 +338,7 @@ class SearchViewModelTest {
         send(vm, SearchIntent.AccessChecked(true))
         settle()
         reply(AppResult.Success(results))
-        assertEquals(SearchBody.Ready(results), vm.state.value.body)
+        assertEquals(SearchBody.Ready(results), vm.snapshot.value.state.body)
         assertEquals(2, repository.calls.size)
     }
 
@@ -345,12 +347,12 @@ class SearchViewModelTest {
         val vm = search()
         reply(AppResult.Success(results))
         send(vm, SearchIntent.AccessChecked(true))
-        assertEquals(SearchBody.Ready(results, SearchRefresh.Running), vm.state.value.body)
+        assertEquals(SearchBody.Ready(results, SearchRefresh.Running), vm.snapshot.value.state.body)
         settle()
         assertEquals(2, repository.calls.size)
         assertEquals(1, repository.maxActiveCount)
         reply(AppResult.Success(emptyResults))
-        assertEquals(SearchBody.Ready(emptyResults), vm.state.value.body)
+        assertEquals(SearchBody.Ready(emptyResults), vm.snapshot.value.state.body)
     }
 
     @Test
@@ -361,7 +363,7 @@ class SearchViewModelTest {
         for (granted in listOf(true, false, true)) {
             send(vm, SearchIntent.AccessChecked(granted))
             settle()
-            assertSame(SearchBody.Idle, vm.state.value.body)
+            assertSame(SearchBody.Idle, vm.snapshot.value.state.body)
         }
         assertEquals(1, repository.calls.size)
     }
@@ -371,7 +373,7 @@ class SearchViewModelTest {
         val vm = search("Ёлка")
         reply(AppResult.Success(results))
         send(vm, SearchIntent.LocaleChanged("en-US"))
-        assertSame(SearchBody.Loading, vm.state.value.body)
+        assertSame(SearchBody.Loading, vm.snapshot.value.state.body)
         settle()
         assertEquals("елка", repository.calls.last().text)
         assertEquals("en-US", repository.calls.last().localeTag)
@@ -379,7 +381,7 @@ class SearchViewModelTest {
         send(vm, SearchIntent.LocaleChanged("en-US"))
         settle()
         assertEquals(2, repository.calls.size)
-        assertEquals(SearchBody.Ready(results), vm.state.value.body)
+        assertEquals(SearchBody.Ready(results), vm.snapshot.value.state.body)
     }
 
     @Test
@@ -410,10 +412,10 @@ class SearchViewModelTest {
         store.clear()
         runCurrent()
         val restored = createVm(SavedStateHandle(saved), localeTag = "en-US")
-        assertEquals("  Ёлка  ", restored.state.value.rawQuery)
-        assertEquals("en-US", restored.state.value.query?.localeTag)
-        assertSame(SearchAccess.Unchecked, restored.state.value.access)
-        assertSame(SearchBody.CheckingAccess, restored.state.value.body)
+        assertEquals("  Ёлка  ", restored.snapshot.value.state.rawQuery)
+        assertEquals("en-US", restored.snapshot.value.state.query?.localeTag)
+        assertSame(SearchAccess.Unchecked, restored.snapshot.value.state.access)
+        assertSame(SearchBody.CheckingAccess, restored.snapshot.value.state.body)
         bind(restored)
         settle()
         assertEquals(1, repository.calls.size)
@@ -424,29 +426,29 @@ class SearchViewModelTest {
 
     @Test
     fun `malformed saved text falls back to idle and clearing persists empty input`() = runTest(dispatcher) {
-        assertSame(SearchBody.Idle, createVm(SavedStateHandle(mapOf("search.query" to 123))).state.value.body)
+        assertSame(SearchBody.Idle, createVm(SavedStateHandle(mapOf("search.query" to 123))).snapshot.value.state.body)
         val handle = SavedStateHandle(mapOf("search.query" to "  saved  "))
         val vm = createVm(handle)
         send(vm, SearchIntent.ClearQuery)
         assertFalse(handle.contains("search.query"))
         val restored = createVm(SavedStateHandle(handle.keys().associateWith { handle.get<Any?>(it) }))
-        assertEquals("", restored.state.value.rawQuery)
-        assertSame(SearchBody.Idle, restored.state.value.body)
+        assertEquals("", restored.snapshot.value.state.rawQuery)
+        assertSame(SearchBody.Idle, restored.snapshot.value.state.body)
     }
 
     @Test
     fun `versioned query wins over legacy and malformed payload never revives old text`() = runTest(dispatcher) {
         val valid = createVm(SavedStateHandle(mapOf("search.inputs" to
             """{"version":1,"payload":{"rawQuery":"  Ёлка  "}}""", "search.query" to "stale")), localeTag = "de")
-        assertEquals("  Ёлка  ", valid.state.value.rawQuery)
-        assertEquals("de", valid.state.value.localeTag)
-        assertSame(SearchAccess.Unchecked, valid.state.value.access)
-        assertSame(SearchBody.CheckingAccess, valid.state.value.body)
+        assertEquals("  Ёлка  ", valid.snapshot.value.state.rawQuery)
+        assertEquals("de", valid.snapshot.value.state.localeTag)
+        assertSame(SearchAccess.Unchecked, valid.snapshot.value.state.access)
+        assertSame(SearchBody.CheckingAccess, valid.snapshot.value.state.body)
         for (raw in listOf<Any>(42, "broken", """{"version":99,"payload":{"rawQuery":"future"}}""",
             """{"version":1,"payload":{"rawQuery":{}}}""")) {
             val vm = createVm(SavedStateHandle(mapOf("search.inputs" to raw, "search.query" to "stale")))
-            assertEquals("", vm.state.value.rawQuery)
-            assertSame(SearchBody.Idle, vm.state.value.body)
+            assertEquals("", vm.snapshot.value.state.rawQuery)
+            assertSame(SearchBody.Idle, vm.snapshot.value.state.body)
         }
     }
 
@@ -505,7 +507,7 @@ class SearchViewModelTest {
         settle()
         assertEquals(0, repository.activeCount)
         assertEquals(1, repository.calls.size)
-        assertEquals("signal", createVm(SavedStateHandle(handle.keys().associateWith { handle.get<Any?>(it) })).state.value.rawQuery)
+        assertEquals("signal", createVm(SavedStateHandle(handle.keys().associateWith { handle.get<Any?>(it) })).snapshot.value.state.rawQuery)
     }
 
     @Test
@@ -515,13 +517,13 @@ class SearchViewModelTest {
         val vm = createVm(handle)
         val ui = vm.uiApi()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.state.collect {
+            vm.snapshot.map { it.state }.distinctUntilChanged().collect {
                 if (it.rawQuery == "first") ui.onIntent(SearchIntent.QueryChanged("second"))
             }
         }
         send(vm, SearchIntent.QueryChanged("first"))
-        assertEquals("second", vm.state.value.rawQuery)
-        assertEquals("second", createVm(SavedStateHandle(handle.keys().associateWith { handle.get<Any?>(it) })).state.value.rawQuery)
+        assertEquals("second", vm.snapshot.value.state.rawQuery)
+        assertEquals("second", createVm(SavedStateHandle(handle.keys().associateWith { handle.get<Any?>(it) })).snapshot.value.state.rawQuery)
     }
 
     @Test
@@ -573,7 +575,7 @@ class SearchViewModelTest {
         runCurrent()
     }
 
-    private fun ready(vm: SearchViewModel): SearchBody.Ready = vm.state.value.body as SearchBody.Ready
+    private fun ready(vm: SearchViewModel): SearchBody.Ready = vm.snapshot.value.state.body as SearchBody.Ready
 
     private val loadError = UiText.Resource(R.string.search_load_failed)
     private val refreshError = UiText.Resource(R.string.search_refresh_failed)

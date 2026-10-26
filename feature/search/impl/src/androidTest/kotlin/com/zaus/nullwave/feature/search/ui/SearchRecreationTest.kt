@@ -12,13 +12,13 @@ import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
-import androidx.lifecycle.Lifecycle
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.initializer
@@ -68,7 +68,7 @@ class SearchRecreationTest {
         activity.onActivity {
             assertNotSame(previous, it)
             assertSame(model, it.model)
-            assertEquals("  Orbit  ", it.model.state.value.rawQuery)
+            assertEquals("  Orbit  ", it.model.snapshot.value.state.rawQuery)
         }
         compose.waitUntil { fixture.repository.calls.size == 2 }
         // Same-query refresh keeps the list, including while the replacement source is delayed.
@@ -91,7 +91,7 @@ class SearchRecreationTest {
         activity.moveToState(Lifecycle.State.RESUMED)
         compose.onNodeWithTag("search_access").assertIsDisplayed()
         compose.onNodeWithTag("search_track:track:0").assertDoesNotExist()
-        activity.onActivity { assertEquals("Orbit", it.model.state.value.rawQuery) }
+        activity.onActivity { assertEquals("Orbit", it.model.snapshot.value.state.rawQuery) }
         compose.runOnIdle { assertEquals(1, fixture.repository.calls.size) }
     }
 
@@ -108,12 +108,12 @@ class SearchRecreationTest {
         activity.onActivity {
             assertNotSame(old, it)
             assertSame(model, it.model)
-            assertEquals("Query must survive Activity recreation in the retained VM", "  Orbit  ", it.model.state.value.rawQuery)
+            assertEquals("Query must survive Activity recreation in the retained VM", "  Orbit  ", it.model.snapshot.value.state.rawQuery)
         }
         awaitIme(activity, visible = true)
         compose.onNodeWithTag("search_input").assertIsFocused().assertTextContains("  Orbit  ")
             .performTextReplacement("Orbit again")
-        activity.onActivity { assertEquals("Orbit again", it.model.state.value.rawQuery) }
+        activity.onActivity { assertEquals("Orbit again", it.model.snapshot.value.state.rawQuery) }
     }
 
     @Test
@@ -165,7 +165,7 @@ class SearchRecreationTest {
         // Apply it after connection setup and prove both renderer and VM contain the fixture text.
         compose.onNodeWithTag("search_input").performTextReplacement(query)
         compose.onNodeWithTag("search_input").assertTextContains(query)
-        activity.onActivity { assertEquals("Query must be present BEFORE recreation", query, it.model.state.value.rawQuery) }
+        activity.onActivity { assertEquals("Query must be present BEFORE recreation", query, it.model.snapshot.value.state.rawQuery) }
     }
 
     /** Real window insets, not a mock keyboard controller; the device needs a software IME enabled. */
@@ -191,7 +191,7 @@ class SearchRecreationTest {
     private fun awaitResults(activity: ActivityScenario<SearchTestActivity>) {
         compose.waitUntil {
             var ready = false
-            activity.onActivity { ready = it.model.state.value.body is SearchBody.Ready }
+            activity.onActivity { ready = it.model.snapshot.value.state.body is SearchBody.Ready }
             ready
         }
         compose.onNodeWithTag("search_results").assertIsDisplayed()

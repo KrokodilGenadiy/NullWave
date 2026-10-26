@@ -12,22 +12,22 @@ import com.zaus.nullwave.feature.search.presentation.SearchBody
 import com.zaus.nullwave.feature.search.presentation.SearchIntent
 import com.zaus.nullwave.feature.search.presentation.SearchViewModel
 import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.createGraphFactory
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
+import dev.zacsweers.metro.createGraphFactory
 import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactory
 import dev.zacsweers.metrox.viewmodel.ViewModelGraph
 import kotlin.reflect.KClass
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
@@ -60,11 +60,11 @@ class SearchGraphTest {
         store.put("first", first)
         store.put("second", second)
         assertNotSame(first, second)
-        assertEquals("  ЁЛКА  ", first.state.value.rawQuery)
-        assertEquals("елка", first.state.value.query?.text)
-        assertEquals("ru", first.state.value.localeTag)
-        assertEquals(SearchAccess.Unchecked, first.state.value.access)
-        assertEquals("", second.state.value.rawQuery)
+        assertEquals("  ЁЛКА  ", first.snapshot.value.state.rawQuery)
+        assertEquals("елка", first.snapshot.value.state.query?.text)
+        assertEquals("ru", first.snapshot.value.state.localeTag)
+        assertEquals(SearchAccess.Unchecked, first.snapshot.value.state.access)
+        assertEquals("", second.snapshot.value.state.rawQuery)
         assertEquals(0, repository.calls.size)
         val firstUi = first.uiApi()
 
@@ -72,7 +72,7 @@ class SearchGraphTest {
         firstUi.onIntent(SearchIntent.AccessChecked(true))
         advanceTimeBy(250)
         runCurrent()
-        assertTrue(first.state.value.body is SearchBody.Ready)
+        assertTrue(first.snapshot.value.state.body is SearchBody.Ready)
         assertEquals(1, repository.activeCount)
         assertEquals(1, repository.calls.size)
         store.clear()

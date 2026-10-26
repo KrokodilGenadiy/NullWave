@@ -54,12 +54,12 @@ class SearchSavedStateRestorationTest {
         val firstJob = first.viewModelScope.coroutineContext.job
         val saved: Bundle
         try {
-            assertEquals("legacy default", first.state.value.rawQuery)
+            assertEquals("legacy default", first.snapshot.value.state.rawQuery)
             firstUi.onIntent(SearchIntent.QueryChanged("  Ёлка 🌊  "))
             firstUi.onIntent(SearchIntent.AccessChecked(true))
             val binding = launch(start = CoroutineStart.UNDISPATCHED) { first.withUiBinding { awaitCancellation() } }
             try {
-                withTimeout(5_000) { first.state.first { it.body is SearchBody.Ready } }
+                withTimeout(5_000) { first.snapshot.first { it.state.body is SearchBody.Ready } }
                 saved = firstOwner.save().parcelCopy()
             } finally { binding.cancelAndJoin() }
         } finally { firstOwner.destroy() }
@@ -74,21 +74,21 @@ class SearchSavedStateRestorationTest {
         val restoredJob = restored.viewModelScope.coroutineContext.job
         try {
             assertNotSame(first, restored)
-            assertEquals("  Ёлка 🌊  ", restored.state.value.rawQuery)
-            assertEquals("елка 🌊", restored.state.value.query?.text)
-            assertEquals("sv-SE", restored.state.value.localeTag)
-            assertSame(SearchAccess.Unchecked, restored.state.value.access)
-            assertSame(SearchBody.CheckingAccess, restored.state.value.body)
+            assertEquals("  Ёлка 🌊  ", restored.snapshot.value.state.rawQuery)
+            assertEquals("елка 🌊", restored.snapshot.value.state.query?.text)
+            assertEquals("sv-SE", restored.snapshot.value.state.localeTag)
+            assertSame(SearchAccess.Unchecked, restored.snapshot.value.state.access)
+            assertSame(SearchBody.CheckingAccess, restored.snapshot.value.state.body)
             val binding = launch(start = CoroutineStart.UNDISPATCHED) { restored.withUiBinding { awaitCancellation() } }
             try {
                 yield()
                 assertEquals(0, repository.calls.size)
                 restoredUi.onIntent(SearchIntent.AccessChecked(false))
-                assertSame(SearchBody.AccessRequired, restored.state.value.body)
+                assertSame(SearchBody.AccessRequired, restored.snapshot.value.state.body)
                 assertEquals(0, repository.calls.size)
                 restoredUi.onIntent(SearchIntent.AccessChecked(true))
-                withTimeout(5_000) { restored.state.first { it.body is SearchBody.Ready } }
-                assertEquals(listOf(restored.state.value.query), repository.calls)
+                withTimeout(5_000) { restored.snapshot.first { it.state.body is SearchBody.Ready } }
+                assertEquals(listOf(restored.snapshot.value.state.query), repository.calls)
             } finally { binding.cancelAndJoin() }
         } finally { owner.destroy() }
         withTimeout(5_000) { restoredJob.join() }
@@ -120,8 +120,8 @@ class SearchSavedStateRestorationTest {
             val restored = restoredOwner.vm(graph(repository, "en-US"))
             val restoredUi = restored.uiApi()
             assertNotSame(first, restored)
-            assertEquals("", restored.state.value.rawQuery)
-            assertSame(SearchBody.Idle, restored.state.value.body)
+            assertEquals("", restored.snapshot.value.state.rawQuery)
+            assertSame(SearchBody.Idle, restored.snapshot.value.state.body)
             restoredUi.onIntent(SearchIntent.AccessChecked(true))
             val binding = launch(start = CoroutineStart.UNDISPATCHED) { restored.withUiBinding { awaitCancellation() } }
             try { yield(); assertEquals(0, repository.calls.size) } finally { binding.cancelAndJoin() }

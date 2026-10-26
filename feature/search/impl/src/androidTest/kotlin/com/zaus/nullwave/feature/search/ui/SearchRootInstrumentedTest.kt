@@ -62,8 +62,8 @@ class SearchRootInstrumentedTest {
         compose.runOnIdle { access.reply(LibraryAccess.Granted) }
         compose.onNodeWithTag("search_idle").assertIsDisplayed()
         compose.runOnIdle {
-            assertEquals(SearchAccess.Granted, vm.state.value.access)
-            assertNull(vm.state.value.request)
+            assertEquals(SearchAccess.Granted, vm.snapshot.value.state.access)
+            assertNull(vm.snapshot.value.state.request)
             assertTrue(repository.calls.isEmpty())
         }
     }
@@ -85,7 +85,7 @@ class SearchRootInstrumentedTest {
         compose.runOnIdle {
             assertEquals(previous, repository.calls.size)
             assertEquals(0, repository.active)
-            assertNull(vm.state.value.request)
+            assertNull(vm.snapshot.value.state.request)
         }
     }
 
@@ -100,7 +100,7 @@ class SearchRootInstrumentedTest {
         compose.runOnIdle { owner.registry.currentState = Lifecycle.State.RESUMED }
         awaitTrack()
         compose.runOnIdle {
-            assertEquals("  Orbit  ", vm.state.value.rawQuery)
+            assertEquals("  Orbit  ", vm.snapshot.value.state.rawQuery)
             assertEquals(1, repository.calls.size)
             assertEquals("orbit", repository.calls.single().text)
         }
@@ -171,7 +171,7 @@ class SearchRootInstrumentedTest {
 
     private fun input(text: String) { compose.onNodeWithTag("search_input").performTextReplacement(text) }
     private fun awaitTrack() {
-        compose.waitUntil { vm.state.value.body is SearchBody.Ready }
+        compose.waitUntil { vm.snapshot.value.state.body is SearchBody.Ready }
         compose.onNodeWithTag("search_track:track:0").assertIsDisplayed()
     }
 }
