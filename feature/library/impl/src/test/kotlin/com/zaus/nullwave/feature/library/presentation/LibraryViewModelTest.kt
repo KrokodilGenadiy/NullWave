@@ -1,31 +1,33 @@
 package com.zaus.nullwave.feature.library.presentation
 
-import com.zaus.nullwave.feature.library.api.access.LibraryAccess
-import com.zaus.nullwave.feature.library.api.access.AccessAction
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.ui.UiText
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.DataError
+import com.zaus.nullwave.feature.library.api.access.AccessAction
+import com.zaus.nullwave.feature.library.api.access.LibraryAccess
 import com.zaus.nullwave.feature.library.api.model.SortDirection
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
 import com.zaus.nullwave.feature.library.api.model.track.TrackId
 import com.zaus.nullwave.feature.library.impl.R
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -58,7 +60,7 @@ class LibraryViewModelTest {
     @Test
     fun `state reads and intents without UI binding do not read the catalog`() = runTest(dispatcher) {
         val vm = createVm()
-        assertEquals(LibraryState(LibraryTrackQuery("ru")), vm.state.value)
+        assertEquals(LibraryState(LibraryTrackQuery("ru")), vm.snapshot.value.state)
         send(vm, LibraryIntent.Retry)
         send(vm, LibraryIntent.Refresh)
         send(vm, LibraryIntent.AccessChecked(LibraryAccess.Granted))
@@ -67,19 +69,19 @@ class LibraryViewModelTest {
 
         bind(vm)
         assertEquals(1, repository.tracks.subscriptions.size)
-        assertEquals(vm.state.value.query, repository.tracks.subscriptions.single().query)
+        assertEquals(vm.snapshot.value.state.query, repository.tracks.subscriptions.single().query)
     }
 
     @Test
     fun `first success and observer updates replace the snapshot including a successful empty list`() = runTest(dispatcher) {
         val vm = createVm()
         bind(vm)
-        assertSame(LibraryBody.Loading, vm.state.value.body)
+        assertSame(LibraryBody.Loading, vm.snapshot.value.state.body)
 
         reply(AppResult.Success(listOf(track)))
-        assertEquals(LibraryBody.Ready(listOf(track)), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(listOf(track)), vm.snapshot.value.state.body)
         reply(AppResult.Success(emptyList()))
-        assertEquals(LibraryBody.Ready(emptyList<LibraryTrack>()), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(emptyList<LibraryTrack>()), vm.snapshot.value.state.body)
         assertEquals(1, repository.tracks.subscriptions.size)
     }
 
@@ -98,17 +100,17 @@ class LibraryViewModelTest {
         val vm = createVm()
         bind(vm)
         reply(AppResult.Failure(DataError.AccessDenied))
-        assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.state.value.body)
+        assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.snapshot.value.state.body)
         assertTrue(repository.tracks.subscriptions.single().closed)
 
         send(vm, LibraryIntent.Retry)
         send(vm, LibraryIntent.Refresh)
         assertEquals(1, repository.tracks.subscriptions.size)
         send(vm, LibraryIntent.AccessChecked(LibraryAccess.Granted))
-        assertSame(LibraryBody.Loading, vm.state.value.body)
+        assertSame(LibraryBody.Loading, vm.snapshot.value.state.body)
         assertEquals(2, repository.tracks.subscriptions.size)
         reply(AppResult.Success(listOf(track)))
-        assertEquals(LibraryBody.Ready(listOf(track)), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(listOf(track)), vm.snapshot.value.state.body)
     }
 
     @Test
@@ -116,15 +118,15 @@ class LibraryViewModelTest {
         val vm = createVm()
         bind(vm)
         reply(AppResult.Failure(DataError.Io, IllegalStateException("private provider detail")))
-        assertEquals(LibraryBody.Failed(loadError), vm.state.value.body)
+        assertEquals(LibraryBody.Failed(loadError), vm.snapshot.value.state.body)
 
         send(vm, LibraryIntent.Retry)
-        assertSame(LibraryBody.Loading, vm.state.value.body)
+        assertSame(LibraryBody.Loading, vm.snapshot.value.state.body)
         send(vm, LibraryIntent.Retry)
         send(vm, LibraryIntent.Refresh)
         assertEquals(2, repository.tracks.subscriptions.size)
         reply(AppResult.Success(listOf(track)))
-        assertEquals(LibraryBody.Ready(listOf(track)), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(listOf(track)), vm.snapshot.value.state.body)
     }
 
     @Test
@@ -133,13 +135,13 @@ class LibraryViewModelTest {
         repository.tracks.completeAfterInitial = true
         val vm = createVm()
         bind(vm)
-        assertEquals(LibraryBody.Failed(loadError), vm.state.value.body)
+        assertEquals(LibraryBody.Failed(loadError), vm.snapshot.value.state.body)
         assertTrue(repository.tracks.subscriptions.single().closed)
 
         repository.tracks.initialResult = AppResult.Success(listOf(track))
         repository.tracks.completeAfterInitial = false
         send(vm, LibraryIntent.Retry)
-        assertEquals(LibraryBody.Ready(listOf(track)), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(listOf(track)), vm.snapshot.value.state.body)
         assertEquals(2, repository.tracks.subscriptions.size)
         assertEquals(1, repository.activeCount)
     }
@@ -152,17 +154,17 @@ class LibraryViewModelTest {
         send(vm, LibraryIntent.Retry)
         assertEquals(1, repository.tracks.subscriptions.size)
         send(vm, LibraryIntent.Refresh)
-        assertEquals(LibraryBody.Ready(listOf(track), RefreshState.Running), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(listOf(track), RefreshState.Running), vm.snapshot.value.state.body)
 
         send(vm, LibraryIntent.Refresh)
         send(vm, LibraryIntent.Retry)
         assertEquals(2, repository.tracks.subscriptions.size)
         reply(AppResult.Failure(DataError.Io))
-        assertEquals(LibraryBody.Ready(listOf(track), RefreshState.Failed(refreshError)), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(listOf(track), RefreshState.Failed(refreshError)), vm.snapshot.value.state.body)
         send(vm, LibraryIntent.Retry)
-        assertEquals(LibraryBody.Ready(listOf(track), RefreshState.Running), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(listOf(track), RefreshState.Running), vm.snapshot.value.state.body)
         reply(AppResult.Success(listOf(otherTrack)))
-        assertEquals(LibraryBody.Ready(listOf(otherTrack)), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(listOf(otherTrack)), vm.snapshot.value.state.body)
         assertEquals(1, repository.maxActiveCount)
     }
 
@@ -172,12 +174,12 @@ class LibraryViewModelTest {
         bind(vm)
         reply(AppResult.Success(emptyList()))
         send(vm, LibraryIntent.Refresh)
-        assertEquals(LibraryBody.Ready(emptyList<LibraryTrack>(), RefreshState.Running), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(emptyList<LibraryTrack>(), RefreshState.Running), vm.snapshot.value.state.body)
         reply(AppResult.Failure(DataError.Io))
-        assertEquals(LibraryBody.Ready(emptyList<LibraryTrack>(), RefreshState.Failed(refreshError)), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(emptyList<LibraryTrack>(), RefreshState.Failed(refreshError)), vm.snapshot.value.state.body)
         send(vm, LibraryIntent.Refresh)
         reply(AppResult.Success(listOf(track)))
-        assertEquals(LibraryBody.Ready(listOf(track)), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(listOf(track)), vm.snapshot.value.state.body)
     }
 
     @Test
@@ -186,9 +188,9 @@ class LibraryViewModelTest {
         bind(vm)
         reply(AppResult.Success(listOf(track)))
         reply(AppResult.Failure(DataError.Io))
-        assertEquals(LibraryBody.Ready(listOf(track), RefreshState.Failed(refreshError)), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(listOf(track), RefreshState.Failed(refreshError)), vm.snapshot.value.state.body)
         reply(AppResult.Success(listOf(otherTrack)))
-        assertEquals(LibraryBody.Ready(listOf(otherTrack)), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(listOf(otherTrack)), vm.snapshot.value.state.body)
         assertEquals(1, repository.tracks.subscriptions.size)
     }
 
@@ -198,7 +200,7 @@ class LibraryViewModelTest {
         bind(vm)
         reply(AppResult.Success(listOf(track)))
         reply(AppResult.Failure(DataError.AccessDenied))
-        assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.state.value.body)
+        assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.snapshot.value.state.body)
     }
 
     @Test
@@ -208,9 +210,9 @@ class LibraryViewModelTest {
         reply(AppResult.Success(listOf(track)))
         for (action in AccessAction.entries) {
             send(vm, LibraryIntent.AccessChecked(LibraryAccess.Required(action)))
-            assertEquals(LibraryBody.AccessRequired(action), vm.state.value.body)
+            assertEquals(LibraryBody.AccessRequired(action), vm.snapshot.value.state.body)
             reply(AppResult.Failure(DataError.AccessDenied))
-            assertEquals(LibraryBody.AccessRequired(action), vm.state.value.body)
+            assertEquals(LibraryBody.AccessRequired(action), vm.snapshot.value.state.body)
         }
     }
 
@@ -221,15 +223,15 @@ class LibraryViewModelTest {
         val first = repository.tracks.subscriptions.single()
         send(vm, LibraryIntent.AccessChecked(LibraryAccess.Granted))
         assertTrue(first.closed)
-        assertSame(LibraryBody.Loading, vm.state.value.body)
+        assertSame(LibraryBody.Loading, vm.snapshot.value.state.body)
         reply(AppResult.Success(listOf(track)))
 
         send(vm, LibraryIntent.AccessChecked(LibraryAccess.Granted))
-        assertEquals(LibraryBody.Ready(listOf(track), RefreshState.Running), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(listOf(track), RefreshState.Running), vm.snapshot.value.state.body)
         assertEquals(3, repository.tracks.subscriptions.size)
         assertTrue(repository.tracks.subscriptions.all { it.query == LibraryTrackQuery("ru") })
         reply(AppResult.Success(emptyList()))
-        assertEquals(LibraryBody.Ready(emptyList<LibraryTrack>()), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(emptyList<LibraryTrack>()), vm.snapshot.value.state.body)
     }
 
     @Test
@@ -248,7 +250,7 @@ class LibraryViewModelTest {
         for ((intent, expected) in cases) {
             send(vm, intent)
             assertEquals(expected, repository.tracks.subscriptions.last().query)
-            assertSame(LibraryBody.Loading, vm.state.value.body)
+            assertSame(LibraryBody.Loading, vm.snapshot.value.state.body)
             reply(AppResult.Success(listOf(otherTrack)))
         }
         assertEquals(4, repository.tracks.subscriptions.size)
@@ -259,10 +261,10 @@ class LibraryViewModelTest {
         val vm = createVm()
         bind(vm)
         reply(AppResult.Success(listOf(track)))
-        val before = vm.state.value
+        val before = vm.snapshot.value.state
         send(vm, LibraryIntent.SortChanged(LibraryTrackSort.Title, SortDirection.Ascending))
         send(vm, LibraryIntent.LocaleChanged("ru"))
-        assertSame(before, vm.state.value)
+        assertSame(before, vm.snapshot.value.state)
         assertEquals(1, repository.tracks.subscriptions.size)
     }
 
@@ -272,13 +274,13 @@ class LibraryViewModelTest {
         bind(vm)
         send(vm, LibraryIntent.AccessChecked(LibraryAccess.Required(AccessAction.Request)))
         send(vm, LibraryIntent.SortChanged(LibraryTrackSort.Artist, SortDirection.Descending))
-        assertEquals(LibraryBody.AccessRequired(AccessAction.Request), vm.state.value.body)
+        assertEquals(LibraryBody.AccessRequired(AccessAction.Request), vm.snapshot.value.state.body)
 
         send(vm, LibraryIntent.AccessChecked(LibraryAccess.Granted))
         reply(AppResult.Success(listOf(track)))
         send(vm, LibraryIntent.LocaleChanged("en"))
         reply(AppResult.Failure(DataError.Io))
-        assertEquals(LibraryBody.Failed(loadError), vm.state.value.body)
+        assertEquals(LibraryBody.Failed(loadError), vm.snapshot.value.state.body)
     }
 
     @Test
@@ -296,7 +298,7 @@ class LibraryViewModelTest {
         previous.cleanupGate!!.complete(Unit)
         runCurrent()
         assertTrue(previous.lateDeliveryAttempted)
-        assertEquals(LibraryBody.AccessRequired(AccessAction.SettingsSuggested), vm.state.value.body)
+        assertEquals(LibraryBody.AccessRequired(AccessAction.SettingsSuggested), vm.snapshot.value.state.body)
         assertEquals(2, repository.tracks.subscriptions.size)
         assertEquals(1, repository.maxActiveCount)
     }
@@ -309,13 +311,13 @@ class LibraryViewModelTest {
         val previous = repository.tracks.subscriptions.single()
         previous.delayCleanupWith(AppResult.Success(listOf(track)))
         send(vm, LibraryIntent.Retry)
-        assertSame(LibraryBody.Loading, vm.state.value.body)
+        assertSame(LibraryBody.Loading, vm.snapshot.value.state.body)
         previous.cleanupGate!!.complete(Unit)
         runCurrent()
         assertTrue(previous.lateDeliveryAttempted)
-        assertSame(LibraryBody.Loading, vm.state.value.body)
+        assertSame(LibraryBody.Loading, vm.snapshot.value.state.body)
         reply(AppResult.Success(emptyList()))
-        assertEquals(LibraryBody.Ready(emptyList<LibraryTrack>()), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(emptyList<LibraryTrack>()), vm.snapshot.value.state.body)
     }
 
     @Test
@@ -330,10 +332,10 @@ class LibraryViewModelTest {
         runCurrent()
 
         assertTrue(original.lateDeliveryAttempted)
-        assertSame(LibraryBody.Loading, vm.state.value.body)
+        assertSame(LibraryBody.Loading, vm.snapshot.value.state.body)
         assertEquals(listOf(LibraryTrackQuery("ru"), LibraryTrackQuery("ru")), repository.tracks.subscriptions.map { it.query })
         reply(AppResult.Success(listOf(otherTrack)))
-        assertEquals(LibraryBody.Ready(listOf(otherTrack)), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(listOf(otherTrack)), vm.snapshot.value.state.body)
     }
 
     @Test
@@ -343,7 +345,7 @@ class LibraryViewModelTest {
         reply(AppResult.Success(listOf(track)))
         val previous = repository.tracks.subscriptions.single()
         previous.delayCleanupWith(AppResult.Failure(DataError.AccessDenied))
-        val before = vm.state.value
+        val before = vm.snapshot.value.state
         store.clear()
         runCurrent()
         previous.cleanupGate!!.complete(Unit)
@@ -353,7 +355,7 @@ class LibraryViewModelTest {
 
         assertTrue(previous.closed)
         assertTrue(previous.lateDeliveryAttempted)
-        assertEquals(before, vm.state.value)
+        assertEquals(before, vm.snapshot.value.state)
         assertEquals(0, repository.activeCount)
         assertEquals(1, repository.tracks.subscriptions.size)
     }
@@ -376,11 +378,11 @@ class LibraryViewModelTest {
         advanceTimeBy(5_000)
         runCurrent()
         assertEquals(0, repository.activeCount)
-        assertEquals(LibraryBody.Ready(listOf(track)), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(listOf(track)), vm.snapshot.value.state.body)
         bind(vm)
         assertEquals(2, repository.tracks.subscriptions.size)
         reply(AppResult.Success(listOf(otherTrack)))
-        assertEquals(LibraryBody.Ready(listOf(otherTrack)), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(listOf(otherTrack)), vm.snapshot.value.state.body)
     }
 
     @Test
@@ -393,12 +395,12 @@ class LibraryViewModelTest {
         advanceTimeBy(5_000)
         runCurrent()
         send(vm, LibraryIntent.Refresh)
-        assertEquals(LibraryBody.Ready(listOf(track), RefreshState.Running), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(listOf(track), RefreshState.Running), vm.snapshot.value.state.body)
         assertEquals(1, repository.tracks.subscriptions.size)
 
         bind(vm)
         reply(AppResult.Success(emptyList()))
-        assertEquals(LibraryBody.Ready(emptyList<LibraryTrack>()), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(emptyList<LibraryTrack>()), vm.snapshot.value.state.body)
     }
 
     @Test
@@ -419,19 +421,19 @@ class LibraryViewModelTest {
 
         val restored = createVm(SavedStateHandle(saved), localeTag = "en-US")
         val expected = LibraryTrackQuery("en-US", LibraryTrackSort.RecentlyAdded, SortDirection.Descending)
-        assertEquals(LibraryState(expected), restored.state.value)
+        assertEquals(LibraryState(expected), restored.snapshot.value.state)
         bind(restored)
         assertEquals(expected, repository.tracks.subscriptions.last().query)
         reply(AppResult.Failure(DataError.AccessDenied))
-        assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), restored.state.value.body)
+        assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), restored.snapshot.value.state.body)
     }
 
     @Test
     fun `unknown or malformed saved inputs fall back independently`() = runTest(dispatcher) {
         val malformed = createVm(SavedStateHandle(mapOf("library.sort" to 123, "library.direction" to "Removed")))
-        assertEquals(LibraryTrackQuery("ru"), malformed.state.value.query)
+        assertEquals(LibraryTrackQuery("ru"), malformed.snapshot.value.state.query)
         val partial = createVm(SavedStateHandle(mapOf("library.sort" to "Artist", "library.direction" to false)))
-        assertEquals(LibraryTrackQuery("ru", LibraryTrackSort.Artist), partial.state.value.query)
+        assertEquals(LibraryTrackQuery("ru", LibraryTrackSort.Artist), partial.snapshot.value.state.query)
     }
 
     @Test
@@ -439,14 +441,14 @@ class LibraryViewModelTest {
         val handle = SavedStateHandle(mapOf("library.inputs" to
             """{"version":1,"payload":{"tab":"Artists","sort":"Removed","direction":"Descending","albumDirection":"Removed","artistDirection":"Descending"}}"""))
         val vm = createVm(handle, localeTag = "sv-SE")
-        assertEquals(LibraryTab.Artists, vm.state.value.selectedTab)
-        assertEquals(LibraryTrackQuery("sv-SE", LibraryTrackSort.Title, SortDirection.Descending), vm.state.value.query)
-        assertEquals(SortDirection.Ascending, vm.state.value.albumQuery.direction)
-        assertEquals(SortDirection.Descending, vm.state.value.artistQuery.direction)
-        assertSame(LibraryBody.Loading, vm.state.value.selectedBody)
+        assertEquals(LibraryTab.Artists, vm.snapshot.value.state.selectedTab)
+        assertEquals(LibraryTrackQuery("sv-SE", LibraryTrackSort.Title, SortDirection.Descending), vm.snapshot.value.state.query)
+        assertEquals(SortDirection.Ascending, vm.snapshot.value.state.albumQuery.direction)
+        assertEquals(SortDirection.Descending, vm.snapshot.value.state.artistQuery.direction)
+        assertSame(LibraryBody.Loading, vm.snapshot.value.state.selectedBody)
         for (raw in listOf<Any>(42, "broken", """{"version":99,"payload":{"tab":"Albums"}}""")) {
             val restored = createVm(SavedStateHandle(mapOf("library.inputs" to raw, "library.tab" to "Artists")))
-            assertEquals(LibraryTab.Songs, restored.state.value.selectedTab)
+            assertEquals(LibraryTab.Songs, restored.snapshot.value.state.selectedTab)
         }
     }
 
@@ -456,23 +458,23 @@ class LibraryViewModelTest {
         repository.tracks.initialResult = AppResult.Success(listOf(track))
         val vm = createVm()
         bind(vm)
-        assertEquals(LibraryBody.Ready(listOf(track)), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(listOf(track)), vm.snapshot.value.state.body)
 
         repository.tracks.initialResult = AppResult.Failure(DataError.Io)
         send(vm, LibraryIntent.Refresh)
-        assertEquals(LibraryBody.Ready(listOf(track), RefreshState.Failed(refreshError)), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(listOf(track), RefreshState.Failed(refreshError)), vm.snapshot.value.state.body)
         repository.tracks.initialResult = AppResult.Success(emptyList())
         send(vm, LibraryIntent.Retry)
-        assertEquals(LibraryBody.Ready(emptyList<LibraryTrack>()), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(emptyList<LibraryTrack>()), vm.snapshot.value.state.body)
 
         repository.tracks.initialResult = AppResult.Failure(DataError.AccessDenied)
         send(vm, LibraryIntent.AccessChecked(LibraryAccess.Required(AccessAction.Request)))
-        assertEquals(LibraryBody.AccessRequired(AccessAction.Request), vm.state.value.body)
+        assertEquals(LibraryBody.AccessRequired(AccessAction.Request), vm.snapshot.value.state.body)
         repository.tracks.initialResult = AppResult.Success(listOf(otherTrack))
         send(vm, LibraryIntent.AccessChecked(LibraryAccess.Granted))
-        assertEquals(LibraryBody.Ready(listOf(otherTrack)), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(listOf(otherTrack)), vm.snapshot.value.state.body)
         send(vm, LibraryIntent.SortChanged(LibraryTrackSort.Artist, SortDirection.Descending))
-        assertEquals(LibraryBody.Ready(listOf(otherTrack)), vm.state.value.body)
+        assertEquals(LibraryBody.Ready(listOf(otherTrack)), vm.snapshot.value.state.body)
     }
 
     @Test
@@ -482,17 +484,17 @@ class LibraryViewModelTest {
         val vm = createVm(handle)
         val ui = vm.uiApi()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.state.collect {
+            vm.snapshot.map { it.state }.distinctUntilChanged().collect {
                 if (it.query.sort == LibraryTrackSort.Artist) {
                     ui.onIntent(LibraryIntent.SortChanged(LibraryTrackSort.RecentlyAdded, SortDirection.Descending))
                 }
             }
         }
         send(vm, LibraryIntent.SortChanged(LibraryTrackSort.Artist, SortDirection.Ascending))
-        assertEquals(LibraryTrackSort.RecentlyAdded, vm.state.value.query.sort)
+        assertEquals(LibraryTrackSort.RecentlyAdded, vm.snapshot.value.state.query.sort)
         val saved = handle.keys().associateWith { handle.get<Any?>(it) }
         val restored = createVm(SavedStateHandle(saved))
-        assertEquals(vm.state.value.query, restored.state.value.query)
+        assertEquals(vm.snapshot.value.state.query, restored.snapshot.value.state.query)
     }
 
     @Test
@@ -503,7 +505,7 @@ class LibraryViewModelTest {
             runTest(dispatcher) {
                 val vm = createVm()
                 bind(vm)
-                assertSame(LibraryBody.Loading, vm.state.value.body)
+                assertSame(LibraryBody.Loading, vm.snapshot.value.state.body)
             }
         }
         assertTrue(generateSequence<Throwable>(thrown) { it.cause }.any { it === failure })
@@ -537,7 +539,7 @@ class LibraryViewModelTest {
         runCurrent()
     }
 
-    private fun ready(vm: LibraryViewModel): LibraryBody.Ready<LibraryTrack> = vm.state.value.body as LibraryBody.Ready<LibraryTrack>
+    private fun ready(vm: LibraryViewModel): LibraryBody.Ready<LibraryTrack> = vm.snapshot.value.state.body as LibraryBody.Ready<LibraryTrack>
 
     private val loadError = UiText.Resource(R.string.library_load_failed)
     private val refreshError = UiText.Resource(R.string.library_refresh_failed)

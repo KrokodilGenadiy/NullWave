@@ -38,8 +38,8 @@ import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.createGraphFactory
 import dev.zacsweers.metrox.viewmodel.ViewModelGraph
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
@@ -77,7 +77,7 @@ class LibrarySavedStateRestorationTest {
                 firstUi.onIntent(LibraryIntent.AccessChecked(LibraryAccess.Granted))
                 val binding = launch(start = CoroutineStart.UNDISPATCHED) { first.withUiBinding { awaitCancellation() } }
                 try {
-                    withTimeout(5_000) { first.state.first { it.selectedBody is LibraryBody.Ready<*> } }
+                    withTimeout(5_000) { first.snapshot.first { it.state.selectedBody is LibraryBody.Ready<*> } }
                     saved = firstOwner.save().parcelCopy()
                 } finally { binding.cancelAndJoin() }
             } finally { firstOwner.destroy() }
@@ -93,21 +93,21 @@ class LibrarySavedStateRestorationTest {
             val restoredJob = restored.viewModelScope.coroutineContext.job
             try {
                 assertNotSame(first, restored)
-                assertEquals(tab, restored.state.value.selectedTab)
-                assertEquals(LibraryTrackQuery("sv-SE", LibraryTrackSort.Artist, SortDirection.Descending), restored.state.value.query)
-                assertEquals(LibraryAlbumQuery("sv-SE", SortDirection.Descending), restored.state.value.albumQuery)
-                assertEquals(LibraryArtistQuery("sv-SE", SortDirection.Descending), restored.state.value.artistQuery)
-                assertSame(LibraryBody.Loading, restored.state.value.selectedBody)
+                assertEquals(tab, restored.snapshot.value.state.selectedTab)
+                assertEquals(LibraryTrackQuery("sv-SE", LibraryTrackSort.Artist, SortDirection.Descending), restored.snapshot.value.state.query)
+                assertEquals(LibraryAlbumQuery("sv-SE", SortDirection.Descending), restored.snapshot.value.state.albumQuery)
+                assertEquals(LibraryArtistQuery("sv-SE", SortDirection.Descending), restored.snapshot.value.state.artistQuery)
+                assertSame(LibraryBody.Loading, restored.snapshot.value.state.selectedBody)
                 assertEquals(0, repository.requests.size)
                 restoredUi.onIntent(LibraryIntent.AccessChecked(LibraryAccess.Required(AccessAction.Request)))
                 val binding = launch(start = CoroutineStart.UNDISPATCHED) { restored.withUiBinding { awaitCancellation() } }
                 try {
                     withTimeout(5_000) { repository.firstRead.await() }
-                    assertEquals(LibraryBody.AccessRequired(AccessAction.Request), restored.state.value.selectedBody)
+                    assertEquals(LibraryBody.AccessRequired(AccessAction.Request), restored.snapshot.value.state.selectedBody)
                     repository.granted = true
                     restoredUi.onIntent(LibraryIntent.AccessChecked(LibraryAccess.Granted))
-                    withTimeout(5_000) { restored.state.first { it.selectedBody is LibraryBody.Ready<*> } }
-                    val expected = if (tab == LibraryTab.Albums) restored.state.value.albumQuery else restored.state.value.artistQuery
+                    withTimeout(5_000) { restored.snapshot.first { it.state.selectedBody is LibraryBody.Ready<*> } }
+                    val expected = if (tab == LibraryTab.Albums) restored.snapshot.value.state.albumQuery else restored.snapshot.value.state.artistQuery
                     assertEquals(expected, repository.requests.last())
                 } finally { binding.cancelAndJoin() }
             } finally { owner.destroy() }
@@ -140,9 +140,9 @@ class LibrarySavedStateRestorationTest {
         try {
             val restored = restoredOwner.vm(graph(RestorationCatalog(), "en-US"))
             assertNotSame(first, restored)
-            assertEquals(LibraryTab.Artists, restored.state.value.selectedTab)
-            assertEquals(LibraryArtistQuery("en-US", SortDirection.Descending), restored.state.value.artistQuery)
-            assertSame(LibraryBody.Loading, restored.state.value.selectedBody)
+            assertEquals(LibraryTab.Artists, restored.snapshot.value.state.selectedTab)
+            assertEquals(LibraryArtistQuery("en-US", SortDirection.Descending), restored.snapshot.value.state.artistQuery)
+            assertSame(LibraryBody.Loading, restored.snapshot.value.state.selectedBody)
         } finally { restoredOwner.destroy() }
     }
 

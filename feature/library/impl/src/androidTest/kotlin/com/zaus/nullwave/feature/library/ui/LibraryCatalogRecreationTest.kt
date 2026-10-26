@@ -119,9 +119,9 @@ internal class LibraryCatalogRecreationTest(private val selected: LibraryTab) {
         activity.onActivity {
             assertNotSame(previousActivity, it)
             assertSame("Configuration recreation retains the ViewModel", previousModel, it.model)
-            assertEquals(selected, it.model.state.value.selectedTab)
-            assertEquals(LibraryBody.Loading, it.model.state.value.selectedBody)
-            assertEquals(SortDirection.Descending, it.model.state.value.sortDirection)
+            assertEquals(selected, it.model.snapshot.value.state.selectedTab)
+            assertEquals(LibraryBody.Loading, it.model.snapshot.value.state.selectedBody)
+            assertEquals(SortDirection.Descending, it.model.snapshot.value.state.sortDirection)
             assertEquals(1, fixture.activeSources)
         }
 
@@ -165,7 +165,7 @@ internal class LibraryCatalogRecreationTest(private val selected: LibraryTab) {
 
     private fun awaitReady(tab: LibraryTab) {
         compose.waitUntil(timeoutMillis = 5_000) {
-            val state = model.state.value
+            val state = model.snapshot.value.state
             state.selectedTab == tab && state.selectedBody is LibraryBody.Ready
         }
         compose.waitForIdle()

@@ -26,10 +26,10 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.core.app.ActivityOptionsCompat
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import com.zaus.nullwave.core.designsystem.theme.NullWaveEffects
@@ -38,12 +38,12 @@ import com.zaus.nullwave.core.mvi.ui.rememberMviUiApi
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.DataError
 import com.zaus.nullwave.feature.library.api.model.SortDirection
+import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumQuery
+import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
 import com.zaus.nullwave.feature.library.api.model.track.TrackId
-import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumQuery
-import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.platform.AudioPermission
@@ -57,9 +57,9 @@ import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
+import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
-import org.junit.Test
 
 /** Real Activity/Compose/SavedStateRegistry recreation; only the external OS operation is faked. */
 @RunWith(Parameterized::class)
@@ -92,8 +92,8 @@ class LibraryPermissionRecreationTest(private val settings: Boolean, private val
             assertNotSame(oldActivity, it)
             assertNotSame(oldRegistry, it.results)
             assertSame("Activity recreation retains its ViewModelStore", oldVm, it.model)
-            assertEquals(LibraryTrackSort.Artist, it.model.state.value.query.sort)
-            assertEquals(SortDirection.Descending, it.model.state.value.query.direction)
+            assertEquals(LibraryTrackSort.Artist, it.model.snapshot.value.state.query.sort)
+            assertEquals(SortDirection.Descending, it.model.snapshot.value.state.query.direction)
             assertEquals(expectedLaunches, fixture.requests.size)
             fixture.granted = grant
             fixture.deliverTo(it.results)

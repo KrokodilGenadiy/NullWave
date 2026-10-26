@@ -3,33 +3,33 @@ package com.zaus.nullwave.feature.library.di
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
+import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
 import com.zaus.nullwave.feature.library.data.repository.MediaStoreLibraryRepository
-import com.zaus.nullwave.feature.library.data.source.audioRow
 import com.zaus.nullwave.feature.library.data.source.FakeMediaStoreAudioSource
+import com.zaus.nullwave.feature.library.data.source.audioRow
 import com.zaus.nullwave.feature.library.presentation.LibraryBody
 import com.zaus.nullwave.feature.library.presentation.LibraryIntent
 import com.zaus.nullwave.feature.library.presentation.LibraryTab
 import com.zaus.nullwave.feature.library.presentation.LibraryViewModel
 import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.createGraphFactory
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
+import dev.zacsweers.metro.createGraphFactory
 import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactory
 import dev.zacsweers.metrox.viewmodel.ViewModelGraph
 import kotlin.reflect.KClass
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
@@ -62,9 +62,9 @@ class LibraryGraphTest {
         store.put("first", first)
         store.put("second", second)
         assertNotSame(first, second)
-        assertEquals(LibraryTrackSort.Artist, first.state.value.query.sort)
-        assertEquals(LibraryTrackSort.Title, second.state.value.query.sort)
-        assertEquals("ru", first.state.value.query.localeTag)
+        assertEquals(LibraryTrackSort.Artist, first.snapshot.value.state.query.sort)
+        assertEquals(LibraryTrackSort.Title, second.snapshot.value.state.query.sort)
+        assertEquals("ru", first.snapshot.value.state.query.localeTag)
         assertEquals(0, source.reads)
         val firstUi = first.uiApi()
 
@@ -72,11 +72,11 @@ class LibraryGraphTest {
         backgroundScope.launch { second.withUiBinding { awaitCancellation() } }
         runCurrent()
         assertEquals(2, source.activeObservers)
-        assertEquals("Low Orbit", (first.state.value.body as LibraryBody.Ready<LibraryTrack>).items.single().title)
+        assertEquals("Low Orbit", (first.snapshot.value.state.body as LibraryBody.Ready<LibraryTrack>).items.single().title)
         firstUi.onIntent(LibraryIntent.TabSelected(LibraryTab.Albums))
         runCurrent()
-        assertEquals("Signals", (first.state.value.albums as LibraryBody.Ready<LibraryAlbum>).items.single().title)
-        assertEquals(LibraryTab.Songs, second.state.value.selectedTab)
+        assertEquals("Signals", (first.snapshot.value.state.albums as LibraryBody.Ready<LibraryAlbum>).items.single().title)
+        assertEquals(LibraryTab.Songs, second.snapshot.value.state.selectedTab)
         assertEquals(2, source.activeObservers)
         store.clear()
         runCurrent()

@@ -9,16 +9,16 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.zaus.nullwave.core.di.dispatchers.IoDispatcher
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
-import com.zaus.nullwave.feature.library.api.repository.LibrarySearchRepository
 import com.zaus.nullwave.feature.library.api.repository.LibraryRepository
+import com.zaus.nullwave.feature.library.api.repository.LibrarySearchRepository
 import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
 import com.zaus.nullwave.feature.library.data.repository.MediaStoreLibraryRepository
 import com.zaus.nullwave.feature.library.presentation.LibraryViewModel
 import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.createGraphFactory
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.ForScope
 import dev.zacsweers.metro.Provides
+import dev.zacsweers.metro.createGraphFactory
 import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactory
 import dev.zacsweers.metrox.viewmodel.ViewModelGraph
 import java.util.Locale
@@ -29,8 +29,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
-import org.junit.runner.RunWith
 import org.junit.Test
+import org.junit.runner.RunWith
 
 /** Exercises production providers; does not subscribe to or request access to device media. */
 @RunWith(AndroidJUnit4::class)
@@ -73,7 +73,7 @@ class LibraryGraphInstrumentedTest {
         try {
             val viewModel = factory.create(SavedStateHandle())
             store.put("library", viewModel)
-            assertEquals("sv-SE", viewModel.state.value.query.localeTag)
+            assertEquals("sv-SE", viewModel.snapshot.value.state.query.localeTag)
         } finally {
             store.clear()
         }

@@ -1,12 +1,12 @@
 package com.zaus.nullwave.feature.library.presentation
 
-import com.zaus.nullwave.feature.library.api.access.LibraryAccess
-import com.zaus.nullwave.feature.library.api.access.AccessAction
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.ui.UiText
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.DataError
+import com.zaus.nullwave.feature.library.api.access.AccessAction
+import com.zaus.nullwave.feature.library.api.access.LibraryAccess
 import com.zaus.nullwave.feature.library.api.model.SortDirection
 import com.zaus.nullwave.feature.library.api.model.album.AlbumArtistCredit
 import com.zaus.nullwave.feature.library.api.model.album.AlbumId
@@ -21,6 +21,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -84,15 +86,15 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
         send(vm, LibraryIntent.TabSelected(tab))
         send(vm, sortIntent(SortDirection.Descending))
         assertTrue(repository.requests.isEmpty())
-        assertSame(LibraryBody.Loading, vm.state.value.selectedBody)
+        assertSame(LibraryBody.Loading, vm.snapshot.value.state.selectedBody)
         bind(vm)
         assertEquals(1, repository.requests.size)
         assertTrue(repository.tracks.subscriptions.isEmpty())
         assertEquals(1, collection.subscriptions.size)
         success()
-        val ready = vm.state.value.selectedBody
+        val ready = vm.snapshot.value.state.selectedBody
         send(vm, LibraryIntent.TabSelected(tab))
-        assertEquals(ready, vm.state.value.selectedBody)
+        assertEquals(ready, vm.snapshot.value.state.selectedBody)
         assertEquals(1, repository.requests.size)
     }
 
@@ -126,12 +128,12 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
         collection.initialResult = AppResult.Failure(DataError.Io)
         collection.completeAfterInitial = true
         val vm = selectedVm()
-        assertEquals(LibraryBody.Failed(loadError), vm.state.value.selectedBody)
+        assertEquals(LibraryBody.Failed(loadError), vm.snapshot.value.state.selectedBody)
         assertTrue(collection.subscriptions.single().closed)
         collection.initialResult = null
         collection.completeAfterInitial = false
         send(vm, LibraryIntent.Retry)
-        assertSame(LibraryBody.Loading, vm.state.value.selectedBody)
+        assertSame(LibraryBody.Loading, vm.snapshot.value.state.selectedBody)
         send(vm, LibraryIntent.Retry)
         send(vm, LibraryIntent.Refresh)
         assertEquals(2, collection.subscriptions.size)
@@ -176,7 +178,7 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
         send(vm, LibraryIntent.Retry)
         assertEquals(1, collection.subscriptions.size)
         send(vm, LibraryIntent.AccessChecked(LibraryAccess.Granted))
-        assertSame(LibraryBody.Loading, vm.state.value.selectedBody)
+        assertSame(LibraryBody.Loading, vm.snapshot.value.state.selectedBody)
         assertEquals(2, collection.subscriptions.size)
         success()
         assertEquals(expectedItems, ready(vm).items)
@@ -210,11 +212,11 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
         assertEquals(1, repository.requests.size)
         assertEquals(expectedItems, ready(vm).items)
         send(vm, sortIntent(SortDirection.Descending))
-        assertSame(LibraryBody.Loading, vm.state.value.selectedBody)
+        assertSame(LibraryBody.Loading, vm.snapshot.value.state.selectedBody)
         assertTrue(collection.subscriptions.first().closed)
         assertEquals(2, repository.requests.size)
-        assertEquals(SortDirection.Descending, vm.state.value.albumQuery.direction)
-        assertEquals(SortDirection.Descending, vm.state.value.artistQuery.direction)
+        assertEquals(SortDirection.Descending, vm.snapshot.value.state.albumQuery.direction)
+        assertEquals(SortDirection.Descending, vm.snapshot.value.state.artistQuery.direction)
         send(vm, sortIntent(SortDirection.Descending))
         assertEquals(2, repository.requests.size)
         send(vm, LibraryIntent.TabSelected(LibraryTab.Songs))
@@ -228,7 +230,7 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
         val vm = selectedVm()
         success()
         send(vm, LibraryIntent.LocaleChanged("de-DE"))
-        val state = vm.state.value
+        val state = vm.snapshot.value.state
         assertEquals("de-DE", state.query.localeTag)
         assertEquals("de-DE", state.albumQuery.localeTag)
         assertEquals("de-DE", state.artistQuery.localeTag)
@@ -255,14 +257,14 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
         assertFalse(old.closed)
         assertTrue(repository.tracks.subscriptions.isEmpty())
         send(vm, LibraryIntent.TabSelected(tab))
-        assertSame(LibraryBody.Loading, vm.state.value.selectedBody)
+        assertSame(LibraryBody.Loading, vm.snapshot.value.state.selectedBody)
         old.cleanupGate!!.complete(Unit)
         runCurrent()
         assertTrue(old.lateDeliveryAttempted)
         assertTrue(old.closed)
         assertEquals(2, collection.subscriptions.size)
-        assertSame(LibraryBody.Loading, vm.state.value.selectedBody)
-        assertSame(LibraryBody.Loading, vm.state.value.body)
+        assertSame(LibraryBody.Loading, vm.snapshot.value.state.selectedBody)
+        assertSame(LibraryBody.Loading, vm.snapshot.value.state.body)
         success(empty = true)
         assertTrue(ready(vm).items.isEmpty())
         assertEquals(1, repository.maxActiveCount)
@@ -286,9 +288,9 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
         store.clear()
         runCurrent()
         assertEquals(0, repository.activeCount)
-        val lastState = vm.state.value
+        val lastState = vm.snapshot.value.state
         send(vm, LibraryIntent.TabSelected(LibraryTab.Songs))
-        assertEquals(lastState, vm.state.value)
+        assertEquals(lastState, vm.snapshot.value.state)
     }
 
     @Test
@@ -302,8 +304,8 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
         old.cleanupGate!!.complete(Unit)
         runCurrent()
         assertTrue(old.lateDeliveryAttempted)
-        assertEquals(LibraryTab.Songs, vm.state.value.selectedTab)
-        assertSame(LibraryBody.Loading, vm.state.value.selectedBody)
+        assertEquals(LibraryTab.Songs, vm.snapshot.value.state.selectedTab)
+        assertSame(LibraryBody.Loading, vm.snapshot.value.state.selectedBody)
         repository.tracks.subscriptions.single().respond(AppResult.Success(listOf(track)))
         runCurrent()
         assertEquals(listOf(track), ready(vm).items)
@@ -326,7 +328,7 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
         store.clear()
         runCurrent()
         val restored = createVm(SavedStateHandle(saved), "en-US")
-        val state = restored.state.value
+        val state = restored.snapshot.value.state
         assertEquals(tab, state.selectedTab)
         assertSame(LibraryBody.Loading, state.selectedBody)
         assertEquals("en-US", state.query.localeTag)
@@ -349,13 +351,13 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
             "library.tab" to tab.name, "library.albums.direction" to 123,
             "library.artists.direction" to "Descending", "library.sort" to false,
         )))
-        assertEquals(tab, vm.state.value.selectedTab)
-        assertEquals(SortDirection.Ascending, vm.state.value.albumQuery.direction)
-        assertEquals(SortDirection.Descending, vm.state.value.artistQuery.direction)
-        assertEquals(LibraryTrackSort.Title, vm.state.value.query.sort)
+        assertEquals(tab, vm.snapshot.value.state.selectedTab)
+        assertEquals(SortDirection.Ascending, vm.snapshot.value.state.albumQuery.direction)
+        assertEquals(SortDirection.Descending, vm.snapshot.value.state.artistQuery.direction)
+        assertEquals(LibraryTrackSort.Title, vm.snapshot.value.state.query.sort)
         val unknown = createVm(SavedStateHandle(mapOf("library.tab" to "Removed", "library.direction" to "Descending")))
-        assertEquals(LibraryTab.Songs, unknown.state.value.selectedTab)
-        assertEquals(SortDirection.Descending, unknown.state.value.query.direction)
+        assertEquals(LibraryTab.Songs, unknown.snapshot.value.state.selectedTab)
+        assertEquals(SortDirection.Descending, unknown.snapshot.value.state.query.direction)
     }
 
     @Test
@@ -391,7 +393,7 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
         send(vm, LibraryIntent.TabSelected(tab))
         var redirected = false
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.state.collect { state ->
+            vm.snapshot.map { it.state }.distinctUntilChanged().collect { state ->
                 val direction = if (tab == LibraryTab.Albums) state.albumQuery.direction else state.artistQuery.direction
                 if (!redirected && direction == SortDirection.Descending) {
                     redirected = true
@@ -404,11 +406,11 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
         val saved = handle.keys().associateWith { handle.get<Any?>(it) }
         val restored = createVm(SavedStateHandle(saved))
         assertTrue(redirected)
-        assertEquals(LibraryTab.Songs, restored.state.value.selectedTab)
-        assertEquals(vm.state.value.albumQuery, restored.state.value.albumQuery)
-        assertEquals(vm.state.value.artistQuery, restored.state.value.artistQuery)
-        assertEquals(SortDirection.Ascending, restored.state.value.albumQuery.direction)
-        assertEquals(SortDirection.Ascending, restored.state.value.artistQuery.direction)
+        assertEquals(LibraryTab.Songs, restored.snapshot.value.state.selectedTab)
+        assertEquals(vm.snapshot.value.state.albumQuery, restored.snapshot.value.state.albumQuery)
+        assertEquals(vm.snapshot.value.state.artistQuery, restored.snapshot.value.state.artistQuery)
+        assertEquals(SortDirection.Ascending, restored.snapshot.value.state.albumQuery.direction)
+        assertEquals(SortDirection.Ascending, restored.snapshot.value.state.artistQuery.direction)
         assertTrue(repository.requests.isEmpty())
     }
 
@@ -457,12 +459,12 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
         if (tab == LibraryTab.Albums) LibraryIntent.AlbumSortChanged(direction)
         else LibraryIntent.ArtistSortChanged(direction)
 
-    private fun ready(vm: LibraryViewModel) = vm.state.value.selectedBody as LibraryBody.Ready<*>
+    private fun ready(vm: LibraryViewModel) = vm.snapshot.value.state.selectedBody as LibraryBody.Ready<*>
 
     private fun assertAllGated(vm: LibraryViewModel, action: AccessAction) {
         val gate = LibraryBody.AccessRequired(action)
-        assertEquals(gate, vm.state.value.body)
-        assertEquals(gate, vm.state.value.albums)
-        assertEquals(gate, vm.state.value.artists)
+        assertEquals(gate, vm.snapshot.value.state.body)
+        assertEquals(gate, vm.snapshot.value.state.albums)
+        assertEquals(gate, vm.snapshot.value.state.artists)
     }
 }

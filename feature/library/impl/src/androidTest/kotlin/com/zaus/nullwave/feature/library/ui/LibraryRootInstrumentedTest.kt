@@ -22,33 +22,33 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.core.app.ActivityOptionsCompat
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.test.platform.app.InstrumentationRegistry
 import com.zaus.nullwave.core.designsystem.theme.NullWaveEffects
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.DataError
+import com.zaus.nullwave.feature.library.api.model.SortDirection
+import com.zaus.nullwave.feature.library.api.model.album.AlbumArtistCredit
+import com.zaus.nullwave.feature.library.api.model.album.AlbumId
+import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
+import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumQuery
+import com.zaus.nullwave.feature.library.api.model.artist.ArtistId
+import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
+import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.api.model.track.TrackId
-import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumQuery
-import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
-import com.zaus.nullwave.feature.library.api.model.album.AlbumId
-import com.zaus.nullwave.feature.library.api.model.album.AlbumArtistCredit
-import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
-import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
-import com.zaus.nullwave.feature.library.api.model.artist.ArtistId
-import com.zaus.nullwave.feature.library.api.model.SortDirection
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.platform.AudioPermission
-import com.zaus.nullwave.feature.library.presentation.LibraryViewModel
 import com.zaus.nullwave.feature.library.presentation.LibraryTab
+import com.zaus.nullwave.feature.library.presentation.LibraryViewModel
 import java.util.Locale
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.flow
@@ -263,7 +263,7 @@ class LibraryRootInstrumentedTest {
         compose.runOnIdle {
             configuration.value = Configuration(configuration.value).apply { setLocale(Locale.forLanguageTag("ru-RU")) }
         }
-        compose.runOnIdle { assertEquals("ru-RU", viewModel.state.value.query.localeTag) }
+        compose.runOnIdle { assertEquals("ru-RU", viewModel.snapshot.value.state.query.localeTag) }
     }
 
     @Test
@@ -284,7 +284,7 @@ class LibraryRootInstrumentedTest {
         compose.onNodeWithText(text(R.string.library_done)).assertIsDisplayed()
         val protectedWork = compose.runOnIdle {
             assertEquals(1, activeSources)
-            assertEquals(LibraryTab.Artists, viewModel.state.value.selectedTab)
+            assertEquals(LibraryTab.Artists, viewModel.snapshot.value.state.selectedTab)
             assertEquals(SortDirection.Descending, (catalogQueries.last() as LibraryArtistQuery).direction)
             owner.registry.currentState = Lifecycle.State.STARTED
             permission.granted = false
@@ -299,7 +299,7 @@ class LibraryRootInstrumentedTest {
         compose.runOnIdle {
             // A different tab can recheck permission through the repository. It must not do I/O.
             assertEquals(protectedWork, protectedReads to observerRegistrations)
-            assertEquals(LibraryTab.Songs, viewModel.state.value.selectedTab)
+            assertEquals(LibraryTab.Songs, viewModel.snapshot.value.state.selectedTab)
             assertEquals(0, activeSources)
             owner.registry.currentState = Lifecycle.State.STARTED
             permission.granted = true
