@@ -66,21 +66,18 @@ internal fun <S : UiState, E : UiEffect, K, T> keyedMviSource(
         check(current != null) { "The MVI source has not been initialized." }
         // Capture ownership before upstream can enter NonCancellable or replace its context.
         val groupJob = currentCoroutineContext().job
-        val groupGeneration = runtime.sourceGeneration
         withContext(MviAccess.workContext(runtime)) {
             revisions.collectLatest { revision ->
                 val requestJob = currentCoroutineContext().job
                 // collectLatest may have waited for an older input's cleanup while this revision
                 // was superseded again. Never start work for that intermediate input.
                 if (
-                    !runtime.isOpen || !groupJob.isActive || !requestJob.isActive ||
-                    runtime.sourceGeneration !== groupGeneration || current !== revision
+                    !runtime.isOpen || !groupJob.isActive || !requestJob.isActive || current !== revision
                 ) return@collectLatest
                 flow(revision.key).collect { value ->
                     withContext(Dispatchers.Main.immediate) {
                         if (
-                            runtime.isOpen && groupJob.isActive && requestJob.isActive &&
-                            runtime.sourceGeneration === groupGeneration && current === revision
+                            runtime.isOpen && groupJob.isActive && requestJob.isActive && current === revision
                         ) {
                             MviAccess.publishing(runtime) {
                                 runtime.updateFromSource(name) { reducer(revision.key, value) }

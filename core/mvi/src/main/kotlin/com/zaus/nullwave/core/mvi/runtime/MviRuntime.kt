@@ -39,9 +39,6 @@ internal class MviRuntime<S : UiState, E : UiEffect>(
     private val intentIngress = MainIntentIngress(runtimeScope)
     val state: StateFlow<S> = mutableState.asStateFlow()
     private val activeUiBindings = MutableStateFlow(0)
-    var sourceGeneration: Any = Any()
-        private set
-    private val sourceRestarts = MutableStateFlow(sourceGeneration)
     private val effectMailbox = EffectMailbox<E>()
     private var closed = false
     private var writingSavedState = false
@@ -57,10 +54,9 @@ internal class MviRuntime<S : UiState, E : UiEffect>(
     private val sourceController = runtimeScope.launch {
         sourceSharing.command(activeUiBindings).collectLatest { command ->
             if (command == SharingCommand.START) {
-                sourceRestarts.collectLatest { generation ->
-                    // A newer restart can arrive while collectLatest joins old cleanup.
-                    if (generation === sourceGeneration) coroutineScope { observeSources() }
-                }
+                // Lifecycle owns the group. A new START waits for the stopped group's cleanup;
+                // explicit refresh is handled independently by each source's input revision.
+                coroutineScope { observeSources() }
             }
         }
     }
@@ -144,13 +140,6 @@ internal class MviRuntime<S : UiState, E : UiEffect>(
     fun queuedOperation(maxPending: Int = 16): MviOperation<S> = operations.queuedOperation(maxPending)
 
     fun idleOperation(): MviOperation<S> = operations.idleOperation()
-
-    fun restartSources() {
-        if (isOpen) {
-            sourceGeneration = Any()
-            sourceRestarts.value = sourceGeneration
-        }
-    }
 
     suspend fun sendEffect(
         effect: E,
