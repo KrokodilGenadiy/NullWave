@@ -6,6 +6,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -49,7 +50,7 @@ class BaseMviViewModelQueryIntegrationTest {
         val observed = mutableListOf<QueryState>()
         // Eager collection records even a briefly incorrect result, not only the final snapshot.
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.withUiBinding { vm.state.collect { observed += it } }
+            vm.withUiBinding { vm.snapshot.map { it.state }.distinctUntilChanged().collect { observed += it } }
         }
         runCurrent()
         val requestA = source.requests.single()
@@ -59,14 +60,14 @@ class BaseMviViewModelQueryIntegrationTest {
         runCurrent()
 
         assertEquals(listOf("A", "B"), source.requests.map { it.input.text })
-        assertTrue(vm.state.value.loading)
-        assertNull(vm.state.value.result)
+        assertTrue(vm.snapshot.value.state.loading)
+        assertNull(vm.snapshot.value.state.result)
         assertFalse(observed.any { it.input.text == "B" && it.result == "result A" })
 
         source.requests.last().results.send("result B")
         runCurrent()
-        assertEquals("result B", vm.state.value.result)
-        assertFalse(vm.state.value.loading)
+        assertEquals("result B", vm.snapshot.value.state.result)
+        assertFalse(vm.snapshot.value.state.loading)
         // Proves the regression actually exercised delivery across the input change.
         assertTrue(vm.delivered.any { it.first == requestA.input && it.second.text == "B" })
     }
@@ -77,7 +78,7 @@ class BaseMviViewModelQueryIntegrationTest {
         val vm = QueryViewModel(source).also { store.put("query", it) }
         val observed = mutableListOf<QueryState>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.withUiBinding { vm.state.collect { observed += it } }
+            vm.withUiBinding { vm.snapshot.map { it.state }.distinctUntilChanged().collect { observed += it } }
         }
         runCurrent()
         val firstA = source.requests.single()
@@ -89,13 +90,13 @@ class BaseMviViewModelQueryIntegrationTest {
 
         assertEquals(listOf("A", "A"), source.requests.map { it.input.text })
         assertEquals(2, source.requests.last().input.revision)
-        assertTrue(vm.state.value.loading)
+        assertTrue(vm.snapshot.value.state.loading)
         assertFalse(observed.any { it.input.revision == 2 && it.result == "first A result" })
 
         source.requests.last().results.send("second A result")
         runCurrent()
-        assertEquals("second A result", vm.state.value.result)
-        assertFalse(vm.state.value.loading)
+        assertEquals("second A result", vm.snapshot.value.state.result)
+        assertFalse(vm.snapshot.value.state.loading)
     }
 
     private data class QueryInput(val text: String, val revision: Int)

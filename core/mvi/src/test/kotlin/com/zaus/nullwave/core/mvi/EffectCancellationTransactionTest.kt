@@ -7,6 +7,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -51,7 +53,7 @@ class EffectCancellationTransactionTest {
             on<Cancel> { cancel(work) }
         }
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.state.collect {
+            vm.snapshot.map { it.state }.distinctUntilChanged().collect {
                 if (it.value == -1) {
                     assertTrue(handlerCancelled)
                     release.complete(Unit)
@@ -111,7 +113,7 @@ class EffectCancellationTransactionTest {
         runCurrent()
 
         assertEquals(listOf("accepted:1", "accepted:2", "cleanup", "cancelled", "accepted:3"), events)
-        assertEquals(Snapshot(3, loading = true), vm.state.value)
+        assertEquals(Snapshot(3, loading = true), vm.snapshot.value.state)
     }
 
     @Test
@@ -143,7 +145,7 @@ class EffectCancellationTransactionTest {
         runCurrent()
 
         assertEquals(0, cancelReducerCalls)
-        assertEquals(1, vm.state.value.value)
+        assertEquals(1, vm.snapshot.value.state.value)
     }
 
     @Test
@@ -179,7 +181,7 @@ class EffectCancellationTransactionTest {
         runCurrent()
 
         assertTrue(secondCancelled)
-        assertEquals(3, vm.state.value.value)
+        assertEquals(3, vm.snapshot.value.state.value)
     }
 
     @Test
@@ -210,7 +212,7 @@ class EffectCancellationTransactionTest {
         runCurrent()
 
         assertEquals(listOf(false), results)
-        assertEquals(2, vm.state.value.value)
+        assertEquals(2, vm.snapshot.value.state.value)
         assertFalse(replacementCancelled)
     }
 
@@ -245,7 +247,7 @@ class EffectCancellationTransactionTest {
         assertTrue(finishWork.isCompleted)
         assertEquals(listOf(1), results)
         assertEquals(listOf(1), finalizers)
-        assertEquals(-1, vm.state.value.value)
+        assertEquals(-1, vm.snapshot.value.state.value)
     }
 
     private suspend fun own(definition: MviDefinition<Snapshot, Intent, Signal>.() -> Unit): Vm =

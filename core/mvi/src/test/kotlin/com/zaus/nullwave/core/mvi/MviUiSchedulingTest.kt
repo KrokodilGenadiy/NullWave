@@ -57,7 +57,7 @@ class MviUiSchedulingTest {
             val binding = launch(start = CoroutineStart.UNDISPATCHED) {
                 first.withUiBinding { awaitCancellation() }
             }
-            withTimeout(5_000) { first.state.first { it.ready } }
+            withTimeout(5_000) { first.snapshot.first { it.state.ready } }
             binding.cancelAndJoin()
             store.clear()
             withTimeout(5_000) { firstJob.join() }
@@ -74,7 +74,7 @@ class MviUiSchedulingTest {
             }
             restored.ui.onIntent(Notify)
             assertEquals(Signal, withTimeout(5_000) { delivered.await() })
-            withTimeout(5_000) { restored.state.first { it.ready } }
+            withTimeout(5_000) { restored.snapshot.first { it.state.ready } }
             assertEquals(1, restored.activeSources)
             effects.cancelAndJoin()
             nextBinding.cancelAndJoin()

@@ -3,18 +3,20 @@ package com.zaus.nullwave.core.mvi
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
-import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import com.zaus.nullwave.core.mvi.persistence.MviSavedState
 import com.zaus.nullwave.core.mvi.persistence.SavedStateStore
 import com.zaus.nullwave.core.mvi.persistence.jsonSavedState
 import com.zaus.nullwave.core.mvi.persistence.savedState
+import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -57,7 +59,7 @@ class MviSavedStateTest {
             source("data", flow = { collections++; flowOf(1) }) { copy(result = it) }
             on<Edit> { reduce { copy(text = it.text) } }
         }
-        assertEquals(Snapshot("saved"), vm.state.value)
+        assertEquals(Snapshot("saved"), vm.snapshot.value.state)
         assertEquals(0, definitions)
         assertEquals(0, collections)
         assertEquals(0, storage.writes)
@@ -69,7 +71,7 @@ class MviSavedStateTest {
         val vm = own(binding(storage)) { on<Edit> { reduce { copy(text = it.text) } } }
         val observed = mutableListOf<String>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.state.collect { state ->
+            vm.snapshot.map { it.state }.distinctUntilChanged().collect { state ->
                 if (state.text.isNotEmpty()) {
                     assertEquals(state.text, restored(storage).text)
                     observed += state.text
@@ -100,7 +102,7 @@ class MviSavedStateTest {
         repeat(3) { vm.ui.onIntent(Tick); vm.ui.onIntent(Edit("one")) }
         assertEquals(2, storage.writes)
         assertEquals(2, encodes)
-        assertEquals(3, vm.state.value.result)
+        assertEquals(3, vm.snapshot.value.state.result)
         assertEquals(Snapshot("one"), restored(storage))
     }
 
@@ -131,7 +133,7 @@ class MviSavedStateTest {
         }
         response.emit(7)
         runCurrent()
-        assertEquals(Snapshot(result = 7), vm.state.value)
+        assertEquals(Snapshot(result = 7), vm.snapshot.value.state)
         assertEquals(Snapshot(), restored(storage))
         assertEquals(1, storage.writes)
         assertEquals(1, subscriptions)
@@ -178,7 +180,7 @@ class MviSavedStateTest {
         runCurrent()
         vm.ui.onIntent(Edit("after clear"))
         assertEquals("accepted", restored(storage).text)
-        assertEquals("accepted", vm.state.value.text)
+        assertEquals("accepted", vm.snapshot.value.state.text)
     }
 
     @Test
@@ -190,7 +192,7 @@ class MviSavedStateTest {
             val adapter = jsonSavedState<Snapshot, String>(storage, "inputs", String.serializer(),
                 select = { text }, restore = { copy(text = it) }, legacy = { legacyCalls++; string("old") })
             val vm = own(adapter) { on<Tick> {} }
-            assertEquals(Snapshot(), vm.state.value)
+            assertEquals(Snapshot(), vm.snapshot.value.state)
             assertEquals(0, legacyCalls)
         }
         assertEquals(Snapshot(), restored(Storage()))
@@ -202,7 +204,7 @@ class MviSavedStateTest {
         val adapter = jsonSavedState<Snapshot, String>(storage, "inputs", String.serializer(),
             select = { text }, restore = { copy(text = it) }, legacy = { string("old") })
         val vm = own(adapter) { on<Tick> {} }
-        assertEquals("legacy", vm.state.value.text)
+        assertEquals("legacy", vm.snapshot.value.state.text)
         assertTrue(storage.contains("old"))
         vm.ui.onIntent(Tick)
         assertEquals(setOf("inputs"), storage.values.keys)
@@ -210,7 +212,7 @@ class MviSavedStateTest {
         storage.values["old"] = "stale"
         val next = own(jsonSavedState<Snapshot, String>(storage, "inputs", String.serializer(),
             select = { text }, restore = { copy(text = it) }, legacy = { string("old") })) { on<Tick> {} }
-        assertEquals("legacy", next.state.value.text)
+        assertEquals("legacy", next.snapshot.value.state.text)
     }
 
     @Test
@@ -230,7 +232,7 @@ class MviSavedStateTest {
         initial.afterWrite = { if (restored(initial).text.isEmpty()) other.ui.onIntent(Edit("from observer")) }
         backgroundScope.launch { other.withUiBinding { awaitCancellation() } }
         runCurrent()
-        assertEquals("from observer", other.state.value.text)
+        assertEquals("from observer", other.snapshot.value.state.text)
     }
 
     @Test
@@ -242,7 +244,7 @@ class MviSavedStateTest {
         vm.ui.onIntent(Edit("never handled"))
         vm.ui.onIntent(Edit("also ignored"))
         assertEquals(0, entries)
-        assertEquals(Snapshot(), vm.state.value)
+        assertEquals(Snapshot(), vm.snapshot.value.state)
         assertEquals(1, storage.writes)
     }
 
@@ -261,7 +263,7 @@ class MviSavedStateTest {
         storage.afterWrite = { owners.clear() }
         vm.ui.onIntent(Edit("written before clear"))
         runCurrent()
-        assertEquals(Snapshot(result = 1), vm.state.value)
+        assertEquals(Snapshot(result = 1), vm.snapshot.value.state)
         assertEquals(1, collections)
         assertEquals("written before clear", restored(storage).text)
         val writes = storage.writes
@@ -278,7 +280,7 @@ class MviSavedStateTest {
         storage.afterWrite = { throw failure }
         assertSame(failure, assertThrows(IllegalStateException::class.java) { vm.ui.onIntent(Edit("failed")) })
         val writes = storage.writes
-        assertEquals("before", vm.state.value.text)
+        assertEquals("before", vm.snapshot.value.state.text)
         // A failed write is not falsely advertised as an atomic rollback of an external object.
         assertEquals("failed", restored(storage).text)
         vm.ui.onIntent(Edit("ignored"))
@@ -302,7 +304,7 @@ class MviSavedStateTest {
         val copy = SavedStateHandle(handle.keys().associateWith { handle.get<Any?>(it) })
         owners.clear()
         val next = own(adapter(copy)) { on<Tick> {} }
-        assertEquals(Snapshot("  Ёлка \"🌊\"\n"), next.state.value)
+        assertEquals(Snapshot("  Ёлка \"🌊\"\n"), next.snapshot.value.state)
     }
 
     private fun binding(storage: Storage, codec: KSerializer<String> = String.serializer()) =

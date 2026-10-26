@@ -9,6 +9,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -52,7 +54,7 @@ class BaseMviViewModelLifecycleTest {
         runCurrent()
         assertEquals(0, viewModel.starts)
 
-        backgroundScope.launch { viewModel.withUiBinding { viewModel.state.collect {} } }
+        backgroundScope.launch { viewModel.withUiBinding { viewModel.snapshot.map { it.state }.distinctUntilChanged().collect {} } }
         runCurrent()
         assertEquals(1, viewModel.starts)
     }
@@ -60,8 +62,8 @@ class BaseMviViewModelLifecycleTest {
     @Test
     fun `two UI bindings share one source group and cancelling one keeps it alive`() = runTest {
         val viewModel = viewModel()
-        val first = backgroundScope.launch { viewModel.withUiBinding { viewModel.state.collect {} } }
-        backgroundScope.launch { viewModel.withUiBinding { viewModel.state.collect {} } }
+        val first = backgroundScope.launch { viewModel.withUiBinding { viewModel.snapshot.map { it.state }.distinctUntilChanged().collect {} } }
+        backgroundScope.launch { viewModel.withUiBinding { viewModel.snapshot.map { it.state }.distinctUntilChanged().collect {} } }
         runCurrent()
 
         assertEquals(1, viewModel.starts)
@@ -80,13 +82,13 @@ class BaseMviViewModelLifecycleTest {
     @Test
     fun `return before timeout preserves the existing source group`() = runTest {
         val viewModel = viewModel()
-        val first = backgroundScope.launch { viewModel.withUiBinding { viewModel.state.collect {} } }
+        val first = backgroundScope.launch { viewModel.withUiBinding { viewModel.snapshot.map { it.state }.distinctUntilChanged().collect {} } }
         runCurrent()
         first.cancel()
         runCurrent()
         advanceTimeBy(STOP_TIMEOUT - 1)
 
-        backgroundScope.launch { viewModel.withUiBinding { viewModel.state.collect {} } }
+        backgroundScope.launch { viewModel.withUiBinding { viewModel.snapshot.map { it.state }.distinctUntilChanged().collect {} } }
         runCurrent()
         advanceTimeBy(STOP_TIMEOUT * 2)
         runCurrent()
@@ -107,7 +109,7 @@ class BaseMviViewModelLifecycleTest {
                 resourceRegistered = false
             }
         }
-        val collector = backgroundScope.launch { viewModel.withUiBinding { viewModel.state.collect {} } }
+        val collector = backgroundScope.launch { viewModel.withUiBinding { viewModel.snapshot.map { it.state }.distinctUntilChanged().collect {} } }
         runCurrent()
         collector.cancel()
         runCurrent()
@@ -128,9 +130,9 @@ class BaseMviViewModelLifecycleTest {
     fun `return first exposes current canonical state then obtains a fresh source snapshot`() = runTest {
         val source = MutableStateFlow(3)
         val viewModel = viewModel { source.collect { writeSource(it) } }
-        val first = backgroundScope.launch { viewModel.withUiBinding { viewModel.state.collect {} } }
+        val first = backgroundScope.launch { viewModel.withUiBinding { viewModel.snapshot.map { it.state }.distinctUntilChanged().collect {} } }
         runCurrent()
-        assertEquals(3, viewModel.state.value.source)
+        assertEquals(3, viewModel.snapshot.value.state.source)
         first.cancel()
         runCurrent()
         advanceTimeBy(STOP_TIMEOUT)
@@ -139,10 +141,10 @@ class BaseMviViewModelLifecycleTest {
         viewModel.writeQuery("changed while hidden")
         source.value = 70
         runCurrent()
-        assertEquals(3, viewModel.state.value.source)
+        assertEquals(3, viewModel.snapshot.value.state.source)
 
         val returnedSnapshots = mutableListOf<TestState>()
-        backgroundScope.launch { viewModel.withUiBinding { viewModel.state.collect { returnedSnapshots += it } } }
+        backgroundScope.launch { viewModel.withUiBinding { viewModel.snapshot.map { it.state }.distinctUntilChanged().collect { returnedSnapshots += it } } }
         runCurrent()
 
         assertEquals(TestState(query = "changed while hidden", source = 3), returnedSnapshots.first())
@@ -168,7 +170,7 @@ class BaseMviViewModelLifecycleTest {
     fun `plain state collection remains live without starting sources`() = runTest {
         val viewModel = viewModel()
         val snapshots = mutableListOf<TestState>()
-        backgroundScope.launch { viewModel.state.collect { snapshots += it } }
+        backgroundScope.launch { viewModel.snapshot.map { it.state }.distinctUntilChanged().collect { snapshots += it } }
         runCurrent()
 
         viewModel.writeQuery("read only")
@@ -203,7 +205,7 @@ class BaseMviViewModelLifecycleTest {
         val viewModel = viewModel()
         val snapshots = mutableListOf<TestState>()
         val plainCollector = backgroundScope.launch {
-            viewModel.state.collect { snapshots += it }
+            viewModel.snapshot.map { it.state }.distinctUntilChanged().collect { snapshots += it }
         }
         val binding = backgroundScope.launch {
             viewModel.withUiBinding { awaitCancellation() }
@@ -328,7 +330,7 @@ class BaseMviViewModelLifecycleTest {
                 selectorFinished = true
             }
         }
-        val collector = backgroundScope.launch { viewModel.withUiBinding { viewModel.state.collect {} } }
+        val collector = backgroundScope.launch { viewModel.withUiBinding { viewModel.snapshot.map { it.state }.distinctUntilChanged().collect {} } }
         runCurrent()
         collector.cancel()
         runCurrent()
@@ -349,7 +351,7 @@ class BaseMviViewModelLifecycleTest {
                 writeSource(it.length)
             }
         }
-        backgroundScope.launch { viewModel.withUiBinding { viewModel.state.collect {} } }
+        backgroundScope.launch { viewModel.withUiBinding { viewModel.snapshot.map { it.state }.distinctUntilChanged().collect {} } }
         runCurrent()
 
         viewModel.writeQuery("music")
@@ -360,8 +362,8 @@ class BaseMviViewModelLifecycleTest {
         runCurrent()
 
         assertEquals(listOf("", "music"), observedQueries)
-        assertEquals(5, viewModel.state.value.source)
-        assertEquals(42, viewModel.state.value.unrelated)
+        assertEquals(5, viewModel.snapshot.value.state.source)
+        assertEquals(42, viewModel.snapshot.value.state.unrelated)
     }
 
     @Test
@@ -382,7 +384,7 @@ class BaseMviViewModelLifecycleTest {
                 awaitCancellation()
             }
         }
-        backgroundScope.launch { viewModel.withUiBinding { viewModel.state.collect {} } }
+        backgroundScope.launch { viewModel.withUiBinding { viewModel.snapshot.map { it.state }.distinctUntilChanged().collect {} } }
         runCurrent()
         assertEquals(2, activeChildren)
 

@@ -55,7 +55,7 @@ class StrictMviSourceContractTest {
         repository.requests.single().respond(12)
         runCurrent()
 
-        assertEquals(ScreenState(), vm.state.value)
+        assertEquals(ScreenState(), vm.snapshot.value.state)
         assertEquals(listOf(Request()), repository.requests.map { it.input })
         assertTrue(repository.failures.single().message.orEmpty().contains("Source 'tracks'"))
         assertTrue(repository.failures.single().message.orEmpty().contains("input of source 'tracks'"))
@@ -80,12 +80,12 @@ class StrictMviSourceContractTest {
 
         tracks.requests.single().respond(1)
         runCurrent()
-        assertEquals(ScreenState(), vm.state.value)
+        assertEquals(ScreenState(), vm.snapshot.value.state)
         assertTrue(tracks.failures.single().message.orEmpty().contains("input of source 'albums'"))
 
         albums.requests.single().respond(1)
         runCurrent()
-        assertEquals(ScreenState(), vm.state.value)
+        assertEquals(ScreenState(), vm.snapshot.value.state)
         assertTrue(albums.failures.single().message.orEmpty().contains("input of source 'tracks'"))
 
         // The failed publications must not revoke either still-valid subscription.
@@ -93,7 +93,7 @@ class StrictMviSourceContractTest {
         albums.requests.single().respond(30)
         runCurrent()
 
-        assertEquals(ScreenState(result = 20, relatedResult = 30), vm.state.value)
+        assertEquals(ScreenState(result = 20, relatedResult = 30), vm.snapshot.value.state)
         assertEquals(1, tracks.requests.size)
         assertEquals(1, albums.requests.size)
     }
@@ -116,7 +116,7 @@ class StrictMviSourceContractTest {
         preferences.requests.single().respond(true)
         runCurrent()
 
-        assertEquals(ScreenState(), vm.state.value)
+        assertEquals(ScreenState(), vm.snapshot.value.state)
         assertEquals(1, tracks.requests.size)
         assertTrue(preferences.failures.single().message.orEmpty().contains("Source 'preferences'"))
         assertTrue(preferences.failures.single().message.orEmpty().contains("input of source 'tracks'"))
@@ -147,7 +147,7 @@ class StrictMviSourceContractTest {
         runCurrent()
 
         assertEquals(listOf(Request(), query, sort, filter), repository.requests.map { it.input })
-        assertEquals(ScreenState(request = filter, result = 42), vm.state.value)
+        assertEquals(ScreenState(request = filter, result = 42), vm.snapshot.value.state)
         assertTrue(repository.failures.isEmpty())
     }
 
@@ -174,7 +174,7 @@ class StrictMviSourceContractTest {
         runCurrent()
 
         assertEquals(listOf(Request(), restored), repository.requests.map { it.input })
-        assertEquals(ScreenState(request = restored, result = 7), vm.state.value)
+        assertEquals(ScreenState(request = restored, result = 7), vm.snapshot.value.state)
         assertTrue(repository.failures.isEmpty())
     }
 

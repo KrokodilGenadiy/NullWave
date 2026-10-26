@@ -94,7 +94,7 @@ class OperationFailureIntegrationTest {
             assertEquals(1, failures.size)
             assertSame(original, failures.single())
             assertEquals(listOf(finalizer), original.suppressed.toList())
-            assertEquals(Snapshot(value = 1), runtime.state.value)
+            assertEquals(Snapshot(value = 1), runtime.snapshot.value.state)
         }
     }
 

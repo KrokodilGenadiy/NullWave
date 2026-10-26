@@ -52,12 +52,12 @@ class MainIntentIngressTest {
 
         onWorker { vm.ui.onIntent(Set(1)) }
         vm.ui.onIntent(Set(2))
-        assertEquals(0, vm.state.value.value)
+        assertEquals(0, vm.snapshot.value.state.value)
 
         runCurrent()
 
         assertEquals(listOf(1, 2), executed)
-        assertEquals(2, vm.state.value.value)
+        assertEquals(2, vm.snapshot.value.state.value)
     }
 
     @Test
@@ -77,7 +77,7 @@ class MainIntentIngressTest {
         vm.ui.onIntent(Set(4))
 
         assertEquals(listOf(1, 2, 3, 4), handled)
-        assertEquals(4, vm.state.value.value)
+        assertEquals(4, vm.snapshot.value.state.value)
     }
 
     @Test
@@ -94,7 +94,7 @@ class MainIntentIngressTest {
         source.ui.onIntent(Set(0))
         runCurrent()
 
-        assertEquals(7, target.state.value.value)
+        assertEquals(7, target.snapshot.value.state.value)
     }
 
     @Test
@@ -114,7 +114,7 @@ class MainIntentIngressTest {
         runCurrent()
 
         assertTrue(rejected)
-        assertEquals(0, vm.state.value.value)
+        assertEquals(0, vm.snapshot.value.state.value)
     }
 
     @Test
@@ -140,8 +140,8 @@ class MainIntentIngressTest {
         runCurrent()
 
         assertNull(callbackFailure)
-        assertEquals(7, source.state.value.value)
-        assertEquals(1, target.state.value.value)
+        assertEquals(7, source.snapshot.value.state.value)
+        assertEquals(1, target.snapshot.value.state.value)
     }
 
     @Test
@@ -164,7 +164,7 @@ class MainIntentIngressTest {
         source.ui.onIntent(Set(2))
 
         assertTrue(rejected)
-        assertEquals(2, source.state.value.value)
+        assertEquals(2, source.snapshot.value.state.value)
     }
 
     @Test
@@ -200,7 +200,7 @@ class MainIntentIngressTest {
         onWorker { vm.ui.onIntent(Set(3)) }
         runCurrent()
 
-        assertEquals(1, vm.state.value.value)
+        assertEquals(1, vm.snapshot.value.state.value)
     }
 
     @Test
@@ -231,7 +231,7 @@ class MainIntentIngressTest {
 
         assertTrue(cleanupRan)
         assertNull(callbackFailure)
-        assertEquals(0, vm.state.value.value)
+        assertEquals(0, vm.snapshot.value.state.value)
     }
 
     @Test
@@ -248,7 +248,7 @@ class MainIntentIngressTest {
         runCurrent()
 
         assertEquals(0, definitions)
-        assertEquals(0, vm.state.value.value)
+        assertEquals(0, vm.snapshot.value.state.value)
     }
 
     @Test

@@ -71,7 +71,7 @@ class BaseMviViewModelOperationTest {
         assertTrue(second)
         assertTrue(third)
         assertEquals(listOf("third"), started)
-        assertEquals(listOf("third"), vm.state.value.values)
+        assertEquals(listOf("third"), vm.snapshot.value.state.values)
     }
 
     @Test
@@ -117,7 +117,7 @@ class BaseMviViewModelOperationTest {
 
         assertEquals(listOf("first:start", "child:cleanup", "child:done", "third:start"), events)
         assertEquals(listOf(false), commits)
-        assertEquals(listOf("third"), vm.state.value.values)
+        assertEquals(listOf("third"), vm.snapshot.value.state.values)
     }
 
     @Test
@@ -149,7 +149,7 @@ class BaseMviViewModelOperationTest {
 
         assertEquals(listOf(false, false, true), commits)
         assertEquals(listOf("old", "new"), started)
-        assertEquals(listOf("new result"), vm.state.value.values)
+        assertEquals(listOf("new result"), vm.snapshot.value.state.values)
     }
 
     @Test
@@ -204,12 +204,12 @@ class BaseMviViewModelOperationTest {
         releases.forEachIndexed { index, release ->
             release.complete(Unit)
             runCurrent()
-            assertEquals((0..index).map(Int::toString), vm.state.value.values)
+            assertEquals((0..index).map(Int::toString), vm.snapshot.value.state.values)
         }
 
         assertFalse(rejectedRan)
         assertEquals(listOf("start:0", "end:0", "start:1", "end:1", "start:2", "end:2"), events)
-        assertEquals(listOf("0", "1", "2"), vm.state.value.values)
+        assertEquals(listOf("0", "1", "2"), vm.snapshot.value.state.values)
     }
 
     @Test
@@ -310,7 +310,7 @@ class BaseMviViewModelOperationTest {
         runCurrent()
 
         assertEquals(listOf("first", "second"), started)
-        assertEquals(listOf("first"), vm.state.value.values)
+        assertEquals(listOf("first"), vm.snapshot.value.state.values)
     }
 
     @Test
@@ -344,7 +344,7 @@ class BaseMviViewModelOperationTest {
         runCurrent()
         assertEquals(listOf("cleanup:start", "cleanup:end", "next"), events)
         assertEquals(listOf(false), commits)
-        assertTrue(vm.state.value.values.isEmpty())
+        assertTrue(vm.snapshot.value.state.values.isEmpty())
     }
 
     @Test
@@ -370,10 +370,10 @@ class BaseMviViewModelOperationTest {
 
             assertTrue("$policy did not cancel the active coroutine", cancelledBeforeResult)
             assertEquals("$policy accepted a cancelled commit", listOf(false, false), attempts)
-            assertTrue(vm.state.value.values.isEmpty())
+            assertTrue(vm.snapshot.value.state.values.isEmpty())
             assertTrue(vm.run(policy) { commitState { copy(values = listOf("fresh")) } })
             runCurrent()
-            assertEquals(listOf("fresh"), vm.state.value.values)
+            assertEquals(listOf("fresh"), vm.snapshot.value.state.values)
         }
     }
 
@@ -409,13 +409,13 @@ class BaseMviViewModelOperationTest {
         runCurrent()
 
         assertTrue(oldLatestCleaned)
-        assertEquals(listOf("latest"), vm.state.value.values)
+        assertEquals(listOf("latest"), vm.snapshot.value.state.values)
         assertEquals(setOf("latest:old", "queue", "idle", "latest:new"), started.toSet())
         assertEquals(0, vm.sourceStarts)
 
         release.complete(Unit)
         runCurrent()
-        assertEquals(setOf("latest", "queue", "idle"), vm.state.value.values.toSet())
+        assertEquals(setOf("latest", "queue", "idle"), vm.snapshot.value.state.values.toSet())
     }
 
     @Test
@@ -501,7 +501,7 @@ class BaseMviViewModelOperationTest {
                 assertTrue(vm.run(policy) { commitState { copy(values = values + "next") } })
             }
             runCurrent()
-            assertEquals(listOf("expected error", "next"), vm.state.value.values)
+            assertEquals(listOf("expected error", "next"), vm.snapshot.value.state.values)
         }
     }
 
@@ -525,7 +525,7 @@ class BaseMviViewModelOperationTest {
                     })
                     runCurrent()
 
-                    assertEquals(listOf("next result"), vm.state.value.values)
+                    assertEquals(listOf("next result"), vm.snapshot.value.state.values)
                 } finally {
                     store.clear()
                     runCurrent()
@@ -570,7 +570,7 @@ class BaseMviViewModelOperationTest {
 
             assertNotSame(mainThread, completionThread)
             assertSame(mainThread, nextBodyOn.await())
-            assertEquals(listOf("next result"), vm.state.value.values)
+            assertEquals(listOf("next result"), vm.snapshot.value.state.values)
         } finally {
             childRelease.complete(Unit)
             store.clear()
@@ -623,7 +623,7 @@ class BaseMviViewModelOperationTest {
         assertEquals(listOf(true, true, true), cancelled)
         assertEquals(listOf(false, false, false), attempts)
         assertEquals(setOf("latest:active", "queue:active", "idle:active"), started.toSet())
-        assertTrue(vm.state.value.values.isEmpty())
+        assertTrue(vm.snapshot.value.state.values.isEmpty())
     }
 
     @Test
@@ -638,7 +638,7 @@ class BaseMviViewModelOperationTest {
             runCurrent()
 
             assertFalse("$policy allowed a commit after completion", lateCommit())
-            assertEquals(listOf("accepted"), vm.state.value.values)
+            assertEquals(listOf("accepted"), vm.snapshot.value.state.values)
         }
     }
 
@@ -669,7 +669,7 @@ class BaseMviViewModelOperationTest {
         assertEquals(true, nestedAccepted)
         assertEquals(listOf(false), attempts)
         assertEquals(listOf("first", "nested"), events)
-        assertEquals(listOf("newest"), vm.state.value.values)
+        assertEquals(listOf("newest"), vm.snapshot.value.state.values)
     }
 
     private fun own(maxPending: Int = 16): OperationViewModel = OperationViewModel(maxPending).also {

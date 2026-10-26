@@ -3,8 +3,8 @@ package com.zaus.nullwave.core.mvi
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.dsl.IntentScope
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
-import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import com.zaus.nullwave.core.mvi.dsl.Source
+import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -67,7 +67,7 @@ class SourceRefreshTest {
         vm.ui.onIntent(Refresh)
         runCurrent()
         assertEquals(listOf("A", "B", "B"), reads)
-        assertEquals(3, vm.state.value.result)
+        assertEquals(3, vm.snapshot.value.state.result)
     }
 
     @Test
@@ -89,13 +89,13 @@ class SourceRefreshTest {
         vm.ui.onIntent(Query("B"))
         runCurrent()
         assertEquals(listOf("A", "B"), reads)
-        assertEquals(2, vm.state.value.result)
-        assertFalse(vm.state.value.loading)
+        assertEquals(2, vm.snapshot.value.state.result)
+        assertFalse(vm.snapshot.value.state.loading)
         vm.ui.onIntent(Refresh)
         runCurrent()
         assertEquals(listOf("A", "B", "B"), reads)
-        assertEquals(3, vm.state.value.result)
-        assertFalse(vm.state.value.loading)
+        assertEquals(3, vm.snapshot.value.state.result)
+        assertFalse(vm.snapshot.value.state.loading)
         assertEquals(1, siblingReads)
     }
 
@@ -124,12 +124,12 @@ class SourceRefreshTest {
             assertEquals(1, requests.size)
             requests[0].complete(42)
             runCurrent()
-            assertEquals(0, vm.state.value.result)
+            assertEquals(0, vm.snapshot.value.state.result)
             assertEquals(2, requests.size)
             requests[1].complete(7)
             runCurrent()
-            assertEquals(7, vm.state.value.result)
-            assertFalse(vm.state.value.loading)
+            assertEquals(7, vm.snapshot.value.state.result)
+            assertFalse(vm.snapshot.value.state.loading)
         } finally {
             requests.toList().forEach { it.complete(-1) }
         }
@@ -188,7 +188,7 @@ class SourceRefreshTest {
         output.emit(7)
         runCurrent()
         assertEquals(1, reads)
-        assertEquals(Snapshot(result = 7), vm.state.value)
+        assertEquals(Snapshot(result = 7), vm.snapshot.value.state)
     }
 
     @Test
@@ -225,7 +225,7 @@ class SourceRefreshTest {
             }
         }
         assertThrows(IllegalStateException::class.java) { vm.ui.onIntent(Refresh) }
-        assertEquals(Snapshot(), vm.state.value)
+        assertEquals(Snapshot(), vm.snapshot.value.state)
         store.clear()
         vm.ui.onIntent(Refresh)
         runCurrent()

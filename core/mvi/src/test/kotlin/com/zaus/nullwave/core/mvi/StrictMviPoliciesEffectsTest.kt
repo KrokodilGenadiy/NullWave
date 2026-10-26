@@ -13,7 +13,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -76,16 +78,16 @@ class StrictMviPoliciesEffectsTest {
         vm.ui.onIntent(Run(2))
         runCurrent()
         assertEquals(listOf(1), started)
-        assertEquals(2, vm.state.value.accepted)
-        assertTrue(vm.state.value.loading)
+        assertEquals(2, vm.snapshot.value.state.accepted)
+        assertTrue(vm.snapshot.value.state.loading)
         releaseOld.complete(Unit)
         runCurrent()
 
         assertEquals(listOf(true, true), accepted)
         assertEquals(listOf(1, 2), started)
-        assertEquals(20, vm.state.value.result)
-        assertEquals(listOf(2), vm.state.value.finished)
-        assertFalse(vm.state.value.loading)
+        assertEquals(20, vm.snapshot.value.state.result)
+        assertEquals(listOf(2), vm.snapshot.value.state.finished)
+        assertFalse(vm.snapshot.value.state.loading)
         assertEquals(listOf(TestEffect(2)), effects)
     }
 
@@ -113,14 +115,14 @@ class StrictMviPoliciesEffectsTest {
         vm.ui.onIntent(Run(3))
 
         assertEquals(listOf(true, true, false), accepted)
-        assertEquals(2, vm.state.value.accepted)
+        assertEquals(2, vm.snapshot.value.state.accepted)
         assertEquals(listOf(1), started)
         first.complete(Unit)
         runCurrent()
 
         assertEquals(listOf(1, 2), started)
-        assertEquals(listOf(1, 2), vm.state.value.finished)
-        assertEquals(20, vm.state.value.result)
+        assertEquals(listOf(1, 2), vm.snapshot.value.state.finished)
+        assertEquals(20, vm.snapshot.value.state.result)
     }
 
     @Test
@@ -142,8 +144,8 @@ class StrictMviPoliciesEffectsTest {
         vm.ui.onIntent(Run(1))
         vm.ui.onIntent(Run(2))
         runCurrent()
-        assertEquals(1, vm.state.value.accepted)
-        assertTrue(vm.state.value.loading)
+        assertEquals(1, vm.snapshot.value.state.accepted)
+        assertTrue(vm.snapshot.value.state.loading)
 
         first.complete(Unit)
         runCurrent()
@@ -151,9 +153,9 @@ class StrictMviPoliciesEffectsTest {
         runCurrent()
 
         assertEquals(listOf(true, false, true), accepted)
-        assertEquals(listOf(1, 3), vm.state.value.finished)
-        assertEquals(3, vm.state.value.result)
-        assertFalse(vm.state.value.loading)
+        assertEquals(listOf(1, 3), vm.snapshot.value.state.finished)
+        assertEquals(3, vm.snapshot.value.state.result)
+        assertFalse(vm.snapshot.value.state.loading)
     }
 
     @Test
@@ -181,9 +183,9 @@ class StrictMviPoliciesEffectsTest {
         runCurrent()
 
         assertEquals(listOf(true, true), accepted)
-        assertEquals(listOf(1, 2), vm.state.value.finished)
-        assertEquals(0, vm.state.value.result)
-        assertFalse(vm.state.value.loading)
+        assertEquals(listOf(1, 2), vm.snapshot.value.state.finished)
+        assertEquals(0, vm.snapshot.value.state.result)
+        assertFalse(vm.snapshot.value.state.loading)
         assertTrue(effects.isEmpty())
     }
 
@@ -211,9 +213,9 @@ class StrictMviPoliciesEffectsTest {
 
         assertEquals(listOf(true, true), accepted)
         assertEquals(listOf(true, false), cancelled)
-        assertEquals(1, vm.state.value.cancelCount)
-        assertTrue(vm.state.value.finished.isEmpty())
-        assertFalse(vm.state.value.loading)
+        assertEquals(1, vm.snapshot.value.state.cancelCount)
+        assertTrue(vm.snapshot.value.state.finished.isEmpty())
+        assertFalse(vm.snapshot.value.state.loading)
     }
 
     @Test
@@ -235,7 +237,7 @@ class StrictMviPoliciesEffectsTest {
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.collectEffects { effects += it } }
         runCurrent()
 
-        assertEquals(2, vm.state.value.result)
+        assertEquals(2, vm.snapshot.value.state.result)
         assertEquals(listOf(TestEffect(2)), effects)
     }
 
@@ -318,9 +320,9 @@ class StrictMviPoliciesEffectsTest {
         }
 
         assertTrue(accepted.all { it })
-        assertEquals(100, vm.state.value.finished.size)
-        assertEquals(99, vm.state.value.result)
-        assertFalse(vm.state.value.loading)
+        assertEquals(100, vm.snapshot.value.state.finished.size)
+        assertEquals(99, vm.snapshot.value.state.result)
+        assertFalse(vm.snapshot.value.state.loading)
     }
 
     @Test
@@ -372,8 +374,8 @@ class StrictMviPoliciesEffectsTest {
         runCurrent()
 
         assertEquals(listOf(TestEffect(7)), effects)
-        assertEquals("from UI effect handler", vm.state.value.query)
-        assertEquals(7, vm.state.value.result)
+        assertEquals("from UI effect handler", vm.snapshot.value.state.query)
+        assertEquals(7, vm.snapshot.value.state.result)
     }
 
     @Test
@@ -391,7 +393,7 @@ class StrictMviPoliciesEffectsTest {
         }
         var replaced = false
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.state.collect {
+            vm.snapshot.map { it.state }.distinctUntilChanged().collect {
                 if (it.result == 1 && !replaced) {
                     replaced = true
                     vm.ui.onIntent(Run(2))
@@ -404,8 +406,8 @@ class StrictMviPoliciesEffectsTest {
         runCurrent()
 
         assertTrue(replaced)
-        assertEquals(2, vm.state.value.accepted)
-        assertTrue(vm.state.value.loading)
+        assertEquals(2, vm.snapshot.value.state.accepted)
+        assertTrue(vm.snapshot.value.state.loading)
         assertTrue(effects.isEmpty())
     }
 
@@ -435,11 +437,11 @@ class StrictMviPoliciesEffectsTest {
             requests[0].second.complete(1)
             runCurrent()
 
-            assertEquals(0, vm.state.value.result)
+            assertEquals(0, vm.snapshot.value.state.result)
             assertEquals(listOf("A", "A"), requests.map { it.first })
             requests[1].second.complete(2)
             runCurrent()
-            assertEquals(2, vm.state.value.result)
+            assertEquals(2, vm.snapshot.value.state.result)
         } finally {
             requests.toList().forEach { it.second.complete(-1) }
         }
@@ -467,11 +469,11 @@ class StrictMviPoliciesEffectsTest {
             requests[0].complete(1)
             runCurrent()
 
-            assertEquals(0, vm.state.value.result)
+            assertEquals(0, vm.snapshot.value.state.result)
             assertEquals(2, requests.size)
             requests[1].complete(2)
             runCurrent()
-            assertEquals(2, vm.state.value.result)
+            assertEquals(2, vm.snapshot.value.state.result)
         } finally {
             requests.toList().forEach { it.complete(-1) }
         }
@@ -498,14 +500,14 @@ class StrictMviPoliciesEffectsTest {
             runCurrent()
             requests[0].complete(1)
             runCurrent()
-            assertEquals(0, vm.state.value.result)
+            assertEquals(0, vm.snapshot.value.state.result)
 
             backgroundScope.launch { vm.withUiBinding { awaitCancellation() } }
             runCurrent()
             assertEquals(2, requests.size)
             requests[1].complete(2)
             runCurrent()
-            assertEquals(2, vm.state.value.result)
+            assertEquals(2, vm.snapshot.value.state.result)
         } finally {
             requests.toList().forEach { it.complete(-1) }
         }
@@ -535,8 +537,8 @@ class StrictMviPoliciesEffectsTest {
         runCurrent()
 
         assertNotNull(rejected)
-        assertEquals("A", vm.state.value.query)
-        assertEquals(4, vm.state.value.result)
+        assertEquals("A", vm.snapshot.value.state.query)
+        assertEquals(4, vm.snapshot.value.state.result)
     }
 
     @Test
@@ -557,7 +559,7 @@ class StrictMviPoliciesEffectsTest {
         backgroundScope.launch { vm.withUiBinding { awaitCancellation() } }
         runCurrent()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.state.collect {
+            vm.snapshot.map { it.state }.distinctUntilChanged().collect {
                 if (it.query == "B") vm.ui.onIntent(Query("C"))
             }
         }
@@ -565,8 +567,8 @@ class StrictMviPoliciesEffectsTest {
         vm.ui.onIntent(Query("B"))
         runCurrent()
 
-        assertEquals("C", vm.state.value.query)
-        assertEquals('C'.code, vm.state.value.result)
+        assertEquals("C", vm.snapshot.value.state.query)
+        assertEquals('C'.code, vm.snapshot.value.state.result)
         // B is a complete transition before the queued C intent, so its synchronous source may run.
         assertEquals(listOf("A", "B", "C"), observedInputs)
     }

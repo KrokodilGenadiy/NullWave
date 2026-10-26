@@ -7,6 +7,8 @@ import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -52,13 +54,13 @@ class StrictMviContractTest {
             on<Start> { reduce { copy(value = value + 1) } }
         }
         assertEquals(0, definitions)
-        assertEquals(TestState(), vm.state.value)
+        assertEquals(TestState(), vm.snapshot.value.state)
 
         vm.ui.onIntent(Start)
         vm.ui.onIntent(Start)
 
         assertEquals(1, definitions)
-        assertEquals(2, vm.state.value.value)
+        assertEquals(2, vm.snapshot.value.state.value)
     }
 
     @Test
@@ -77,7 +79,7 @@ class StrictMviContractTest {
         assertEquals(1, definitions)
         assertSame(failure, first)
         assertTrue(second === first || second.cause === first)
-        assertEquals(TestState(), vm.state.value)
+        assertEquals(TestState(), vm.snapshot.value.state)
     }
 
     @Test
@@ -88,7 +90,7 @@ class StrictMviContractTest {
         val failure = assertThrows(RuntimeException::class.java) { vm.ui.onIntent(Stop) }
 
         assertTrue(failure.message.orEmpty().contains("Stop"))
-        assertEquals(TestState(), vm.state.value)
+        assertEquals(TestState(), vm.snapshot.value.state)
     }
 
     @Test
@@ -99,7 +101,7 @@ class StrictMviContractTest {
         }
 
         assertThrows(RuntimeException::class.java) { vm.ui.onIntent(Start) }
-        assertEquals(TestState(), vm.state.value)
+        assertEquals(TestState(), vm.snapshot.value.state)
     }
 
     @Test
@@ -199,7 +201,7 @@ class StrictMviContractTest {
         vm.ui.onIntent(Start)
 
         assertThrows(IllegalStateException::class.java) { configureLater() }
-        assertEquals(TestState(), vm.state.value)
+        assertEquals(TestState(), vm.snapshot.value.state)
     }
 
     @Test
@@ -225,7 +227,7 @@ class StrictMviContractTest {
         vm.ui.onIntent(Start)
 
         assertThrows(IllegalStateException::class.java) { mutateLater() }
-        assertEquals(TestState(), vm.state.value)
+        assertEquals(TestState(), vm.snapshot.value.state)
     }
 
     @Test
@@ -251,7 +253,7 @@ class StrictMviContractTest {
 
         assertThrows(IllegalStateException::class.java) { vm.ui.onIntent(Start) }
         assertThrows(IllegalStateException::class.java) { mutateLater() }
-        assertEquals(TestState(), vm.state.value)
+        assertEquals(TestState(), vm.snapshot.value.state)
     }
 
     @Test
@@ -296,7 +298,7 @@ class StrictMviContractTest {
         }
 
         assertThrows(IllegalStateException::class.java) { vm.ui.onIntent(Start) }
-        assertEquals(TestState(), vm.state.value)
+        assertEquals(TestState(), vm.snapshot.value.state)
     }
 
     @Test
@@ -307,7 +309,7 @@ class StrictMviContractTest {
         }
         val seen = mutableListOf<Int>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.state.collect {
+            vm.snapshot.map { it.state }.distinctUntilChanged().collect {
                 seen += it.value
                 if (it.value == 1) vm.ui.onIntent(Stop)
             }
@@ -316,7 +318,7 @@ class StrictMviContractTest {
         vm.ui.onIntent(Start)
 
         assertEquals(listOf(0, 1, 2), seen)
-        assertEquals(2, vm.state.value.value)
+        assertEquals(2, vm.snapshot.value.state.value)
     }
 
     @Test
@@ -338,13 +340,13 @@ class StrictMviContractTest {
             }
         }
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.state.collect { if (it.value == 1) vm.ui.onIntent(Stop) }
+            vm.snapshot.map { it.state }.distinctUntilChanged().collect { if (it.value == 1) vm.ui.onIntent(Stop) }
         }
 
         vm.ui.onIntent(Start)
 
         assertTrue(rejected)
-        assertEquals(2, vm.state.value.value)
+        assertEquals(2, vm.snapshot.value.state.value)
     }
 
     @Test
@@ -373,13 +375,13 @@ class StrictMviContractTest {
 
         assertEquals(null, failure.get())
         assertEquals(0, definitions)
-        assertEquals(TestState(), vm.state.value)
+        assertEquals(TestState(), vm.snapshot.value.state)
 
         runCurrent()
 
         assertEquals(1, definitions)
         assertSame(mainThread, handledOn.get())
-        assertEquals(1, vm.state.value.value)
+        assertEquals(1, vm.snapshot.value.state.value)
     }
 
     @Test
@@ -391,12 +393,12 @@ class StrictMviContractTest {
         }
         val seen = mutableListOf<Int>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.state.collect { seen += it.value }
+            vm.snapshot.map { it.state }.distinctUntilChanged().collect { seen += it.value }
         }
 
         assertThrows(IllegalStateException::class.java) { vm.ui.onIntent(Start) }
         assertEquals(listOf(0), seen)
-        assertEquals(TestState(), vm.state.value)
+        assertEquals(TestState(), vm.snapshot.value.state)
         vm.ui.onIntent(Stop)
         assertEquals(listOf(0, 2), seen)
     }

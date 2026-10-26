@@ -8,6 +8,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -62,9 +64,9 @@ class BaseMviViewModelLifecycleIntegrationTest {
                 }
             }
         }
-        val firstUi = backgroundScope.launch { viewModel.withUiBinding { viewModel.state.collect {} } }
+        val firstUi = backgroundScope.launch { viewModel.withUiBinding { viewModel.snapshot.map { it.state }.distinctUntilChanged().collect {} } }
         runCurrent()
-        assertEquals(10, viewModel.state.value.source)
+        assertEquals(10, viewModel.snapshot.value.state.source)
 
         firstUi.cancel()
         runCurrent()
@@ -74,7 +76,7 @@ class BaseMviViewModelLifecycleIntegrationTest {
 
         source.value = 20
         val returnedSnapshots = mutableListOf<TestState>()
-        backgroundScope.launch { viewModel.withUiBinding { viewModel.state.collect { returnedSnapshots += it } } }
+        backgroundScope.launch { viewModel.withUiBinding { viewModel.snapshot.map { it.state }.distinctUntilChanged().collect { returnedSnapshots += it } } }
         runCurrent()
 
         assertEquals(1, viewModel.starts)
@@ -122,7 +124,7 @@ class BaseMviViewModelLifecycleIntegrationTest {
 
         viewModel.writeQuery("first")
         viewModel.writeQuery("before collection")
-        val ui = backgroundScope.launch { viewModel.withUiBinding { viewModel.state.collect {} } }
+        val ui = backgroundScope.launch { viewModel.withUiBinding { viewModel.snapshot.map { it.state }.distinctUntilChanged().collect {} } }
         runCurrent()
         assertEquals(listOf("before collection"), selectedQueries)
 
@@ -131,14 +133,14 @@ class BaseMviViewModelLifecycleIntegrationTest {
         viewModel.writeSource(-1)
         viewModel.writeQuery("latest")
         runCurrent()
-        assertEquals("latest", viewModel.state.value.query)
+        assertEquals("latest", viewModel.snapshot.value.state.query)
         assertEquals(listOf("before collection"), selectedQueries)
 
         allowNextInput.complete(Unit)
         runCurrent()
 
         assertEquals(listOf("before collection", "latest"), selectedQueries)
-        assertEquals("latest".length, viewModel.state.value.source)
+        assertEquals("latest".length, viewModel.snapshot.value.state.source)
         assertEquals(1, viewModel.starts)
 
         ui.cancel()

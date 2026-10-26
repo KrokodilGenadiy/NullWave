@@ -7,6 +7,8 @@ import kotlin.coroutines.suspendCoroutine
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -55,10 +57,10 @@ class BaseMviViewModelRequestIntegrationTest {
         assertEquals(SearchState(query = "new", loading = true), oldCleanup.state)
         assertTrue(vm.events.indexOf("cleanup:old") < vm.events.indexOf("launch-returned:new"))
         assertTrue(repository.requests.containsKey("new"))
-        assertTrue(vm.state.value.loading)
+        assertTrue(vm.snapshot.value.state.loading)
 
         repository.requests.getValue("new").complete("new result")
-        assertEquals(SearchState(query = "new", result = "new result"), vm.state.value)
+        assertEquals(SearchState(query = "new", result = "new result"), vm.snapshot.value.state)
         assertEquals(listOf(ResultAttempt("new", applied = true)), vm.results)
     }
 
@@ -79,13 +81,13 @@ class BaseMviViewModelRequestIntegrationTest {
 
         assertEquals(listOf("old", "new"), repository.started)
         assertEquals(listOf(ResultAttempt("old", applied = false)), vm.results)
-        assertEquals(SearchState(query = "new", loading = true), vm.state.value)
-        assertEquals(listOf(Cleanup("old", applied = false, vm.state.value)), vm.cleanups)
+        assertEquals(SearchState(query = "new", loading = true), vm.snapshot.value.state)
+        assertEquals(listOf(Cleanup("old", applied = false, vm.snapshot.value.state)), vm.cleanups)
 
         repository.complete("new", "current result")
         runCurrent()
 
-        assertEquals(SearchState(query = "new", result = "current result"), vm.state.value)
+        assertEquals(SearchState(query = "new", result = "current result"), vm.snapshot.value.state)
         assertEquals(
             listOf(ResultAttempt("old", applied = false), ResultAttempt("new", applied = true)),
             vm.results,
@@ -100,7 +102,7 @@ class BaseMviViewModelRequestIntegrationTest {
         vm.onIntent(SearchIntent.Search("cancelled"))
         runCurrent()
         vm.onIntent(SearchIntent.Cancel)
-        val cancelledState = vm.state.value
+        val cancelledState = vm.snapshot.value.state
         assertFalse(cancelledState.loading)
 
         repository.complete("cancelled", "late result")
@@ -108,7 +110,7 @@ class BaseMviViewModelRequestIntegrationTest {
 
         assertEquals(listOf(ResultAttempt("cancelled", applied = false)), vm.results)
         assertEquals(listOf(Cleanup("cancelled", applied = false, cancelledState)), vm.cleanups)
-        assertEquals(cancelledState, vm.state.value)
+        assertEquals(cancelledState, vm.snapshot.value.state)
     }
 
     @Test
@@ -118,20 +120,20 @@ class BaseMviViewModelRequestIntegrationTest {
         vm.onIntent(SearchIntent.Search("cleared"))
         runCurrent()
         store.clear()
-        val stateAtClear = vm.state.value
+        val stateAtClear = vm.snapshot.value.state
 
         repository.complete("cleared", "late result")
         runCurrent()
 
         assertEquals(listOf(ResultAttempt("cleared", applied = false)), vm.results)
         assertEquals(listOf(Cleanup("cleared", applied = false, stateAtClear)), vm.cleanups)
-        assertEquals(stateAtClear, vm.state.value)
+        assertEquals(stateAtClear, vm.snapshot.value.state)
 
         vm.onIntent(SearchIntent.Search("after clear"))
         runCurrent()
         assertEquals(listOf("cleared" to true, "after clear" to false), vm.admissions)
         assertEquals(listOf("cleared"), repository.started)
-        assertEquals(stateAtClear, vm.state.value)
+        assertEquals(stateAtClear, vm.snapshot.value.state)
     }
 
     @Test
@@ -141,7 +143,7 @@ class BaseMviViewModelRequestIntegrationTest {
         val vm = own(SearchViewModel(repository))
         var nestedSubmitted = false
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.state.collect { state ->
+            vm.snapshot.map { it.state }.distinctUntilChanged().collect { state ->
                 if (state.query == "outer" && !nestedSubmitted) {
                     nestedSubmitted = true
                     vm.onIntent(SearchIntent.Search("nested"))
@@ -154,13 +156,13 @@ class BaseMviViewModelRequestIntegrationTest {
         // Both were accepted; the nested intent superseded the outer request before it ran.
         assertEquals(listOf("nested" to true, "outer" to true), vm.admissions)
         assertEquals(listOf("nested"), repository.started)
-        assertEquals(SearchState(query = "nested", loading = true), vm.state.value)
+        assertEquals(SearchState(query = "nested", loading = true), vm.snapshot.value.state)
 
         vm.onIntent(SearchIntent.Cancel)
         repository.complete("nested", "late nested result")
 
         assertEquals(listOf(ResultAttempt("nested", applied = false)), vm.results)
-        assertEquals(SearchState(query = "nested"), vm.state.value)
+        assertEquals(SearchState(query = "nested"), vm.snapshot.value.state)
     }
 
     @Test
@@ -170,7 +172,7 @@ class BaseMviViewModelRequestIntegrationTest {
         val vm = own(SearchViewModel(repository))
         var cancelled = false
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.state.collect { state ->
+            vm.snapshot.map { it.state }.distinctUntilChanged().collect { state ->
                 if (state.loading && !cancelled) {
                     cancelled = true
                     vm.onIntent(SearchIntent.Cancel)
@@ -183,7 +185,7 @@ class BaseMviViewModelRequestIntegrationTest {
 
         assertTrue(cancelled)
         assertEquals(listOf("cancel before return" to true), vm.admissions)
-        assertEquals(SearchState(query = "cancel before return"), vm.state.value)
+        assertEquals(SearchState(query = "cancel before return"), vm.snapshot.value.state)
         assertTrue(repository.started.isEmpty())
         assertTrue(vm.results.isEmpty())
     }

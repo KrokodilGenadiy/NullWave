@@ -74,7 +74,7 @@ class MviWorkUiCapabilityTest {
         assertEquals(contexts, completed.await().getOrThrow())
         runCurrent()
 
-        assertEquals(1, caller.state.value.value)
+        assertEquals(1, caller.snapshot.value.state.value)
         assertEquals(0, targetDefinitions)
         assertEquals(0, targetSources)
         assertSame(cachedCaller, caller.uiApi())
@@ -107,7 +107,7 @@ class MviWorkUiCapabilityTest {
         assertEquals(contexts, completed.await().getOrThrow())
         runCurrent()
 
-        assertEquals(1, caller.state.value.value)
+        assertEquals(1, caller.snapshot.value.state.value)
         assertEquals(0, targetDefinitions)
         assertEquals(0, targetSources)
         assertSame(cachedCaller, caller.uiApi())
@@ -148,7 +148,7 @@ class MviWorkUiCapabilityTest {
         completed.await().getOrThrow()
 
         assertEquals(0, targetDefinitions)
-        assertEquals(Snapshot(), caller.state.value)
+        assertEquals(Snapshot(), caller.snapshot.value.state)
     }
 
     @Test
@@ -210,7 +210,7 @@ class MviWorkUiCapabilityTest {
 
         assertTrue("The regression must exercise execute before its submitting handler returns", executedInline)
         assertNotNull("An active handler receiver must still be unavailable inside execute", rejected)
-        assertEquals(1, caller.state.value.value)
+        assertEquals(1, caller.snapshot.value.state.value)
     }
 
     private suspend fun checkAllContexts(caller: ProbeViewModel, target: ProbeViewModel): List<String> {

@@ -64,8 +64,8 @@ class MviNeutralRuntimeContextTest(
         advanceTimeBy(2)
         runCurrent()
 
-        assertEquals(Snapshot(accepted = 1, started = 1, value = 42, finished = 1), target.state.value)
-        if (!sameViewModel) assertEquals(Snapshot(), source.state.value)
+        assertEquals(Snapshot(accepted = 1, started = 1, value = 42, finished = 1), target.snapshot.value.state)
+        if (!sameViewModel) assertEquals(Snapshot(), source.snapshot.value.state)
     }
 
     private data class Snapshot(

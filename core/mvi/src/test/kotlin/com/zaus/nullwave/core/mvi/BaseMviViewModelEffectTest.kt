@@ -8,6 +8,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -83,8 +85,8 @@ class BaseMviViewModelEffectTest {
                 results += vm.notify(-1)
             })
             runCurrent()
-            assertEquals(index + 1, vm.state.value.value)
-            assertFalse(vm.state.value.loading)
+            assertEquals(index + 1, vm.snapshot.value.state.value)
+            assertFalse(vm.snapshot.value.state.loading)
             assertEquals(List(index + 1) { false }, results)
         }
         assertFalse(vm.save.cancel())
@@ -114,7 +116,7 @@ class BaseMviViewModelEffectTest {
         releaseFirst.complete(Unit)
         runCurrent()
         assertEquals(listOf(1, 2), finished)
-        assertEquals(2, vm.state.value.value)
+        assertEquals(2, vm.snapshot.value.state.value)
         assertFalse(vm.queue.cancel())
     }
 
@@ -183,7 +185,7 @@ class BaseMviViewModelEffectTest {
 
             // Main stays queued; this collector reenters synchronously during state publication.
             backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-                vm.state.collect { state ->
+                vm.snapshot.map { it.state }.distinctUntilChanged().collect { state ->
                     if (state.value == 1) {
                         replacementAccepted = vm.search.submit(onAccepted = { copy(value = 2) }) {
                             assertTrue(vm.notify(2))
@@ -206,7 +208,7 @@ class BaseMviViewModelEffectTest {
             assertTrue(replacementAccepted)
             assertTrue(oldCancelled)
             assertFalse(oldReturned)
-            assertEquals(2, vm.state.value.value)
+            assertEquals(2, vm.snapshot.value.state.value)
             assertEquals(listOf(Signal(2)), received)
         }
 

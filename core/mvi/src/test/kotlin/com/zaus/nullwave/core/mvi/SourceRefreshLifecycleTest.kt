@@ -55,14 +55,14 @@ class SourceRefreshLifecycleTest {
         }
         val binding = backgroundScope.launch { vm.withUiBinding { awaitCancellation() } }
         runCurrent()
-        assertTrue(vm.state.value.failed)
+        assertTrue(vm.snapshot.value.state.failed)
         assertEquals(1, reads)
 
         vm.ui.onIntent(Refresh)
         runCurrent()
 
-        assertFalse(vm.state.value.failed)
-        assertEquals(8, vm.state.value.value)
+        assertFalse(vm.snapshot.value.state.failed)
+        assertEquals(8, vm.snapshot.value.state.value)
         assertEquals(2, reads)
         assertTrue(binding.isActive)
     }
@@ -142,7 +142,7 @@ class SourceRefreshLifecycleTest {
         backgroundScope.launch { vm.withUiBinding { awaitCancellation() } }
         runCurrent()
         assertEquals(3, reads)
-        assertEquals(3, vm.state.value.value)
+        assertEquals(3, vm.snapshot.value.state.value)
     }
 
     @Test
@@ -170,13 +170,13 @@ class SourceRefreshLifecycleTest {
             responses[0].complete(99)
             runCurrent()
             assertTrue(reduced.isEmpty())
-            assertEquals(0, vm.state.value.value)
+            assertEquals(0, vm.snapshot.value.state.value)
             assertEquals(2, responses.size)
 
             responses[1].complete(7)
             runCurrent()
             assertEquals(listOf(7), reduced)
-            assertEquals(7, vm.state.value.value)
+            assertEquals(7, vm.snapshot.value.state.value)
         } finally { responses.toList().forEach { it.complete(-1) } }
     }
 
@@ -202,7 +202,7 @@ class SourceRefreshLifecycleTest {
 
             assertEquals(1, responses.size)
             assertTrue(reduced.isEmpty())
-            assertEquals(0, vm.state.value.value)
+            assertEquals(0, vm.snapshot.value.state.value)
             vm.ui.onIntent(Refresh)
             runCurrent()
             assertEquals(1, responses.size)

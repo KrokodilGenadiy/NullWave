@@ -2,8 +2,8 @@ package com.zaus.nullwave.core.mvi
 
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
-import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import com.zaus.nullwave.core.mvi.runtime.MviRuntime
+import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -109,10 +109,10 @@ class MviRuntimeBoundaryTest {
         assertEquals(listOf("A"), observedKeys)
 
         assertThrows(IllegalStateException::class.java) { vm.ui.onIntent(Change("B", "invalid")) }
-        assertEquals(Snapshot(), vm.state.value)
+        assertEquals(Snapshot(), vm.snapshot.value.state)
         assertTrue(sourceValues.tryEmit(42))
         runCurrent()
-        assertEquals(Snapshot(value = 42), vm.state.value)
+        assertEquals(Snapshot(value = 42), vm.snapshot.value.state)
 
         vm.ui.onIntent(Change("B", "B"))
         runCurrent()

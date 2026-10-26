@@ -208,7 +208,7 @@ class CollectMviEffectsWithLifecycleTest {
         runCurrent()
         vm.ui.onIntent(Notify(1))
         runCurrent()
-        assertEquals(1, vm.state.value.handled)
+        assertEquals(1, vm.snapshot.value.state.handled)
     }
 
     private suspend fun vm(): Vm = Vm().also { store.put("effects", it); it.ui = it.uiApi() }

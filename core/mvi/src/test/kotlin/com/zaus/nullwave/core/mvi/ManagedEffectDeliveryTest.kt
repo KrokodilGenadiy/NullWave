@@ -2,10 +2,10 @@ package com.zaus.nullwave.core.mvi
 
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
-import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import com.zaus.nullwave.core.mvi.runtime.MviRuntime
 import com.zaus.nullwave.core.mvi.runtime.effect.EffectEpoch
 import com.zaus.nullwave.core.mvi.runtime.effect.EffectMailbox
+import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -66,7 +66,7 @@ class ManagedEffectDeliveryTest {
         runCurrent()
         collector.cancelAndJoin()
 
-        assertEquals(64, vm.state.value.value)
+        assertEquals(64, vm.snapshot.value.state.value)
         assertEquals(listOf(Signal(64)), received)
         assertTrue(collector.isCompleted)
     }
@@ -161,7 +161,7 @@ class ManagedEffectDeliveryTest {
 
             assertTrue(cleanupStarted)
             assertTrue(collector.isActive)
-            assertEquals(2, vm.state.value.value)
+            assertEquals(2, vm.snapshot.value.state.value)
             assertEquals(listOf(1), started)
 
             cleanup.complete(Unit)
@@ -333,7 +333,7 @@ class ManagedEffectDeliveryTest {
         vm.ui.onIntent(Notify(42))
         runCurrent()
 
-        assertEquals(42, vm.state.value.value)
+        assertEquals(42, vm.snapshot.value.state.value)
     }
 
     @Test
@@ -361,7 +361,7 @@ class ManagedEffectDeliveryTest {
         runCurrent()
 
         assertTrue(rejected)
-        assertEquals(7, vm.state.value.value)
+        assertEquals(7, vm.snapshot.value.state.value)
         val remaining = mutableListOf<Signal>()
         backgroundScope.launch { vm.collectEffects { remaining += it } }
         runCurrent()
@@ -397,7 +397,7 @@ class ManagedEffectDeliveryTest {
         vm.ui.onIntent(Run(2))
         runCurrent()
 
-        assertEquals(3, vm.state.value.value)
+        assertEquals(3, vm.snapshot.value.state.value)
         // Run(3) from cleanup waits for Run(2)'s handler. Its synchronous work/effect may finish
         // before the next intent starts; latest does not retroactively revoke delivered actions.
         assertEquals(listOf(1, 2, 3), received)
@@ -442,7 +442,7 @@ class ManagedEffectDeliveryTest {
 
             release.complete(Unit)
             runCurrent()
-            assertEquals(2, vm.state.value.value)
+            assertEquals(2, vm.snapshot.value.state.value)
             assertEquals(listOf(1, 2), received)
         } finally {
             release.complete(Unit)

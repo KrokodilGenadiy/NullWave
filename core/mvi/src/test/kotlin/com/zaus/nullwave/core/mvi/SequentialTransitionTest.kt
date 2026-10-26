@@ -2,12 +2,14 @@ package com.zaus.nullwave.core.mvi
 
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
-import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import com.zaus.nullwave.core.mvi.runtime.MainIntentIngress
 import com.zaus.nullwave.core.mvi.runtime.MviRuntime
 import com.zaus.nullwave.core.mvi.runtime.source.PreparedSourceChanges
+import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -47,12 +49,12 @@ class SequentialTransitionTest {
             }
         }.also { store.put("vm", it); it.ui = it.uiApi() }
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.state.collect {
+            vm.snapshot.map { it.state }.distinctUntilChanged().collect {
                 if (it.value == 1) {
                     vm.ui.onIntent(Write(2))
                     vm.ui.onIntent(Write(3))
                     events += "observer returned"
-                    assertEquals(1, vm.state.value.value)
+                    assertEquals(1, vm.snapshot.value.state.value)
                 }
             }
         }
@@ -61,7 +63,7 @@ class SequentialTransitionTest {
 
         assertEquals(listOf("begin 1", "observer returned", "end 1", "begin 2", "end 2", "begin 3", "end 3"), events)
         assertEquals(listOf(1, 2, 3), saved)
-        assertEquals(3, vm.state.value.value)
+        assertEquals(3, vm.snapshot.value.state.value)
     }
 
     @Test
@@ -72,7 +74,7 @@ class SequentialTransitionTest {
             PreparedSourceChanges(commit = {}, notifyCollectors = { events += "notified" })
         }
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            runtime.state.collect {
+            runtime.snapshot.map { it.state }.distinctUntilChanged().collect {
                 if (it.value == 1) {
                     events += "observed"
                     runtime.dispatch { events += "intent" }
@@ -144,14 +146,14 @@ class SequentialTransitionTest {
             }
         }.also { store.put("vm", it); it.ui = it.uiApi() }
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.state.collect { if (it.value == 1) vm.ui.onIntent(Write(2)) }
+            vm.snapshot.map { it.state }.distinctUntilChanged().collect { if (it.value == 1) vm.ui.onIntent(Write(2)) }
         }
 
         vm.ui.onIntent(Write(1))
         runCurrent()
 
         assertEquals(0, nestedRuns)
-        assertEquals(1, vm.state.value.value)
+        assertEquals(1, vm.snapshot.value.state.value)
     }
 
     private data class Snapshot(val value: Int = 0) : UiState

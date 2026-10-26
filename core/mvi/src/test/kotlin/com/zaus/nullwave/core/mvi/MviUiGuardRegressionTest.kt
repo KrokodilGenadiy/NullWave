@@ -51,12 +51,12 @@ class MviUiGuardRegressionTest {
             val ui = source.uiApi()
             assertSame(ui, source.uiApi())
             ui.onIntent(Change)
-            assertEquals(1, source.state.value.edits)
+            assertEquals(1, source.snapshot.value.state.edits)
             // A different owner must also be safe, without initializing it just by acquisition.
             val otherUi = target.uiApi()
             assertEquals(0, target.definitions)
             otherUi.onIntent(Change)
-            assertEquals(1, target.state.value.edits)
+            assertEquals(1, target.snapshot.value.state.edits)
         }
     }
 
@@ -86,7 +86,7 @@ class MviUiGuardRegressionTest {
                 }
                 try {
                     assertEquals(Signal, received.await())
-                    assertEquals(1, target.state.value.edits)
+                    assertEquals(1, target.snapshot.value.state.edits)
                 } finally { collection.cancelAndJoin() }
             }
         }
@@ -128,17 +128,17 @@ class MviUiGuardRegressionTest {
         val vm = ProbeVm(CompletableDeferred()).also { store.put("screen", it) }
         val ui = vm.uiApi()
         assertSame(ui, vm.uiApi())
-        assertSame(vm.state, ui.state)
+        assertSame(vm.snapshot, ui.snapshot)
         runCurrent()
         assertEquals(0, vm.definitions)
         assertEquals(0, vm.activeSources)
         ui.onIntent(Change)
-        assertEquals(1, ui.state.value.edits)
+        assertEquals(1, ui.snapshot.value.state.edits)
         assertEquals(0, vm.activeSources)
         store.clear()
         ui.onIntent(Change)
         assertSame(ui, vm.uiApi())
-        assertEquals(1, ui.state.value.edits)
+        assertEquals(1, ui.snapshot.value.state.edits)
     }
 
     @Test
@@ -151,7 +151,7 @@ class MviUiGuardRegressionTest {
         }
         ui.onIntent(Change)
         runCurrent()
-        assertEquals(1, ui.state.value.edits)
+        assertEquals(1, ui.snapshot.value.state.edits)
         assertEquals(0, vm.activeSources)
         collection.cancelAndJoin()
     }

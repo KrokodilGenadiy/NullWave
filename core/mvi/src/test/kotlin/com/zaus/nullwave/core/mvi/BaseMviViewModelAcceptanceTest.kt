@@ -6,6 +6,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -47,11 +49,11 @@ class BaseMviViewModelAcceptanceTest {
             var started = false
             val accepted = vm.run(policy, onAccepted = { copy(query = "accepted", loading = true) }) {
                 started = true
-                assertEquals(AcceptanceState(query = "accepted", loading = true), vm.state.value)
+                assertEquals(AcceptanceState(query = "accepted", loading = true), vm.snapshot.value.state)
             }
 
             assertTrue(accepted)
-            assertEquals(AcceptanceState(query = "accepted", loading = true), vm.state.value)
+            assertEquals(AcceptanceState(query = "accepted", loading = true), vm.snapshot.value.state)
             assertFalse("$policy dispatched before its scheduled turn", started)
             runCurrent()
             assertTrue(started)
@@ -64,13 +66,13 @@ class BaseMviViewModelAcceptanceTest {
         for (policy in Policy.entries) {
             val vm = own()
             val accepted = vm.run(policy, onAccepted = { copy(query = "accepted", loading = true) }) {
-                assertEquals("accepted", vm.state.value.query)
-                assertTrue(vm.state.value.loading)
+                assertEquals("accepted", vm.snapshot.value.state.query)
+                assertTrue(vm.snapshot.value.state.loading)
                 assertTrue(commitState { copy(result = "finished", loading = false) })
             }
 
             assertTrue(accepted)
-            assertEquals(AcceptanceState(query = "accepted", result = "finished"), vm.state.value)
+            assertEquals(AcceptanceState(query = "accepted", result = "finished"), vm.snapshot.value.state)
         }
     }
 
@@ -85,7 +87,7 @@ class BaseMviViewModelAcceptanceTest {
         }
         var callbackResult: Boolean? = null
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.state.collect { state ->
+            vm.snapshot.map { it.state }.distinctUntilChanged().collect { state ->
                 if (state.query == "new" && callbackResult == null) {
                     callbackResult = oldCallback()
                 }
@@ -97,7 +99,7 @@ class BaseMviViewModelAcceptanceTest {
         }
 
         assertEquals(false, callbackResult)
-        assertEquals(AcceptanceState(query = "new", loading = true), vm.state.value)
+        assertEquals(AcceptanceState(query = "new", loading = true), vm.snapshot.value.state)
     }
 
     @Test
@@ -111,7 +113,7 @@ class BaseMviViewModelAcceptanceTest {
             awaitCancellation()
         }
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.state.collect { state ->
+            vm.snapshot.map { it.state }.distinctUntilChanged().collect { state ->
                 if (state.query == "B") {
                     nestedAccepted = vm.run(Policy.Latest, onAccepted = { copy(query = "C") }) {
                         started += "C"
@@ -128,7 +130,7 @@ class BaseMviViewModelAcceptanceTest {
         assertTrue(outer)
         assertEquals(true, nestedAccepted)
         assertEquals(listOf("A", "C"), started)
-        assertEquals(AcceptanceState(query = "C", result = "C result"), vm.state.value)
+        assertEquals(AcceptanceState(query = "C", result = "C result"), vm.snapshot.value.state)
     }
 
     @Test
@@ -143,16 +145,16 @@ class BaseMviViewModelAcceptanceTest {
         runCurrent()
         val pending = vm.run(Policy.Queue, onAccepted = { copy(query = "waiting") }) {
             started += "waiting"
-            assertEquals("waiting", vm.state.value.query)
+            assertEquals("waiting", vm.snapshot.value.state.query)
         }
 
         assertTrue(pending)
-        assertEquals("waiting", vm.state.value.query)
+        assertEquals("waiting", vm.snapshot.value.state.query)
         assertEquals(listOf("active"), started)
         assertFalse(vm.run(Policy.Queue, onAccepted = { copy(query = "overflow") }) {
             error("Rejected queue work must not execute")
         })
-        assertEquals("waiting", vm.state.value.query)
+        assertEquals("waiting", vm.snapshot.value.state.query)
 
         release.complete(Unit)
         runCurrent()
@@ -168,7 +170,7 @@ class BaseMviViewModelAcceptanceTest {
             assertFalse(vm.run(Policy.IfIdle, onAccepted = { copy(query = "duplicate") }) {
                 error("Rejected duplicate must not execute")
             })
-            assertEquals("accepted", vm.state.value.query)
+            assertEquals("accepted", vm.snapshot.value.state.query)
             runCurrent()
         }
     }
@@ -183,7 +185,7 @@ class BaseMviViewModelAcceptanceTest {
                 error("Cleared ViewModel must not execute work")
             }
             assertFalse(accepted)
-            assertEquals(AcceptanceState(), vm.state.value)
+            assertEquals(AcceptanceState(), vm.snapshot.value.state)
         }
     }
 
@@ -199,7 +201,7 @@ class BaseMviViewModelAcceptanceTest {
 
         assertFalse(vm.run(Policy.IfIdle, onAccepted = { copy(query = "rejected first") }) {})
         assertFalse(vm.independentIdle.submit(onAccepted = { copy(query = "rejected second") }) {})
-        assertEquals("second", vm.state.value.query)
+        assertEquals("second", vm.snapshot.value.state.query)
     }
 
     @Test
@@ -215,12 +217,12 @@ class BaseMviViewModelAcceptanceTest {
 
             assertSame(expected, actual)
             assertFalse(failedBodyStarted)
-            assertEquals(AcceptanceState(), vm.state.value)
+            assertEquals(AcceptanceState(), vm.snapshot.value.state)
             val recovered = vm.run(policy, onAccepted = { copy(query = "recovered") }) {
                 commitState { copy(result = "success") }
             }
             assertTrue(recovered)
-            assertEquals(AcceptanceState(query = "recovered", result = "success"), vm.state.value)
+            assertEquals(AcceptanceState(query = "recovered", result = "success"), vm.snapshot.value.state)
         }
     }
 
@@ -244,9 +246,9 @@ class BaseMviViewModelAcceptanceTest {
         }
 
         assertEquals(false, cleanupCommit)
-        assertEquals(AcceptanceState(query = "old"), vm.state.value)
+        assertEquals(AcceptanceState(query = "old"), vm.snapshot.value.state)
         assertTrue(vm.run(Policy.Latest, onAccepted = { copy(query = "recovered") }) {})
-        assertEquals("recovered", vm.state.value.query)
+        assertEquals("recovered", vm.snapshot.value.state.query)
     }
 
     @Test
@@ -274,7 +276,7 @@ class BaseMviViewModelAcceptanceTest {
         runCurrent()
 
         assertTrue(activeFinished)
-        assertEquals(AcceptanceState(query = "replacement", result = "success"), vm.state.value)
+        assertEquals(AcceptanceState(query = "replacement", result = "success"), vm.snapshot.value.state)
     }
 
     @Test
@@ -289,7 +291,7 @@ class BaseMviViewModelAcceptanceTest {
             try {
                 awaitCancellation()
             } finally {
-                cleanupState = vm.state.value
+                cleanupState = vm.snapshot.value.state
                 cleanupCommit = commitState { copy(result = "A cleanup") }
                 vm.run(Policy.Latest, onAccepted = { copy(query = "C") }) { started += "C" }
             }
@@ -302,7 +304,7 @@ class BaseMviViewModelAcceptanceTest {
         assertEquals(false, cleanupCommit)
         assertTrue(superseded)
         assertEquals(listOf("A", "C"), started)
-        assertEquals("C", vm.state.value.query)
+        assertEquals("C", vm.snapshot.value.state.query)
     }
 
     @Test
@@ -313,7 +315,7 @@ class BaseMviViewModelAcceptanceTest {
         var duplicateAccepted: Boolean? = null
         var acceptedStarted = false
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.state.collect { state ->
+            vm.snapshot.map { it.state }.distinctUntilChanged().collect { state ->
                 if (state.query == "accepted" && !duplicateAttempted) {
                     duplicateAttempted = true
                     duplicateAccepted = vm.run(Policy.IfIdle, onAccepted = { copy(query = "duplicate") }) {
@@ -332,7 +334,7 @@ class BaseMviViewModelAcceptanceTest {
         assertTrue(duplicateAttempted)
         assertEquals(false, duplicateAccepted)
         assertTrue(acceptedStarted)
-        assertEquals("accepted", vm.state.value.query)
+        assertEquals("accepted", vm.snapshot.value.state.query)
     }
 
     @Test
@@ -343,7 +345,7 @@ class BaseMviViewModelAcceptanceTest {
             val started = mutableListOf<String>()
             var nestedAttempted = false
             backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-                vm.state.collect { state ->
+                vm.snapshot.map { it.state }.distinctUntilChanged().collect { state ->
                     if (state.query == "outer" && !nestedAttempted) {
                         nestedAttempted = true
                         assertTrue(vm.run(Policy.Queue, onAccepted = { copy(query = "nested") }) {
@@ -363,7 +365,7 @@ class BaseMviViewModelAcceptanceTest {
 
             assertTrue(nestedAttempted)
             assertEquals(listOf("outer", "nested"), started)
-            assertEquals("nested", vm.state.value.query)
+            assertEquals("nested", vm.snapshot.value.state.query)
         }
 
     @Test
@@ -388,7 +390,7 @@ class BaseMviViewModelAcceptanceTest {
 
         assertFalse(bodyStarted)
         assertFalse(cleanupRan)
-        assertEquals("accepted waiting", vm.state.value.query)
+        assertEquals("accepted waiting", vm.snapshot.value.state.query)
     }
 
     @Test
@@ -399,7 +401,7 @@ class BaseMviViewModelAcceptanceTest {
             var cancellationAccepted: Boolean? = null
             var bodyStarted = false
             val observer = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-                vm.state.collect { state ->
+                vm.snapshot.map { it.state }.distinctUntilChanged().collect { state ->
                     if (state.query == "accepted" && cancellationAccepted == null) {
                         cancellationAccepted = vm.cancel(policy)
                     }
@@ -413,10 +415,10 @@ class BaseMviViewModelAcceptanceTest {
             assertTrue("$policy must report historical acceptance", accepted)
             assertEquals(true, cancellationAccepted)
             assertFalse("$policy ran a request cancelled during acceptance", bodyStarted)
-            assertEquals("accepted", vm.state.value.query)
+            assertEquals("accepted", vm.snapshot.value.state.query)
             observer.cancel()
             assertTrue(vm.run(policy) { commitState { copy(result = "reused") } })
-            assertEquals("reused", vm.state.value.result)
+            assertEquals("reused", vm.snapshot.value.state.result)
         }
     }
 
@@ -427,7 +429,7 @@ class BaseMviViewModelAcceptanceTest {
             val vm = own()
             var bodyStarted = false
             val observer = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-                vm.state.collect { state ->
+                vm.snapshot.map { it.state }.distinctUntilChanged().collect { state ->
                     if (state.query == "accepted") store.clear()
                 }
             }

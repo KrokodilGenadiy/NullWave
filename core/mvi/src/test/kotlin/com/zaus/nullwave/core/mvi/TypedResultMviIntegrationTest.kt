@@ -2,6 +2,7 @@ package com.zaus.nullwave.core.mvi
 
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
+import com.zaus.nullwave.core.mvi.dsl.OperationKey
 import com.zaus.nullwave.core.mvi.ui.MviUiApi
 import com.zaus.nullwave.core.mvi.ui.UiText
 import com.zaus.nullwave.core.mvi.ui.toUiText
@@ -34,6 +35,7 @@ import org.junit.Test
 class TypedResultMviIntegrationTest {
     private val dispatcher = StandardTestDispatcher()
     private val store = ViewModelStore()
+    private val loadKey = OperationKey<Int>("load")
 
     @Before
     fun setUp() {
@@ -55,19 +57,21 @@ class TypedResultMviIntegrationTest {
 
         vm.ui.onIntent(Load(1))
         runCurrent()
-        assertTrue(vm.state.value.loading)
+        assertTrue(vm.snapshot.value.operations[loadKey].isBusy)
         first.complete(AppResult.Failure(DataError.AccessDenied, SecurityException("private file path")))
         runCurrent()
-        assertEquals(ScreenState(error = DataError.AccessDenied.toUiText()), vm.state.value)
+        assertEquals(ScreenState(error = DataError.AccessDenied.toUiText()), vm.snapshot.value.state)
+        assertFalse(vm.snapshot.value.operations[loadKey].isBusy)
 
         vm.ui.onIntent(Load(2))
         runCurrent()
-        assertTrue(vm.state.value.loading)
-        assertNull(vm.state.value.error)
+        assertTrue(vm.snapshot.value.operations[loadKey].isBusy)
+        assertNull(vm.snapshot.value.state.error)
         second.complete(AppResult.Success("restored"))
         runCurrent()
 
-        assertEquals(ScreenState(value = "restored"), vm.state.value)
+        assertEquals(ScreenState(value = "restored"), vm.snapshot.value.state)
+        assertFalse(vm.snapshot.value.operations[loadKey].isBusy)
     }
 
     @Test
@@ -96,7 +100,7 @@ class TypedResultMviIntegrationTest {
         runCurrent()
 
         assertEquals(listOf(2), applied)
-        assertEquals(ScreenState(value = "current"), vm.state.value)
+        assertEquals(ScreenState(value = "current"), vm.snapshot.value.state)
     }
 
     @Test
@@ -111,9 +115,9 @@ class TypedResultMviIntegrationTest {
         runCurrent()
 
         assertTrue(entered)
-        assertFalse(vm.state.value.loading)
-        assertNull(vm.state.value.error)
-        assertNull(vm.state.value.value)
+        assertFalse(vm.snapshot.value.operations[loadKey].isBusy)
+        assertNull(vm.snapshot.value.state.error)
+        assertNull(vm.snapshot.value.state.value)
     }
 
     @Test
@@ -131,20 +135,19 @@ class TypedResultMviIntegrationTest {
 
         values.send(AppResult.Failure(DataError.NotFound))
         runCurrent()
-        assertEquals(ScreenState(error = DataError.NotFound.toUiText()), vm.state.value)
+        assertEquals(ScreenState(error = DataError.NotFound.toUiText()), vm.snapshot.value.state)
         values.send(AppResult.Success("available again"))
         runCurrent()
 
         assertEquals(1, subscriptions)
-        assertEquals(ScreenState(value = "available again"), vm.state.value)
+        assertEquals(ScreenState(value = "available again"), vm.snapshot.value.state)
     }
 
     private suspend fun operation(work: suspend (Int) -> AppResult<String, DataError>): ProbeViewModel = own {
-        val load = latest<Int, AppResult<String, DataError>>("load") {
+        val load = latest<Int, AppResult<String, DataError>>(loadKey) {
             execute(work)
-            onAccepted { copy(loading = true, error = null) }
+            onAccepted { copy(error = null) }
             onResult { _, result -> withResult(result) }
-            onFinished { copy(loading = false) }
         }
         on<Load> { submit(load, it.id) }
     }
@@ -155,7 +158,6 @@ class TypedResultMviIntegrationTest {
     private data class ScreenState(
         val value: String? = null,
         val error: UiText? = null,
-        val loading: Boolean = false,
     ) : UiState {
         fun withResult(result: AppResult<String, DataError>): ScreenState = when (result) {
             is AppResult.Success -> copy(value = result.value, error = null)

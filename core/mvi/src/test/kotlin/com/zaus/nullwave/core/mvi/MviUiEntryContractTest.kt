@@ -71,7 +71,7 @@ class MviUiEntryContractTest {
         assertNotNull(rejected)
         assertFalse(enteredBinding)
         assertEquals(0, sourceStarts)
-        assertEquals(1, vm.state.value.value)
+        assertEquals(1, vm.snapshot.value.state.value)
 
         val ui = backgroundScope.launch { vm.withUiBinding { awaitCancellation() } }
         runCurrent()
@@ -163,12 +163,12 @@ class MviUiEntryContractTest {
         runCurrent()
 
         assertNotNull(rejected)
-        assertEquals(0, caller.state.value.value)
+        assertEquals(0, caller.snapshot.value.state.value)
 
         // An actual external UI handler may dispatch into either VM, using the untouched signal.
         backgroundScope.launch { target.collectEffects { caller.ui.onIntent(Change(it.value)) } }
         runCurrent()
-        assertEquals(99, caller.state.value.value)
+        assertEquals(99, caller.snapshot.value.state.value)
     }
 
     @Test
@@ -232,7 +232,7 @@ class MviUiEntryContractTest {
 
         assertNotNull(rejected)
         assertEquals(0, targetDefinitions)
-        assertEquals(7, caller.state.value.value)
+        assertEquals(7, caller.snapshot.value.state.value)
     }
 
     @Test

@@ -7,6 +7,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -60,7 +62,7 @@ class MviOperationCancellationTest {
             })
             runCurrent()
             backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-                vm.state.collect { state ->
+                vm.snapshot.map { it.state }.distinctUntilChanged().collect { state ->
                     if (state.value == "cancelled" && publicationAttempts.isEmpty()) {
                         // The original Job is still active until this publication returns.
                         publicationAttempts += lateCommit()
@@ -72,14 +74,14 @@ class MviOperationCancellationTest {
             }
 
             assertTrue(operation.cancel { copy(value = "cancelled", loading = false) })
-            assertEquals(OperationState(value = "cancelled"), vm.state.value)
+            assertEquals(OperationState(value = "cancelled"), vm.snapshot.value.state)
             assertTrue(cleanupAttempts.isEmpty())
             runCurrent()
 
             assertEquals(listOf(false), publicationAttempts)
             assertEquals(listOf(false), nestedCancellations)
             assertEquals(listOf(false), cleanupAttempts)
-            assertEquals(OperationState(value = "cancelled"), vm.state.value)
+            assertEquals(OperationState(value = "cancelled"), vm.snapshot.value.state)
             assertFalse(operation.cancel { error("An idle operation must not publish state") })
         }
     }
@@ -115,11 +117,11 @@ class MviOperationCancellationTest {
         assertEquals(listOf(false), cleanupAttempts)
         assertTrue(replacementAccepted)
         assertTrue(replacementStarted)
-        assertEquals(OperationState(value = "new search", loading = true), vm.state.value)
+        assertEquals(OperationState(value = "new search", loading = true), vm.snapshot.value.state)
 
         release.complete(Unit)
         runCurrent()
-        assertEquals(OperationState(value = "new result"), vm.state.value)
+        assertEquals(OperationState(value = "new result"), vm.snapshot.value.state)
     }
 
     @Test
@@ -130,7 +132,7 @@ class MviOperationCancellationTest {
         var replacementAccepted = false
         var nestedSubmitted = false
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.state.collect { state ->
+            vm.snapshot.map { it.state }.distinctUntilChanged().collect { state ->
                 if (state.value == "cancelled" && !nestedSubmitted) {
                     nestedSubmitted = true
                     replacementAccepted = vm.latest.submit(
@@ -160,7 +162,7 @@ class MviOperationCancellationTest {
         assertTrue(nestedSubmitted)
         assertTrue(replacementAccepted)
         assertEquals(listOf("old:start", "old:cleanup", "new:start"), events)
-        assertEquals(OperationState(value = "new search", loading = true), vm.state.value)
+        assertEquals(OperationState(value = "new search", loading = true), vm.snapshot.value.state)
     }
 
     @Test
@@ -182,7 +184,7 @@ class MviOperationCancellationTest {
         var freshAccepted = false
         var nestedSubmitted = false
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            vm.state.collect { state ->
+            vm.snapshot.map { it.state }.distinctUntilChanged().collect { state ->
                 if (state.value == "cancelled" && !nestedSubmitted) {
                     nestedSubmitted = true
                     freshAccepted = vm.queue.submit {
@@ -200,7 +202,7 @@ class MviOperationCancellationTest {
         assertTrue(nestedSubmitted)
         assertTrue(freshAccepted)
         assertEquals(listOf("active", "cleanup", "fresh"), events)
-        assertEquals(OperationState(value = "fresh result"), vm.state.value)
+        assertEquals(OperationState(value = "fresh result"), vm.snapshot.value.state)
     }
 
     @Test
@@ -223,7 +225,7 @@ class MviOperationCancellationTest {
         assertEquals(listOf("cleanup started"), events)
         assertFalse(vm.idle.cancel { error("Cancellation already selected this request") })
         assertFalse(vm.idle.submit { error("Cleanup still owns the operation") })
-        assertEquals(OperationState(value = "cancelled"), vm.state.value)
+        assertEquals(OperationState(value = "cancelled"), vm.snapshot.value.state)
 
         cleanupRelease.complete(Unit)
         runCurrent()
@@ -234,7 +236,7 @@ class MviOperationCancellationTest {
         runCurrent()
 
         assertEquals(listOf("cleanup started", "cleanup finished", "fresh"), events)
-        assertEquals(OperationState(value = "fresh result"), vm.state.value)
+        assertEquals(OperationState(value = "fresh result"), vm.snapshot.value.state)
     }
 
     @Test
@@ -252,7 +254,7 @@ class MviOperationCancellationTest {
             assertFalse(vm.operation(policy).cancel { error("The ViewModel was cleared") })
             assertFalse(vm.operation(policy).submit { error("Cleared owners reject new work") })
         }
-        assertEquals(OperationState(), vm.state.value)
+        assertEquals(OperationState(), vm.snapshot.value.state)
     }
 
     @Test
@@ -277,11 +279,11 @@ class MviOperationCancellationTest {
 
         assertEquals(expected.message, actual.message)
         assertEquals(listOf(false), cleanupAttempts)
-        assertEquals(OperationState(loading = true), vm.state.value)
+        assertEquals(OperationState(loading = true), vm.snapshot.value.state)
 
         assertTrue(vm.queue.submit { commitState { copy(value = "fresh result", loading = false) } })
         runCurrent()
-        assertEquals(OperationState(value = "fresh result"), vm.state.value)
+        assertEquals(OperationState(value = "fresh result"), vm.snapshot.value.state)
     }
 
     private fun own(): OperationViewModel = OperationViewModel().also {

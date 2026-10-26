@@ -10,6 +10,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -48,15 +50,15 @@ class BaseMviViewModelCommandTest {
     @Test
     fun `state is synchronous and stable without a UI collector`() = runTest(dispatcher) {
         val vm = own(CommandViewModel())
-        val publicState = vm.state
+        val publicState = vm.snapshot
 
         vm.onIntent(CommandIntent.Edit("first"))
-        assertEquals("first", publicState.value.draft)
-        assertEquals(publicState.value, vm.snapshot)
+        assertEquals("first", publicState.value.state.draft)
+        assertEquals(publicState.value.state, vm.currentData)
 
         vm.onIntent(CommandIntent.Edit("second"))
-        assertSame(publicState, vm.state)
-        assertEquals("second", vm.state.value.draft)
+        assertSame(publicState, vm.snapshot)
+        assertEquals("second", vm.snapshot.value.state.draft)
         assertEquals(0, vm.sourceStarts)
     }
 
@@ -67,7 +69,7 @@ class BaseMviViewModelCommandTest {
         vm.onIntent(CommandIntent.Save)
         vm.onIntent(CommandIntent.Save)
 
-        assertTrue(vm.state.value.saving)
+        assertTrue(vm.snapshot.value.state.saving)
         // Commands have not run yet. The idle property must already reserve its slot.
         assertEquals(0, vm.saveCalls)
         runCurrent()
@@ -75,8 +77,8 @@ class BaseMviViewModelCommandTest {
 
         vm.saveResult.complete("saved")
         runCurrent()
-        assertFalse(vm.state.value.saving)
-        assertEquals("saved", vm.state.value.savedValue)
+        assertFalse(vm.snapshot.value.state.saving)
+        assertEquals("saved", vm.snapshot.value.state.savedValue)
     }
 
     @Test
@@ -91,15 +93,15 @@ class BaseMviViewModelCommandTest {
         runCurrent()
 
         assertEquals("submitted", vm.submittedDraft)
-        assertEquals("submitted", vm.state.value.savedValue)
-        assertEquals("new draft", vm.state.value.draft)
-        assertFalse(vm.state.value.saving)
+        assertEquals("submitted", vm.snapshot.value.state.savedValue)
+        assertEquals("new draft", vm.snapshot.value.state.draft)
+        assertFalse(vm.snapshot.value.state.saving)
     }
 
     @Test
     fun `command survives the last UI binding and source stop timeout`() = runTest(dispatcher) {
         val vm = own(CommandViewModel())
-        val ui = backgroundScope.launch { vm.withUiBinding { vm.state.collect() } }
+        val ui = backgroundScope.launch { vm.withUiBinding { vm.snapshot.map { it.state }.distinctUntilChanged().collect() } }
         runCurrent()
         assertEquals(1, vm.sourceStarts)
 
@@ -112,18 +114,18 @@ class BaseMviViewModelCommandTest {
 
         assertEquals(1, vm.sourceStops)
         assertFalse(vm.saveCancelled)
-        assertTrue(vm.state.value.saving)
+        assertTrue(vm.snapshot.value.state.saving)
 
         vm.saveResult.complete("finished while hidden")
         runCurrent()
-        assertEquals("finished while hidden", vm.state.value.savedValue)
-        assertFalse(vm.state.value.saving)
+        assertEquals("finished while hidden", vm.snapshot.value.state.savedValue)
+        assertFalse(vm.snapshot.value.state.saving)
     }
 
     @Test
     fun `clearing the ViewModelStore cancels commands and sources without a UI error`() = runTest(dispatcher) {
         val vm = own(CommandViewModel())
-        backgroundScope.launch { vm.withUiBinding { vm.state.collect() } }
+        backgroundScope.launch { vm.withUiBinding { vm.snapshot.map { it.state }.distinctUntilChanged().collect() } }
         vm.onIntent(CommandIntent.Save)
         runCurrent()
 
@@ -132,8 +134,8 @@ class BaseMviViewModelCommandTest {
 
         assertTrue(vm.saveCancelled)
         assertEquals(1, vm.sourceStops)
-        assertNull(vm.state.value.savedValue)
-        assertNull(vm.state.value.error)
+        assertNull(vm.snapshot.value.state.savedValue)
+        assertNull(vm.snapshot.value.state.error)
     }
 
     @Test
@@ -143,12 +145,12 @@ class BaseMviViewModelCommandTest {
         runCurrent()
         assertEquals(listOf("finished"), vm.primaryFinishes)
         val completedScope = vm.primaryScopes.single()
-        val completedState = vm.state.value
+        val completedState = vm.snapshot.value.state
         assertEquals("finished", completedState.primaryResult)
         assertFalse(completedState.primaryLoading)
 
         assertFalse(completedScope.commitState { copy(primaryResult = "late callback") })
-        assertEquals(completedState, vm.state.value)
+        assertEquals(completedState, vm.snapshot.value.state)
     }
 
     @Test
@@ -165,8 +167,8 @@ class BaseMviViewModelCommandTest {
         assertEquals(listOf("A", "A"), vm.primaryStarts)
         assertFalse(firstScope.commitState { copy(primaryResult = "first A") })
         assertTrue(vm.primaryScopes.last().commitState { copy(primaryResult = "second A") })
-        assertEquals("A", vm.state.value.query)
-        assertEquals("second A", vm.state.value.primaryResult)
+        assertEquals("A", vm.snapshot.value.state.query)
+        assertEquals("second A", vm.snapshot.value.state.primaryResult)
     }
 
     @Test
@@ -185,8 +187,8 @@ class BaseMviViewModelCommandTest {
         assertTrue(vm.primaryScopes.single().commitState { copy(primaryResult = "catalog result") })
         assertFalse(firstSecondaryScope.commitState { copy(secondaryResult = "stale artwork") })
         assertTrue(vm.secondaryScopes.last().commitState { copy(secondaryResult = "artwork result") })
-        assertEquals("catalog result", vm.state.value.primaryResult)
-        assertEquals("artwork result", vm.state.value.secondaryResult)
+        assertEquals("catalog result", vm.snapshot.value.state.primaryResult)
+        assertEquals("artwork result", vm.snapshot.value.state.secondaryResult)
     }
 
     @Test
@@ -196,18 +198,18 @@ class BaseMviViewModelCommandTest {
         runCurrent()
         val scope = vm.primaryScopes.single()
         assertTrue(vm.cancelPrimary())
-        val stateAfterCancellation = vm.state.value
+        val stateAfterCancellation = vm.snapshot.value.state
         assertFalse(stateAfterCancellation.primaryLoading)
         assertTrue(vm.primaryFinishes.isEmpty())
 
         // No dispatcher turn yet: cancellation must revoke writes before cleanup resumes.
         assertFalse(scope.commitState { copy(primaryResult = "too late") })
         assertFalse(scope.commitState { copy(primaryLoading = false) })
-        assertEquals(stateAfterCancellation, vm.state.value)
+        assertEquals(stateAfterCancellation, vm.snapshot.value.state)
         assertFalse(vm.cancelPrimary())
         runCurrent()
         assertEquals(listOf("revoked"), vm.primaryFinishes)
-        assertEquals(stateAfterCancellation, vm.state.value)
+        assertEquals(stateAfterCancellation, vm.snapshot.value.state)
     }
 
     @Test
@@ -215,7 +217,7 @@ class BaseMviViewModelCommandTest {
         val vm = own(CommandViewModel())
         val observed = mutableListOf<Pair<CommandEffect, String?>>()
         backgroundScope.launch {
-            vm.collectEffects { effect -> observed += effect to vm.state.value.savedValue }
+            vm.collectEffects { effect -> observed += effect to vm.snapshot.value.state.savedValue }
         }
         runCurrent()
 
@@ -234,7 +236,7 @@ class BaseMviViewModelCommandTest {
         runCurrent()
         vm.saveResult.complete("buffered")
         runCurrent()
-        assertEquals("buffered", vm.state.value.savedValue)
+        assertEquals("buffered", vm.snapshot.value.state.savedValue)
 
         val first = mutableListOf<CommandEffect>()
         val firstCollector = backgroundScope.launch { vm.collectEffects(first::add) }
@@ -266,7 +268,7 @@ class BaseMviViewModelCommandTest {
         assertTrue(effects.isEmpty())
         assertTrue(collector.isCompleted)
         assertFalse(collector.isCancelled)
-        assertEquals("obsolete signal", vm.state.value.savedValue)
+        assertEquals("obsolete signal", vm.snapshot.value.state.savedValue)
     }
 
     @Test
@@ -277,9 +279,9 @@ class BaseMviViewModelCommandTest {
             runTest(dispatcher) {
                 val vm = own(CommandViewModel(sourceFailure = expected))
                 try {
-                    backgroundScope.launch { vm.withUiBinding { vm.state.collect() } }
+                    backgroundScope.launch { vm.withUiBinding { vm.snapshot.map { it.state }.distinctUntilChanged().collect() } }
                     runCurrent()
-                    assertNull(vm.state.value.error)
+                    assertNull(vm.snapshot.value.state.error)
                 } finally {
                     store.clear()
                     runCurrent()
@@ -340,7 +342,7 @@ class BaseMviViewModelCommandTest {
             private set
         var sourceStops = 0
             private set
-        val snapshot: CommandState get() = currentState
+        val currentData: CommandState get() = currentState
 
         override fun onIntent(intent: CommandIntent) {
             when (intent) {
