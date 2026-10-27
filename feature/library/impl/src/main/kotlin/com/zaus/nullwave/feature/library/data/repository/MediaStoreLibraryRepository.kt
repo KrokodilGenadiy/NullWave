@@ -10,7 +10,7 @@ import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumQuery
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchQuery
 import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchResults
@@ -36,7 +36,7 @@ internal class MediaStoreLibraryRepository(
     private val source: MediaStoreAudioSource,
     private val io: CoroutineDispatcher,
 ) : LibraryCatalogRepository, LibrarySearchRepository {
-    override fun observeTracks(query: LibraryTrackQuery): Flow<AppResult<List<LibraryTrack>, DataError>> =
+    override fun observeTracks(query: LibraryTrackQuery): Flow<AppResult<List<MediaTrack>, DataError>> =
         observe { it.toTracks(query) }
 
     override fun observeAlbums(query: LibraryAlbumQuery): Flow<AppResult<List<LibraryAlbum>, DataError>> =

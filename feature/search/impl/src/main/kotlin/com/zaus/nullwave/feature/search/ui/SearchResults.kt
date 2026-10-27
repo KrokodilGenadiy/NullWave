@@ -29,7 +29,7 @@ import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveBut
 import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveDivider
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
-import com.zaus.nullwave.feature.library.api.model.ArtworkRef
+import com.zaus.nullwave.core.media.model.ArtworkRef
 import com.zaus.nullwave.feature.library.api.ui.LibraryArtworkRenderer
 import com.zaus.nullwave.feature.library.api.ui.libraryAlbumCredit
 import com.zaus.nullwave.feature.library.api.ui.libraryDuration

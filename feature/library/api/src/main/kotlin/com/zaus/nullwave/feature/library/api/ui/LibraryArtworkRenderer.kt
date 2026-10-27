@@ -3,7 +3,7 @@ package com.zaus.nullwave.feature.library.api.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
-import com.zaus.nullwave.feature.library.api.model.ArtworkRef
+import com.zaus.nullwave.core.media.model.ArtworkRef
 
 /** Library-owned thumbnail rendering. A null/unreadable reference uses the title's monogram. */
 interface LibraryArtworkRenderer {

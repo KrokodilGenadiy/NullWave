@@ -1,6 +1,6 @@
 package com.zaus.nullwave.feature.library.data.mapping
 
-import com.zaus.nullwave.feature.library.api.model.ArtworkRef
+import com.zaus.nullwave.core.media.model.ArtworkRef
 import com.zaus.nullwave.feature.library.data.source.MediaStoreAudioRow
 import java.security.MessageDigest
 import kotlinx.coroutines.currentCoroutineContext

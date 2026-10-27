@@ -17,8 +17,8 @@ import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
 import com.zaus.nullwave.feature.library.api.model.search.LibraryAlbumSearchHit
 import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchResults
 import com.zaus.nullwave.feature.library.api.model.search.LibraryTrackSearchHit
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
-import com.zaus.nullwave.feature.library.api.model.track.TrackId
+import com.zaus.nullwave.core.media.model.track.MediaTrack
+import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.feature.library.api.ui.LibraryAccessUi
 import com.zaus.nullwave.feature.search.impl.R
 import com.zaus.nullwave.feature.search.presentation.SearchBody
@@ -27,8 +27,8 @@ import com.zaus.nullwave.feature.search.presentation.SearchState
 
 private val previewResults = LibrarySearchResults(
     tracks = listOf(
-        LibraryTrackSearchHit(LibraryTrack(TrackId("preview:1"), "Static Bloom", "Static Pilgrim", "Nullwave EP", 242_000), "static_bloom.flac"),
-        LibraryTrackSearchHit(LibraryTrack(TrackId("preview:2"), "Сигнал из очень далёкого города", "Статика", "Ночная орбита", 221_000), "Статика — Сигнал.flac"),
+        LibraryTrackSearchHit(MediaTrack(TrackId("preview:1"), "Static Bloom", "Static Pilgrim", "Nullwave EP", 242_000), "static_bloom.flac"),
+        LibraryTrackSearchHit(MediaTrack(TrackId("preview:2"), "Сигнал из очень далёкого города", "Статика", "Ночная орбита", 221_000), "Статика — Сигнал.flac"),
     ),
     albums = listOf(LibraryAlbumSearchHit(LibraryAlbum(AlbumId("preview:album"), "Nullwave EP", AlbumArtistCredit.Various, 12), listOf("Static Pilgrim"))),
     artists = listOf(LibraryArtist(ArtistId("preview:artist"), "Static Pilgrim", 41, 3)),

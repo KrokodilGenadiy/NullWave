@@ -7,7 +7,7 @@ import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumQuery
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
 import kotlinx.coroutines.flow.Flow
@@ -29,7 +29,7 @@ internal val LibraryState.catalogRequest: LibraryCatalogRequest
 
 /** Typed payloads keep tab routing safe without casting repository lists. */
 internal sealed interface LibraryCatalogSnapshot {
-    data class Songs(val items: List<LibraryTrack>) : LibraryCatalogSnapshot
+    data class Songs(val items: List<MediaTrack>) : LibraryCatalogSnapshot
     data class Albums(val items: List<LibraryAlbum>) : LibraryCatalogSnapshot
     data class Artists(val items: List<LibraryArtist>) : LibraryCatalogSnapshot
 }

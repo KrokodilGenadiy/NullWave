@@ -12,9 +12,9 @@ import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import com.zaus.nullwave.core.designsystem.theme.NullWaveEffects
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.mvi.ui.UiText
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
-import com.zaus.nullwave.feature.library.api.model.track.TrackId
+import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.api.access.AccessAction
 import com.zaus.nullwave.feature.library.presentation.LibraryBody
@@ -24,10 +24,10 @@ import com.zaus.nullwave.feature.library.presentation.RefreshState
 import kotlinx.coroutines.delay
 
 private val previewTracks = listOf(
-    LibraryTrack(TrackId("preview:1"), "Low Orbit", "Nullwave", "Transmission", 203_000, sizeBytes = 32_000_000),
-    LibraryTrack(TrackId("preview:2"), "Очень длинное название трека на дальней орбите", "Необычайно длинное имя исполнителя", "Ночной город", 4_021_000, sizeBytes = 68_000_000),
-    LibraryTrack(TrackId("preview:3"), "Untitled recording", null, null, null, sizeBytes = 1_250_000),
-    LibraryTrack(TrackId("preview:4"), "Unknown artist", null, "Off-Grid", 281_000, sizeBytes = 27_000_000),
+    MediaTrack(TrackId("preview:1"), "Low Orbit", "Nullwave", "Transmission", 203_000, sizeBytes = 32_000_000),
+    MediaTrack(TrackId("preview:2"), "Очень длинное название трека на дальней орбите", "Необычайно длинное имя исполнителя", "Ночной город", 4_021_000, sizeBytes = 68_000_000),
+    MediaTrack(TrackId("preview:3"), "Untitled recording", null, null, null, sizeBytes = 1_250_000),
+    MediaTrack(TrackId("preview:4"), "Unknown artist", null, "Off-Grid", 281_000, sizeBytes = 27_000_000),
 )
 
 internal class LibraryPreviewStates : PreviewParameterProvider<LibraryState> {

@@ -1,6 +1,6 @@
 package com.zaus.nullwave.feature.library.api.model.album
 
-import com.zaus.nullwave.feature.library.api.model.ArtworkRef
+import com.zaus.nullwave.core.media.model.ArtworkRef
 
 /** Opaque source identity, distinct from a title or [ArtworkRef]. Not stable across reindexing. */
 @JvmInline

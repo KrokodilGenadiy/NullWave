@@ -1,6 +1,6 @@
 package com.zaus.nullwave.feature.library.api.model.search
 
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.core.media.model.track.MediaTrack
 
 /**
  * Existing track metadata plus the original, cleaned file display name, if known. A filename
@@ -8,7 +8,7 @@ import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
  * Unlike search comparison text, its spelling, case and internal whitespace are preserved.
  */
 data class LibraryTrackSearchHit(
-    val track: LibraryTrack,
+    val track: MediaTrack,
     val fileName: String?,
 ) {
     init {

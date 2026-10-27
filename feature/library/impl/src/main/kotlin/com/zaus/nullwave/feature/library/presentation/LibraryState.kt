@@ -7,13 +7,13 @@ import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumQuery
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 
 /** [query]/[body] belong to Songs; [selectedBody] exposes the active tab's loading/error status. */
 internal data class LibraryState(
     val query: LibraryTrackQuery,
-    val body: LibraryBody<LibraryTrack> = LibraryBody.Loading,
+    val body: LibraryBody<MediaTrack> = LibraryBody.Loading,
     val selectedTab: LibraryTab = LibraryTab.Songs,
     val albumQuery: LibraryAlbumQuery = LibraryAlbumQuery(query.localeTag),
     val artistQuery: LibraryArtistQuery = LibraryArtistQuery(query.localeTag),

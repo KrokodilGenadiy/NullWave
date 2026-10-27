@@ -17,9 +17,9 @@ import com.zaus.nullwave.feature.library.api.model.album.AlbumId
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
 import com.zaus.nullwave.feature.library.api.model.artist.ArtistId
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
-import com.zaus.nullwave.feature.library.api.model.track.TrackId
+import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.presentation.LibraryBody
 import com.zaus.nullwave.feature.library.presentation.LibraryIntent
@@ -43,7 +43,7 @@ private val sampleArtists = listOf(
 private fun sampleCatalog(tab: LibraryTab) = LibraryState(
     query = LibraryTrackQuery("en"),
     selectedTab = tab,
-    body = LibraryBody.Ready(listOf(LibraryTrack(
+    body = LibraryBody.Ready(listOf(MediaTrack(
         TrackId("sample:1"), "Deadzone Chorus", "Static Pilgrim", "Nullwave EP", 221_000,
     ))),
     albums = LibraryBody.Ready(sampleAlbums),

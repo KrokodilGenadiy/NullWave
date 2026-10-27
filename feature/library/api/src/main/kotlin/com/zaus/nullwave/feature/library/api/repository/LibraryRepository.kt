@@ -2,7 +2,7 @@ package com.zaus.nullwave.feature.library.api.repository
 
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.DataError
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import kotlinx.coroutines.flow.Flow
 
@@ -19,5 +19,5 @@ interface LibraryRepository {
      * Cancellation releases the query/observer and must not be converted into a failure value.
      * Programming errors propagate. This method does not scan the filesystem or request permission.
      */
-    fun observeTracks(query: LibraryTrackQuery): Flow<AppResult<List<LibraryTrack>, DataError>>
+    fun observeTracks(query: LibraryTrackQuery): Flow<AppResult<List<MediaTrack>, DataError>>
 }

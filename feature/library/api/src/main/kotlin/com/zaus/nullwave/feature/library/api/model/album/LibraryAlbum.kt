@@ -1,6 +1,6 @@
 package com.zaus.nullwave.feature.library.api.model.album
 
-import com.zaus.nullwave.feature.library.api.model.ArtworkRef
+import com.zaus.nullwave.core.media.model.ArtworkRef
 
 /**
  * One album represented by at least one eligible catalog track.

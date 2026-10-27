@@ -32,6 +32,7 @@ include(
     ":core:designsystem",
     ":core:mvi",
     ":core:result",
+    ":core:media",
     ":feature:library:api",
     ":feature:library:impl",
     ":feature:playlists:api",

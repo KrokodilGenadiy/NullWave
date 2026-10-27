@@ -1,11 +1,11 @@
 package com.zaus.nullwave.feature.library.data.mapping
 
 import com.zaus.nullwave.feature.library.api.model.SortDirection
-import com.zaus.nullwave.feature.library.api.model.ArtworkRef
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.core.media.model.ArtworkRef
+import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
-import com.zaus.nullwave.feature.library.api.model.track.TrackId
+import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.feature.library.data.source.MediaStoreAudioRow
 import java.io.IOException
 import java.text.Collator
@@ -14,7 +14,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
 /** Local collator per snapshot: Collator is mutable and cannot be shared across subscriptions. */
-internal suspend fun List<MediaStoreAudioRow>.toTracks(query: LibraryTrackQuery): List<LibraryTrack> {
+internal suspend fun List<MediaStoreAudioRow>.toTracks(query: LibraryTrackQuery): List<MediaTrack> {
     val context = currentCoroutineContext()
     val artwork = artworkReferences()
     val collator = Collator.getInstance(Locale.forLanguageTag(query.localeTag))
@@ -39,11 +39,11 @@ internal suspend fun List<MediaStoreAudioRow>.toTracks(query: LibraryTrackQuery)
 }
 
 /** Shared entity mapping; callers supply artwork computed from the complete album membership. */
-internal fun MediaStoreAudioRow.toTrack(artwork: ArtworkRef?): LibraryTrack {
+internal fun MediaStoreAudioRow.toTrack(artwork: ArtworkRef?): MediaTrack {
     val volume = validateAudioIdentityAndGetVolume()
     val title = title.metadataOrNull() ?: displayName.metadataOrNull()
         ?: throw IOException("MediaStore audio row has neither title nor display name")
-    return LibraryTrack(
+    return MediaTrack(
         id = TrackId("$volume:$id"),
         title = title,
         artist = artist.metadataOrNull(),
@@ -54,4 +54,4 @@ internal fun MediaStoreAudioRow.toTrack(artwork: ArtworkRef?): LibraryTrack {
     )
 }
 
-private data class DatedTrack(val track: LibraryTrack, val added: Long?)
+private data class DatedTrack(val track: MediaTrack, val added: Long?)

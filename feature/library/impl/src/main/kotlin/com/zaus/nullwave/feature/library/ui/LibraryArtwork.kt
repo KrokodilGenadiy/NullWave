@@ -17,14 +17,14 @@ import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
 import com.zaus.nullwave.core.designsystem.components.content.NullWaveArtworkPlaceholder
 import com.zaus.nullwave.core.designsystem.components.content.NullWaveCoverArt
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
-import com.zaus.nullwave.feature.library.api.model.ArtworkRef
+import com.zaus.nullwave.core.media.model.track.MediaTrack
+import com.zaus.nullwave.core.media.model.ArtworkRef
 import com.zaus.nullwave.feature.library.artwork.artworkRequest
 import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
 
 /** Only composed rows request artwork. Preview/null-loader paths never access the device catalog. */
 @Composable
-internal fun LibraryArtwork(track: LibraryTrack, loader: LibraryArtworkLoader?, modifier: Modifier = Modifier) {
+internal fun LibraryArtwork(track: MediaTrack, loader: LibraryArtworkLoader?, modifier: Modifier = Modifier) {
     LibraryArtwork(track.artwork, track.album ?: track.title, loader, modifier)
 }
 

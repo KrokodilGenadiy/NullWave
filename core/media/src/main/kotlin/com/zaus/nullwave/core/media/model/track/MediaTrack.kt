@@ -1,9 +1,9 @@
-package com.zaus.nullwave.feature.library.api.model.track
+package com.zaus.nullwave.core.media.model.track
 
-import com.zaus.nullwave.feature.library.api.model.ArtworkRef
+import com.zaus.nullwave.core.media.model.ArtworkRef
 
-/** Catalog metadata, independent of Android URIs, formatted UI text and playback state. */
-data class LibraryTrack(
+/** Source metadata shared by catalog and playback, without Android resources or playback state. */
+data class MediaTrack(
     val id: TrackId,
     val title: String,
     val artist: String?,
