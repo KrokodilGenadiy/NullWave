@@ -13,8 +13,8 @@ import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
 import com.zaus.nullwave.feature.library.api.model.search.LibraryAlbumSearchHit
 import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchResults
 import com.zaus.nullwave.feature.library.api.model.search.LibraryTrackSearchHit
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
-import com.zaus.nullwave.feature.library.api.model.track.TrackId
+import com.zaus.nullwave.core.media.model.track.MediaTrack
+import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.feature.search.impl.R
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -582,7 +582,7 @@ class SearchViewModelTest {
     private val emptyResults = LibrarySearchResults(emptyList(), emptyList(), emptyList())
     private val results = LibrarySearchResults(
         tracks = listOf(LibraryTrackSearchHit(
-            LibraryTrack(TrackId("track:1"), "Signal", "Nullwave", "Transmission", 30_000), "Signal.m4a",
+            MediaTrack(TrackId("track:1"), "Signal", "Nullwave", "Transmission", 30_000), "Signal.m4a",
         )),
         albums = listOf(LibraryAlbumSearchHit(
             LibraryAlbum(AlbumId("album:1"), "Transmission", AlbumArtistCredit.Various, 12), listOf("Nullwave"),

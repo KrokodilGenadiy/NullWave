@@ -31,8 +31,8 @@ import com.zaus.nullwave.feature.library.api.model.search.LibraryAlbumSearchHit
 import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchQuery
 import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchResults
 import com.zaus.nullwave.feature.library.api.model.search.LibraryTrackSearchHit
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
-import com.zaus.nullwave.feature.library.api.model.track.TrackId
+import com.zaus.nullwave.core.media.model.track.MediaTrack
+import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.feature.library.api.repository.LibrarySearchRepository
 import com.zaus.nullwave.feature.library.api.ui.LibraryAccessHost
 import com.zaus.nullwave.feature.library.api.ui.LibraryAccessUi
@@ -45,7 +45,7 @@ import kotlinx.coroutines.flow.transformWhile
 
 internal fun emptyResults() = LibrarySearchResults(emptyList(), emptyList(), emptyList())
 internal fun searchResults(trackCount: Int = 1) = LibrarySearchResults(
-    List(trackCount) { LibraryTrackSearchHit(LibraryTrack(TrackId("track:$it"), "Orbit $it", "Static Pilgrim", "Transmission", 201_000), "orbit_$it.flac") },
+    List(trackCount) { LibraryTrackSearchHit(MediaTrack(TrackId("track:$it"), "Orbit $it", "Static Pilgrim", "Transmission", 201_000), "orbit_$it.flac") },
     listOf(LibraryAlbumSearchHit(LibraryAlbum(AlbumId("album:1"), "Transmission", AlbumArtistCredit.Various, 12), listOf("Guest Orbit"))),
     listOf(LibraryArtist(ArtistId("artist:1"), "Static Pilgrim", 41, 3)),
 )

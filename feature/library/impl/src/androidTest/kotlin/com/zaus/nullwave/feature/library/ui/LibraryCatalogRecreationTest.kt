@@ -41,9 +41,9 @@ import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumQuery
 import com.zaus.nullwave.feature.library.api.model.artist.ArtistId
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
-import com.zaus.nullwave.feature.library.api.model.track.TrackId
+import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.platform.AudioPermission
@@ -241,7 +241,7 @@ internal class CatalogActivityFixture : AudioPermission {
 
     val repository = object : LibraryCatalogRepository {
         override fun observeTracks(query: LibraryTrackQuery) = observe(LibraryTab.Songs, query, query.direction,
-            (1..40).map { LibraryTrack(TrackId("track:$it"), "Track $it", null, null, null) })
+            (1..40).map { MediaTrack(TrackId("track:$it"), "Track $it", null, null, null) })
         override fun observeAlbums(query: LibraryAlbumQuery) = observe(LibraryTab.Albums, query, query.direction,
             (1..40).map { LibraryAlbum(AlbumId("album:$it"), "Album $it", AlbumArtistCredit.Named("Artist $it"), 3) })
         override fun observeArtists(query: LibraryArtistQuery) = observe(LibraryTab.Artists, query, query.direction,

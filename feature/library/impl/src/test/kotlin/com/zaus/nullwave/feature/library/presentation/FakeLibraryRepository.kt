@@ -6,7 +6,7 @@ import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumQuery
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
 import kotlinx.coroutines.channels.Channel
@@ -16,11 +16,11 @@ import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
-internal typealias LibraryResult = AppResult<List<LibraryTrack>, DataError>
+internal typealias LibraryResult = AppResult<List<MediaTrack>, DataError>
 
 /** Test-only provider: independent cold subscriptions, synchronous results and delayed cleanup. */
 internal class FakeLibraryRepository : LibraryCatalogRepository {
-    val tracks = CatalogFlow<LibraryTrackQuery, LibraryTrack>()
+    val tracks = CatalogFlow<LibraryTrackQuery, MediaTrack>()
     val albums = CatalogFlow<LibraryAlbumQuery, LibraryAlbum>()
     val artists = CatalogFlow<LibraryArtistQuery, LibraryArtist>()
     val requests = mutableListOf<Any>()

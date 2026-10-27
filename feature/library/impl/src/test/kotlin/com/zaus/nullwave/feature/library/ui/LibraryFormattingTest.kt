@@ -4,9 +4,9 @@ import com.zaus.nullwave.feature.library.api.ui.libraryMonogram
 import com.zaus.nullwave.feature.library.api.ui.librarySubtitle
 import com.zaus.nullwave.feature.library.api.ui.libraryDuration
 import com.zaus.nullwave.feature.library.api.ui.libraryAlbumCredit
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.feature.library.api.model.album.AlbumArtistCredit
-import com.zaus.nullwave.feature.library.api.model.track.TrackId
+import com.zaus.nullwave.core.media.model.track.TrackId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
@@ -39,7 +39,7 @@ class LibraryFormattingTest {
 
     @Test
     fun `total distinguishes complete empty partial and overflowing metadata`() {
-        val track = LibraryTrack(TrackId("test:1"), "Title", null, null, null)
+        val track = MediaTrack(TrackId("test:1"), "Title", null, null, null)
         assertEquals(0L, libraryTotalBytes(emptyList()))
         assertEquals(6_000_000_001L, libraryTotalBytes(listOf(track.copy(sizeBytes = 6_000_000_000), track.copy(sizeBytes = 1))))
         assertNull(libraryTotalBytes(listOf(track.copy(sizeBytes = 500), track)))

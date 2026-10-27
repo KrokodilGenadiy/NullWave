@@ -6,7 +6,7 @@ import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumQuery
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchQuery
 import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchResults
@@ -79,7 +79,7 @@ class MediaStoreLibraryRepositoryTest(private val kind: String) {
         val payload = (results.single() as AppResult.Success).value
         val item = if (payload is LibrarySearchResults) payload.tracks.single().track else (payload as List<*>).single()
         when (kind) {
-            "tracks", "search" -> assertEquals("Low Orbit", (item as LibraryTrack).title)
+            "tracks", "search" -> assertEquals("Low Orbit", (item as MediaTrack).title)
             "albums" -> assertEquals("Signals", (item as LibraryAlbum).title)
             "artists" -> assertEquals("Nullwave", (item as LibraryArtist).name)
         }

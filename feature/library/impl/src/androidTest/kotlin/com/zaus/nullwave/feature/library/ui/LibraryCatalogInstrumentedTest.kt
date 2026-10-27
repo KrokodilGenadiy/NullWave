@@ -39,10 +39,10 @@ import com.zaus.nullwave.feature.library.api.model.album.AlbumId
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
 import com.zaus.nullwave.feature.library.api.model.artist.ArtistId
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
-import com.zaus.nullwave.feature.library.api.model.track.TrackId
+import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.presentation.LibraryBody
 import com.zaus.nullwave.feature.library.api.access.AccessAction
@@ -248,7 +248,7 @@ class LibraryCatalogInstrumentedTest {
     private fun album(index: Int) = LibraryAlbum(AlbumId("album:$index"), "Album $index", AlbumArtistCredit.Named("Artist $index"), 3)
     private fun catalog(selected: LibraryTab = LibraryTab.Songs) = LibraryState(
         query = LibraryTrackQuery("en"), selectedTab = selected,
-        body = LibraryBody.Ready((1..40).map { LibraryTrack(TrackId("track:$it"), "Track $it", null, null, null) }),
+        body = LibraryBody.Ready((1..40).map { MediaTrack(TrackId("track:$it"), "Track $it", null, null, null) }),
         albums = LibraryBody.Ready((1..40).map(::album)),
         artists = LibraryBody.Ready((1..40).map { LibraryArtist(ArtistId("artist:$it"), "Artist $it", 3, 1) }),
     )

@@ -13,9 +13,9 @@ import com.zaus.nullwave.feature.library.api.model.album.AlbumId
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
 import com.zaus.nullwave.feature.library.api.model.artist.ArtistId
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
-import com.zaus.nullwave.feature.library.api.model.track.TrackId
+import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.feature.library.impl.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -64,7 +64,7 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
     }
     private val album = LibraryAlbum(AlbumId("primary:8"), "Signals", AlbumArtistCredit.Named("Nullwave"), 2, null)
     private val artist = LibraryArtist(ArtistId("primary:4"), "Nullwave", 2, 1)
-    private val track = LibraryTrack(TrackId("primary:1"), "Low Orbit", "Nullwave", "Signals", 180_000)
+    private val track = MediaTrack(TrackId("primary:1"), "Low Orbit", "Nullwave", "Signals", 180_000)
     private val expectedItems get() = if (tab == LibraryTab.Albums) listOf(album) else listOf(artist)
     private val loadError = UiText.Resource(R.string.library_load_failed)
     private val refreshError = UiText.Resource(R.string.library_refresh_failed)

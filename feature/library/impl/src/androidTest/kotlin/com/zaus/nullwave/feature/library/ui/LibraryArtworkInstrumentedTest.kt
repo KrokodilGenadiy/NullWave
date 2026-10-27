@@ -33,9 +33,9 @@ import coil3.Uri
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColors
 import com.zaus.nullwave.core.designsystem.theme.NullWaveEffects
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
-import com.zaus.nullwave.feature.library.api.model.ArtworkRef
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
-import com.zaus.nullwave.feature.library.api.model.track.TrackId
+import com.zaus.nullwave.core.media.model.ArtworkRef
+import com.zaus.nullwave.core.media.model.track.MediaTrack
+import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.feature.library.artwork.artworkRequest
 import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
 import com.zaus.nullwave.feature.library.artwork.mediaStoreUri
@@ -57,7 +57,7 @@ import org.junit.Test
 class LibraryArtworkInstrumentedTest {
     @get:Rule val compose = createComposeRule()
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
-    private val track = LibraryTrack(TrackId("test:1"), "Low Orbit", "Nullwave", "Transmission", 203_000)
+    private val track = MediaTrack(TrackId("test:1"), "Low Orbit", "Nullwave", "Transmission", 203_000)
 
     @Test
     fun volumeAndRevisionSelectTheRightThumbnailAndReuseMemoryCache() = runBlocking {

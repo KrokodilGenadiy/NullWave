@@ -4,7 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
 import com.zaus.nullwave.feature.library.data.repository.MediaStoreLibraryRepository
@@ -72,7 +72,7 @@ class LibraryGraphTest {
         backgroundScope.launch { second.withUiBinding { awaitCancellation() } }
         runCurrent()
         assertEquals(2, source.activeObservers)
-        assertEquals("Low Orbit", (first.snapshot.value.state.body as LibraryBody.Ready<LibraryTrack>).items.single().title)
+        assertEquals("Low Orbit", (first.snapshot.value.state.body as LibraryBody.Ready<MediaTrack>).items.single().title)
         firstUi.onIntent(LibraryIntent.TabSelected(LibraryTab.Albums))
         runCurrent()
         assertEquals("Signals", (first.snapshot.value.state.albums as LibraryBody.Ready<LibraryAlbum>).items.single().title)

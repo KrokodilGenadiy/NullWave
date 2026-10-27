@@ -41,9 +41,9 @@ import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumQuery
 import com.zaus.nullwave.feature.library.api.model.artist.ArtistId
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
-import com.zaus.nullwave.feature.library.api.model.track.TrackId
+import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.platform.AudioPermission
@@ -325,7 +325,7 @@ class LibraryRootInstrumentedTest {
                 override fun observeArtists(query: LibraryArtistQuery) = observe(query, listOf(
                     LibraryArtist(ArtistId("test:artist"), "Test artist", 1, 1)))
                 override fun observeTracks(query: LibraryTrackQuery) = observe(query, listOf(
-                    LibraryTrack(TrackId("test:1"), "Low Orbit", null, null, 203_000)))
+                    MediaTrack(TrackId("test:1"), "Low Orbit", null, null, 203_000)))
             }
             viewModel = LibraryViewModel(repository, savedState, "en")
             store.put("library", viewModel)

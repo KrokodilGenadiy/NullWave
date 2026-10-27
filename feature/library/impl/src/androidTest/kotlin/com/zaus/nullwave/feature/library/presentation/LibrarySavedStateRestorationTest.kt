@@ -25,7 +25,7 @@ import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumQuery
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
@@ -163,7 +163,7 @@ private class RestorationCatalog : LibraryCatalogRepository {
     val firstRead = CompletableDeferred<Unit>()
     var granted = true
     var active = 0
-    override fun observeTracks(query: LibraryTrackQuery) = observe<LibraryTrack>(query)
+    override fun observeTracks(query: LibraryTrackQuery) = observe<MediaTrack>(query)
     override fun observeAlbums(query: LibraryAlbumQuery) = observe<LibraryAlbum>(query)
     override fun observeArtists(query: LibraryArtistQuery) = observe<LibraryArtist>(query)
     private fun <T> observe(query: Any): Flow<AppResult<List<T>, DataError>> = flow {

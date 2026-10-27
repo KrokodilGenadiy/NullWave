@@ -40,10 +40,10 @@ import com.zaus.nullwave.core.result.DataError
 import com.zaus.nullwave.feature.library.api.model.SortDirection
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumQuery
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
-import com.zaus.nullwave.feature.library.api.model.track.TrackId
+import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.platform.AudioPermission
@@ -220,9 +220,9 @@ internal class PermissionActivityFixture : AudioPermission {
     val repository = object : LibraryCatalogRepository {
         override fun observeAlbums(query: LibraryAlbumQuery): Nothing = error("Songs permission test must not read albums")
         override fun observeArtists(query: LibraryArtistQuery): Nothing = error("Songs permission test must not read artists")
-        override fun observeTracks(query: LibraryTrackQuery) = flow<AppResult<List<LibraryTrack>, DataError>> {
+        override fun observeTracks(query: LibraryTrackQuery) = flow<AppResult<List<MediaTrack>, DataError>> {
             if (granted) {
-                emit(AppResult.Success(listOf(LibraryTrack(TrackId("test:restored"), "Restored orbit", null, null, null))))
+                emit(AppResult.Success(listOf(MediaTrack(TrackId("test:restored"), "Restored orbit", null, null, null))))
                 awaitCancellation()
             } else emit(AppResult.Failure(DataError.AccessDenied))
         }

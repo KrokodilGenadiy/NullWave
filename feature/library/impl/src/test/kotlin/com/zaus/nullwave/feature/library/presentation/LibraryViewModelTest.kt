@@ -8,10 +8,10 @@ import com.zaus.nullwave.core.result.DataError
 import com.zaus.nullwave.feature.library.api.access.AccessAction
 import com.zaus.nullwave.feature.library.api.access.LibraryAccess
 import com.zaus.nullwave.feature.library.api.model.SortDirection
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
-import com.zaus.nullwave.feature.library.api.model.track.TrackId
+import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.feature.library.impl.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -81,7 +81,7 @@ class LibraryViewModelTest {
         reply(AppResult.Success(listOf(track)))
         assertEquals(LibraryBody.Ready(listOf(track)), vm.snapshot.value.state.body)
         reply(AppResult.Success(emptyList()))
-        assertEquals(LibraryBody.Ready(emptyList<LibraryTrack>()), vm.snapshot.value.state.body)
+        assertEquals(LibraryBody.Ready(emptyList<MediaTrack>()), vm.snapshot.value.state.body)
         assertEquals(1, repository.tracks.subscriptions.size)
     }
 
@@ -174,9 +174,9 @@ class LibraryViewModelTest {
         bind(vm)
         reply(AppResult.Success(emptyList()))
         send(vm, LibraryIntent.Refresh)
-        assertEquals(LibraryBody.Ready(emptyList<LibraryTrack>(), RefreshState.Running), vm.snapshot.value.state.body)
+        assertEquals(LibraryBody.Ready(emptyList<MediaTrack>(), RefreshState.Running), vm.snapshot.value.state.body)
         reply(AppResult.Failure(DataError.Io))
-        assertEquals(LibraryBody.Ready(emptyList<LibraryTrack>(), RefreshState.Failed(refreshError)), vm.snapshot.value.state.body)
+        assertEquals(LibraryBody.Ready(emptyList<MediaTrack>(), RefreshState.Failed(refreshError)), vm.snapshot.value.state.body)
         send(vm, LibraryIntent.Refresh)
         reply(AppResult.Success(listOf(track)))
         assertEquals(LibraryBody.Ready(listOf(track)), vm.snapshot.value.state.body)
@@ -231,7 +231,7 @@ class LibraryViewModelTest {
         assertEquals(3, repository.tracks.subscriptions.size)
         assertTrue(repository.tracks.subscriptions.all { it.query == LibraryTrackQuery("ru") })
         reply(AppResult.Success(emptyList()))
-        assertEquals(LibraryBody.Ready(emptyList<LibraryTrack>()), vm.snapshot.value.state.body)
+        assertEquals(LibraryBody.Ready(emptyList<MediaTrack>()), vm.snapshot.value.state.body)
     }
 
     @Test
@@ -317,7 +317,7 @@ class LibraryViewModelTest {
         assertTrue(previous.lateDeliveryAttempted)
         assertSame(LibraryBody.Loading, vm.snapshot.value.state.body)
         reply(AppResult.Success(emptyList()))
-        assertEquals(LibraryBody.Ready(emptyList<LibraryTrack>()), vm.snapshot.value.state.body)
+        assertEquals(LibraryBody.Ready(emptyList<MediaTrack>()), vm.snapshot.value.state.body)
     }
 
     @Test
@@ -400,7 +400,7 @@ class LibraryViewModelTest {
 
         bind(vm)
         reply(AppResult.Success(emptyList()))
-        assertEquals(LibraryBody.Ready(emptyList<LibraryTrack>()), vm.snapshot.value.state.body)
+        assertEquals(LibraryBody.Ready(emptyList<MediaTrack>()), vm.snapshot.value.state.body)
     }
 
     @Test
@@ -465,7 +465,7 @@ class LibraryViewModelTest {
         assertEquals(LibraryBody.Ready(listOf(track), RefreshState.Failed(refreshError)), vm.snapshot.value.state.body)
         repository.tracks.initialResult = AppResult.Success(emptyList())
         send(vm, LibraryIntent.Retry)
-        assertEquals(LibraryBody.Ready(emptyList<LibraryTrack>()), vm.snapshot.value.state.body)
+        assertEquals(LibraryBody.Ready(emptyList<MediaTrack>()), vm.snapshot.value.state.body)
 
         repository.tracks.initialResult = AppResult.Failure(DataError.AccessDenied)
         send(vm, LibraryIntent.AccessChecked(LibraryAccess.Required(AccessAction.Request)))
@@ -539,10 +539,10 @@ class LibraryViewModelTest {
         runCurrent()
     }
 
-    private fun ready(vm: LibraryViewModel): LibraryBody.Ready<LibraryTrack> = vm.snapshot.value.state.body as LibraryBody.Ready<LibraryTrack>
+    private fun ready(vm: LibraryViewModel): LibraryBody.Ready<MediaTrack> = vm.snapshot.value.state.body as LibraryBody.Ready<MediaTrack>
 
     private val loadError = UiText.Resource(R.string.library_load_failed)
     private val refreshError = UiText.Resource(R.string.library_refresh_failed)
-    private val track = LibraryTrack(TrackId("primary:1"), "Low Orbit", "Nullwave", null, 180_000)
-    private val otherTrack = LibraryTrack(TrackId("sd-card:1"), "Сигнал", null, null, null)
+    private val track = MediaTrack(TrackId("primary:1"), "Low Orbit", "Nullwave", null, 180_000)
+    private val otherTrack = MediaTrack(TrackId("sd-card:1"), "Сигнал", null, null, null)
 }

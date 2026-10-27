@@ -1,5 +1,6 @@
 package com.zaus.nullwave.feature.library.api.model
 
+import com.zaus.nullwave.core.media.model.ArtworkRef
 import com.zaus.nullwave.feature.library.api.model.album.AlbumArtistCredit
 import com.zaus.nullwave.feature.library.api.model.album.AlbumId
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum

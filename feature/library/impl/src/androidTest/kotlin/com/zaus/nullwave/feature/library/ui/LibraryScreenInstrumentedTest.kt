@@ -34,10 +34,10 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveEffects
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.mvi.ui.UiText
 import com.zaus.nullwave.feature.library.api.model.SortDirection
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
+import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
-import com.zaus.nullwave.feature.library.api.model.track.TrackId
+import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.api.access.AccessAction
 import com.zaus.nullwave.feature.library.presentation.LibraryBody
@@ -51,7 +51,7 @@ import org.junit.Test
 class LibraryScreenInstrumentedTest {
     @get:Rule val compose = createComposeRule()
     private val robot by lazy { LibraryScreenRobot(compose) }
-    private val track = LibraryTrack(TrackId("test:1"), "Low Orbit", null, null, 203_000)
+    private val track = MediaTrack(TrackId("test:1"), "Low Orbit", null, null, 203_000)
 
     @Test
     fun metadataSummaryAndSubtitleFollowTheCurrentSnapshot() {
@@ -177,7 +177,7 @@ private class LibraryScreenRobot(private val compose: ComposeContentTestRule) {
     var aboutClicks = 0
     fun text(id: Int, vararg args: Any) = InstrumentationRegistry.getInstrumentation().targetContext.getString(id, *args)
 
-    fun show(body: LibraryBody<LibraryTrack>, access: LibraryAccessUi = LibraryAccessUi(),
+    fun show(body: LibraryBody<MediaTrack>, access: LibraryAccessUi = LibraryAccessUi(),
              fontScale: Float = 1f, direction: LayoutDirection = LayoutDirection.Ltr) = apply {
         state.value = LibraryState(LibraryTrackQuery("en"), body)
         compose.setContent {
@@ -195,7 +195,7 @@ private class LibraryScreenRobot(private val compose: ComposeContentTestRule) {
             }
         }
     }
-    fun updateBody(body: LibraryBody<LibraryTrack>) = apply {
+    fun updateBody(body: LibraryBody<MediaTrack>) = apply {
         compose.runOnIdle { state.value = state.value.copy(body = body) }
     }
     fun visible(tag: String) = apply { compose.onNodeWithTag(tag).assertIsDisplayed() }

@@ -1,13 +1,13 @@
 package com.zaus.nullwave.feature.library.api.model.search
 
-import com.zaus.nullwave.feature.library.api.model.ArtworkRef
+import com.zaus.nullwave.core.media.model.ArtworkRef
 import com.zaus.nullwave.feature.library.api.model.album.AlbumArtistCredit
 import com.zaus.nullwave.feature.library.api.model.album.AlbumId
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
 import com.zaus.nullwave.feature.library.api.model.artist.ArtistId
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
-import com.zaus.nullwave.feature.library.api.model.track.LibraryTrack
-import com.zaus.nullwave.feature.library.api.model.track.TrackId
+import com.zaus.nullwave.core.media.model.track.MediaTrack
+import com.zaus.nullwave.core.media.model.track.TrackId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -15,7 +15,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class LibrarySearchModelsTest {
-    private val track = LibraryTrack(
+    private val track = MediaTrack(
         id = TrackId("primary:1"),
         title = "Morning",
         artist = "Ёлка",
