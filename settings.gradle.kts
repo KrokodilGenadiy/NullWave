@@ -33,6 +33,8 @@ include(
     ":core:mvi",
     ":core:result",
     ":core:media",
+    ":core:playback:api",
+    ":core:playback:impl",
     ":feature:library:api",
     ":feature:library:impl",
     ":feature:playlists:api",
