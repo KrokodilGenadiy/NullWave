@@ -5,7 +5,9 @@ import coil3.ImageLoader
 import com.zaus.nullwave.core.di.dispatchers.IoDispatcher
 import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
 import com.zaus.nullwave.feature.library.data.source.AndroidMediaStoreAudioSource
+import com.zaus.nullwave.feature.library.data.source.AndroidMediaStorePlaybackSource
 import com.zaus.nullwave.feature.library.data.source.MediaStoreAudioSource
+import com.zaus.nullwave.feature.library.data.source.MediaStorePlaybackSource
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
@@ -40,6 +42,12 @@ object LibraryPlatformBindings {
         @ForScope(AppScope::class) context: Context,
         @IoDispatcher io: CoroutineDispatcher,
     ): MediaStoreAudioSource = AndroidMediaStoreAudioSource(context, io)
+
+    @Provides
+    private fun playbackSource(
+        @ForScope(AppScope::class) context: Context,
+        @IoDispatcher io: CoroutineDispatcher,
+    ): MediaStorePlaybackSource = AndroidMediaStorePlaybackSource(context, io)
 
     /** Read for each VM creation; an app-scoped cached locale would outlive configuration changes. */
     @Provides
