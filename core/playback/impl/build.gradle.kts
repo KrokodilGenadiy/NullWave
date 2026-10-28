@@ -8,4 +8,6 @@ android {
 
 dependencies {
     implementation(project(":core:playback:api"))
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
