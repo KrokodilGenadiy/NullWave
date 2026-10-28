@@ -36,7 +36,6 @@ internal suspend fun List<MediaStoreAudioRow>.toSearchResults(query: LibrarySear
 
     val albumGroups = catalogGroups { it.albumId }
     val albums = albumGroups.mapValues { (id, members) ->
-        context.ensureActive()
         members.toAlbum(id)
     }
     val trackHits = mapNotNull { row ->
@@ -79,7 +78,6 @@ internal suspend fun List<MediaStoreAudioRow>.toSearchResults(query: LibrarySear
     }
 
     val artistHits = catalogGroups { it.artistId }.mapNotNull { (id, members) ->
-        context.ensureActive()
         val artist = members.toArtist(id)
         val rank = matcher.matchPrimary(artist.name?.let(::normalizeLibrarySearchText)).rank ?: return@mapNotNull null
         RankedHit(artist, rank)

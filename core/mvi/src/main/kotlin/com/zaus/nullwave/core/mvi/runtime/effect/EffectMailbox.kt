@@ -112,7 +112,6 @@ internal class EffectMailbox<E>(private val capacity: Int = 64) {
     /** Main confines admission; the inner coroutineScope joins all handler cleanup before release. */
     private suspend fun withConsumer(block: suspend () -> Unit) {
         val caller = currentCoroutineContext()
-        caller.ensureActive()
         // A cancelled handler's NonCancellable cleanup cannot wait for its own lease to release.
         // A per-mailbox context key also preserves this check through another VM's UI handler.
         check(caller[consumerKey] == null) { "MVI effects allow only one active collector." }

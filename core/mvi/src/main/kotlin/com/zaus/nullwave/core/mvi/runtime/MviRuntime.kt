@@ -149,7 +149,6 @@ internal class MviRuntime<S : UiState, E : UiEffect>(
     fun <T> deferIntents(block: () -> T): T = intentIngress.deferDispatch(block)
 
     suspend fun withUiBinding(block: suspend () -> Unit) = withContext(Dispatchers.Main.immediate) {
-        currentCoroutineContext().ensureActive()
         if (!isOpen) return@withContext
         activeUiBindings.value += 1
         try {

@@ -67,7 +67,6 @@ abstract class BaseMviViewModel<S : UiState, I : UiIntent, E : UiEffect>(
         if (cleared || !runtimeScope.isActive) return
         MviAccess.checkUiEntryAllowed()
         withContext(Dispatchers.Main.immediate + MviAccess.neutralContext()) {
-            currentCoroutineContext().ensureActive()
             if (!runtime.isOpen) return@withContext
             requireDefinition()
             runtime.collectEffects(onEffect)
@@ -93,7 +92,6 @@ abstract class BaseMviViewModel<S : UiState, I : UiIntent, E : UiEffect>(
         if (cleared || !runtimeScope.isActive) return
         MviAccess.checkUiEntryAllowed()
         withContext(Dispatchers.Main.immediate + MviAccess.neutralContext()) {
-            currentCoroutineContext().ensureActive()
             if (!runtime.isOpen) return@withContext
             requireDefinition()
             runtime.withUiBinding(block)

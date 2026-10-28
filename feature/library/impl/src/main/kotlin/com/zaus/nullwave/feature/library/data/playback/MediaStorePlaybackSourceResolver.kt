@@ -26,7 +26,6 @@ internal class MediaStorePlaybackSourceResolver(
     override suspend fun resolveTrack(id: TrackId): AppResult<ResolvedPlaybackTrack, PlaybackSourceError> =
         withContext(io) {
             try {
-                currentCoroutineContext().ensureActive()
                 if (!source.hasReadAccess()) return@withContext AppResult.Failure(PlaybackSourceError.AccessDenied)
                 val address = MediaStoreTrackAddress.from(id)
                     ?: return@withContext AppResult.Failure(PlaybackSourceError.NotFound)
@@ -42,7 +41,6 @@ internal class MediaStorePlaybackSourceResolver(
                 if (!source.hasReadAccess()) AppResult.Failure(PlaybackSourceError.AccessDenied)
                 else AppResult.Success(ResolvedPlaybackTrack(track, data.resourceUri))
             } catch (failure: SecurityException) {
-                currentCoroutineContext().ensureActive()
                 // A provider/resource can deny access even while the broad audio permission is granted.
                 AppResult.Failure(PlaybackSourceError.AccessDenied, failure)
             } catch (failure: IOException) {
