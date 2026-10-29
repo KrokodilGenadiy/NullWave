@@ -7,8 +7,8 @@ import com.zaus.nullwave.core.playback.api.model.PlaybackConnection
 import com.zaus.nullwave.core.playback.api.model.PlaybackConnectionError
 import com.zaus.nullwave.core.playback.api.model.PlaybackProgress
 import com.zaus.nullwave.core.playback.api.model.PlaybackSessionId
-import com.zaus.nullwave.core.playback.media3.PlaybackServiceRegistry
-import com.zaus.nullwave.core.playback.media3.PlaybackSessionProtocol
+import com.zaus.nullwave.core.playback.media3.session.PlaybackSessionProtocol
+import com.zaus.nullwave.core.playback.media3.state.PlaybackServiceRegistry
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.EmptyResult
 import kotlinx.coroutines.CompletableDeferred

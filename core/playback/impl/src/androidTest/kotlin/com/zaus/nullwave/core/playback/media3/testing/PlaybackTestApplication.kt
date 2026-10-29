@@ -8,9 +8,9 @@ import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.core.playback.api.source.PlaybackSourceError
 import com.zaus.nullwave.core.playback.api.source.PlaybackSourceResolver
 import com.zaus.nullwave.core.playback.api.source.ResolvedPlaybackTrack
-import com.zaus.nullwave.core.playback.media3.PlaybackServiceComponent
-import com.zaus.nullwave.core.playback.media3.PlaybackServiceComponentOwner
-import com.zaus.nullwave.core.playback.media3.PlaybackServiceDependencies
+import com.zaus.nullwave.core.playback.media3.service.PlaybackServiceComponent
+import com.zaus.nullwave.core.playback.media3.service.PlaybackServiceComponentOwner
+import com.zaus.nullwave.core.playback.media3.service.PlaybackServiceDependencies
 import com.zaus.nullwave.core.result.AppResult
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers

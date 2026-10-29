@@ -6,7 +6,7 @@
     <application>
         <!-- System media clients bind here; session admission checks trust, private commands check UID. -->
         <service
-            android:name="com.zaus.nullwave.core.playback.media3.NullWavePlaybackService"
+            android:name="com.zaus.nullwave.core.playback.media3.service.NullWavePlaybackService"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback"
             tools:ignore="ExportedService">

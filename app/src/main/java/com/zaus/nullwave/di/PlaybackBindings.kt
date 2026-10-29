@@ -5,7 +5,7 @@ import com.zaus.nullwave.core.di.dispatchers.DefaultDispatcher
 import com.zaus.nullwave.core.di.dispatchers.MainDispatcher
 import com.zaus.nullwave.core.playback.api.PlaybackController
 import com.zaus.nullwave.core.playback.api.source.PlaybackSourceResolver
-import com.zaus.nullwave.core.playback.media3.PlaybackServiceDependencies
+import com.zaus.nullwave.core.playback.media3.service.PlaybackServiceDependencies
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo

@@ -4,7 +4,7 @@ import android.app.Application
 import android.content.Context
 import com.zaus.nullwave.core.navigation.EntryProviderInstaller
 import com.zaus.nullwave.core.playback.api.PlaybackController
-import com.zaus.nullwave.core.playback.media3.PlaybackServiceComponent
+import com.zaus.nullwave.core.playback.media3.service.PlaybackServiceComponent
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Binds
 import dev.zacsweers.metro.DependencyGraph
