@@ -18,5 +18,7 @@ class AppGraphInstrumentedTest {
         assertSame(application, graph.application)
         assertSame(application, graph.applicationContext)
         assertSame(graph.metroViewModelFactory, graph.metroViewModelFactory)
+        assertSame(graph.playbackController, graph.playbackController)
+        assertSame(graph.playbackController, graph.playbackServiceDependencies.controller())
     }
 }
