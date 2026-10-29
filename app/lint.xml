@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- MediaSession-associated notifications are exempt from POST_NOTIFICATIONS.
+         The dependency-bytecode detector reports at this app's manifest and ignores
+         the caller's @SuppressLint. Keep the exception limited to this media sender. -->
+    <issue id="NotificationPermission">
+        <ignore regexp="\(usage from com\.zaus\.nullwave\.core\.playback\.media3\.PlaybackForegroundNotification\)" />
+    </issue>
+</lint>

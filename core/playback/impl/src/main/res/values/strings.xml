@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="playback_notification_app_name">NullWave</string>
+    <string name="playback_notification_channel">Music playback</string>
+    <string name="playback_notification_preparing">Preparing playback…</string>
+    <string name="playback_notification_play">Play</string>
+    <string name="playback_notification_pause">Pause</string>
+    <string name="playback_notification_previous">Previous track</string>
+    <string name="playback_notification_next">Next track</string>
+    <string name="playback_notification_cancel">Cancel</string>
+</resources>
