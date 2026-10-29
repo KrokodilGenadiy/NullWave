@@ -64,6 +64,16 @@ internal class PlaybackQueueOwner(
         return reply.await()
     }
 
+    /** Native Player actions (e.g. stop-without-clear) share admission without changing their semantics. */
+    suspend fun executeNative(action: () -> Unit): EmptyResult<PlaybackCommandError> = withContext(main) {
+        admission.withLock {
+            if (closed || !lifetime.isActive) return@withLock AppResult.Failure(PlaybackCommandError.ConnectionUnavailable)
+            invalidate(PlaybackCommandError.Superseded)
+            action()
+            AppResult.Success(Unit)
+        }
+    }
+
     /** Close is a short cleanup boundary, including when called from an already-cancelled service. */
     suspend fun close() = withContext(main + NonCancellable) {
         admission.withLock {
