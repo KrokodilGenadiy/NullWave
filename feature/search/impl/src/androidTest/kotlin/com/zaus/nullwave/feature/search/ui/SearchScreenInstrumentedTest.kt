@@ -3,9 +3,12 @@ package com.zaus.nullwave.feature.search.ui
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertHasNoClickAction
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -23,6 +26,7 @@ import com.zaus.nullwave.feature.library.api.ui.LibraryAccessUi
 import com.zaus.nullwave.feature.search.impl.R
 import com.zaus.nullwave.feature.search.presentation.SearchBody
 import com.zaus.nullwave.feature.search.presentation.SearchIntent
+import com.zaus.nullwave.feature.search.presentation.SearchPlaybackNotice
 import com.zaus.nullwave.feature.search.presentation.SearchRefresh
 import com.zaus.nullwave.feature.search.presentation.SearchState
 import org.junit.Assert.assertEquals
@@ -34,6 +38,11 @@ class SearchScreenInstrumentedTest {
     private val state = mutableStateOf(SearchState("en"))
     private val intents = mutableListOf<SearchIntent>()
     private var back = 0
+
+    // TrackRow's caller modifier tags its bounds container; the inner Row owns the action.
+    private fun trackAction(id: String) = compose.onNode(
+        hasClickAction() and hasAnyAncestor(hasTestTag("search_track:$id")),
+    )
 
     @Test
     fun inputPreservesRawTextAndImeDoesNotResubmitOrChangeTheQuery() {
@@ -50,16 +59,57 @@ class SearchScreenInstrumentedTest {
     }
 
     @Test
-    fun groupsAreInformationalAndHideFilenamesButShowAlbumParticipantExplanations() {
+    fun tracksCanPlayAndHideFilenamesWhileAlbumsAndArtistsRemainInformational() {
         state.value = SearchState("en", "orbit", body = SearchBody.Ready(searchResults()))
         show()
-        compose.onNodeWithTag("search_track:track:0").assertIsDisplayed().assertHasNoClickAction()
+        trackAction("track:0").assertIsDisplayed().assertHasClickAction()
         compose.onNodeWithText("orbit_0.flac", substring = true).assertDoesNotExist()
         compose.onNodeWithTag("search_results").performScrollToNode(hasTestTag("search_album:album:1"))
         compose.onNodeWithText("Matching artist: Guest Orbit").assertIsDisplayed()
         compose.onNodeWithTag("search_album:album:1").assertHasNoClickAction()
         compose.onNodeWithTag("search_results").performScrollToNode(hasTestTag("search_artist:artist:1"))
         compose.onNodeWithTag("search_artist:artist:1").assertIsDisplayed().assertHasNoClickAction()
+    }
+
+    @Test
+    fun trackClickCarriesTheSelectedTrackAndDisplayedRankingIncludingDuringRefresh() {
+        val results = searchResults(3).let { it.copy(tracks = listOf(it.tracks[2], it.tracks[0], it.tracks[1])) }
+        state.value = SearchState("en", "orbit", body = SearchBody.Ready(results))
+        show()
+        compose.onNodeWithTag("search_input").performImeAction()
+        trackAction("track:0").performClick()
+        compose.runOnIdle {
+            assertEquals(SearchIntent.PlayTrack(results.tracks[1].track.id, results.tracks.map { it.track }), intents.single())
+            state.value = state.value.copy(body = SearchBody.Ready(results.copy(tracks = results.tracks.reversed()), SearchRefresh.Running))
+        }
+        trackAction("track:2").performClick()
+        compose.runOnIdle {
+            assertEquals(SearchIntent.PlayTrack(results.tracks[0].track.id, results.tracks.reversed().map { it.track }), intents.last())
+            assertEquals("orbit", state.value.rawQuery)
+        }
+    }
+
+    @Test
+    fun playbackFailureCanBeDismissedWithoutMovingResultsOrChangingTheQuery() {
+        state.value = SearchState("en", "orbit", body = SearchBody.Ready(searchResults(60)))
+        show()
+        compose.onNodeWithTag("search_input").performImeAction()
+        compose.onNodeWithTag("search_results").performScrollToIndex(41)
+        val anchor = compose.onNodeWithTag("search_track:track:40").fetchSemanticsNode().boundsInRoot.top
+        compose.runOnIdle {
+            state.value = state.value.copy(playbackNotice = SearchPlaybackNotice.Command(
+                UiText.Resource(R.string.search_playback_not_found),
+            ))
+        }
+        compose.onNodeWithTag("search_playback_error").assertIsDisplayed()
+        assertEquals(anchor, compose.onNodeWithTag("search_track:track:40").fetchSemanticsNode().boundsInRoot.top, 1f)
+        compose.onNodeWithText("Dismiss").performClick()
+        compose.onNodeWithTag("search_playback_error").assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals(SearchIntent.DismissPlaybackError, intents.single())
+            assertEquals("orbit", state.value.rawQuery)
+        }
+        assertEquals(anchor, compose.onNodeWithTag("search_track:track:40").fetchSemanticsNode().boundsInRoot.top, 1f)
     }
 
     @Test
@@ -171,6 +221,7 @@ class SearchScreenInstrumentedTest {
                     is SearchIntent.QueryChanged -> state.value = state.value.copy(rawQuery = intent.value,
                         body = if (intent.value.isBlank()) SearchBody.Idle else state.value.body)
                     SearchIntent.ClearQuery -> state.value = SearchState("en")
+                    SearchIntent.DismissPlaybackError -> state.value = state.value.copy(playbackNotice = null)
                     else -> Unit
                 }
             }, { back++ }, access)

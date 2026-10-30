@@ -64,6 +64,20 @@ internal fun SearchScreen(
     val spacing = NullWaveTheme.spacing
     NullWaveScaffold(
         modifier = Modifier.fillMaxSize().testTag("search_screen"),
+        snackbarHost = {
+            state.playbackError?.let { message ->
+                NullWaveInlineMessage(
+                    message = message.asString(),
+                    modifier = Modifier.padding(spacing.md).testTag("search_playback_error")
+                        .semantics { liveRegion = LiveRegionMode.Polite },
+                    variant = NullWaveMessageVariant.Error,
+                    action = NullWaveMessageAction(
+                        label = stringResource(R.string.search_playback_dismiss),
+                        onClick = { onIntent(SearchIntent.DismissPlaybackError) },
+                    ),
+                )
+            }
+        },
         topBar = {
             Column {
                 NullWaveTopBar(stringResource(R.string.search_title), navigationIcon = {

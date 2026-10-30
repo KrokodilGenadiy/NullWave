@@ -22,6 +22,7 @@ import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.feature.library.api.ui.LibraryAccessUi
 import com.zaus.nullwave.feature.search.impl.R
 import com.zaus.nullwave.feature.search.presentation.SearchBody
+import com.zaus.nullwave.feature.search.presentation.SearchPlaybackNotice
 import com.zaus.nullwave.feature.search.presentation.SearchRefresh
 import com.zaus.nullwave.feature.search.presentation.SearchState
 
@@ -60,5 +61,18 @@ private fun SearchPreview(@PreviewParameter(SearchPreviewStates::class) state: S
 private fun SearchLargeTextPreview() {
     NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
         SearchScreen(SearchState("ru", "стат", body = SearchBody.Ready(previewResults)), {}, {})
+    }
+}
+
+@Preview(name = "Search — playback error — EN", widthDp = 360, heightDp = 800, locale = "en")
+@Preview(name = "Search — playback error — RU", widthDp = 360, heightDp = 800, locale = "ru")
+@Composable
+private fun SearchPlaybackErrorPreview() {
+    NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
+        SearchScreen(
+            SearchState("en", "stat", body = SearchBody.Ready(previewResults),
+                playbackNotice = SearchPlaybackNotice.Command(UiText.Resource(R.string.search_playback_not_found))),
+            {}, {},
+        )
     }
 }

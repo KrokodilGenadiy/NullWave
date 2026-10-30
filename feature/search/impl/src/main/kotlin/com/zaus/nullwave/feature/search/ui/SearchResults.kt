@@ -51,6 +51,9 @@ internal fun SearchResults(
 ) {
     val gutter = NullWaveTheme.dimens.gutter
     val spacing = NullWaveTheme.spacing
+    val results = body.results
+    // Keep the exact rendered order in each click callback, even if a newer result arrives first.
+    val displayedTracks = remember(results.tracks) { results.tracks.map { it.track } }
     LazyColumn(
         modifier = Modifier.fillMaxSize().consumeWindowInsets(insets).testTag("search_results"),
         state = listState,
@@ -61,13 +64,14 @@ internal fun SearchResults(
                 modifier = Modifier.testTag("search_no_matches"), illustration = { SearchStateIcon(NullWaveIcons.Search) },
                 primaryAction = { NullWaveButton(stringResource(R.string.search_clear), { onIntent(SearchIntent.ClearQuery) }) })
         }
-        val results = body.results
         if (results.tracks.isNotEmpty()) {
             section("tracks", R.plurals.search_tracks, results.tracks.size)
             items(results.tracks, key = { "track:${it.track.id.value}" }, contentType = { "track" }) { hit ->
                 val track = hit.track
-                Column(Modifier.testTag("search_track:${track.id.value}")) {
+                Column {
                     NullWaveTrackRow(title = track.title,
+                        onClick = { onIntent(SearchIntent.PlayTrack(track.id, displayedTracks)) },
+                        modifier = Modifier.testTag("search_track:${track.id.value}"),
                         subtitle = librarySubtitle(track.artist, track.album, stringResource(R.string.search_unknown_artist)),
                         durationLabel = libraryDuration(track.durationMs),
                         artwork = { SearchArtwork(track.artwork, track.album ?: track.title, artwork, 48.dp) })
