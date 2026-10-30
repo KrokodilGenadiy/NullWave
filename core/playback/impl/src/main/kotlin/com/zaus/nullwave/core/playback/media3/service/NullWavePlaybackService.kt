@@ -26,8 +26,6 @@ import com.zaus.nullwave.core.playback.runtime.PlaybackIdentities
 import com.zaus.nullwave.core.playback.runtime.PlaybackQueueOwner
 import com.zaus.nullwave.core.result.EmptyResult
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -137,6 +135,7 @@ private class ServicePlaybackRuntime(service: NullWavePlaybackService, private v
             noisy = PlaybackNoisyReceiver(service, interruption::onAudioBecomingNoisy).also { builtNoisy = it }
         } catch (failure: Throwable) {
             // A failed platform registration must not hide its cause or leak the earlier resources.
+            val failures = PlaybackCleanupFailures(failure)
             val cleanup = listOf<() -> Unit>(
                 { builtNoisy?.close() },
                 { builtForeground?.close() },
@@ -146,11 +145,8 @@ private class ServicePlaybackRuntime(service: NullWavePlaybackService, private v
                 { player.release() },
                 { scope.cancel() },
             )
-            cleanup.forEach { release ->
-                try { release() }
-                catch (secondary: Throwable) { if (secondary !== failure) failure.addSuppressed(secondary) }
-            }
-            throw failure
+            cleanup.forEach(failures::attempt)
+            throw checkNotNull(failures.failure)
         }
     }
 
@@ -189,25 +185,17 @@ private class ServicePlaybackRuntime(service: NullWavePlaybackService, private v
     fun close() {
         if (closed) return
         closed = true
-        try { noisy.close() }
-        finally {
-            try { foreground.close() }
-            finally {
-                // Revoke lifetime even if platform cleanup fails or admission is still occupied.
-                scope.cancel()
-                // Immediate on the application looper; if reentrant, admission finishes before release.
-                scope.launch(dependencies.main + NonCancellable, start = CoroutineStart.UNDISPATCHED) {
-                    try { owner.close() }
-                    finally {
-                        raw.removeListener(interruption)
-                        try { target.close() }
-                        finally {
-                            try { session.release() }
-                            finally { player.release() }
-                        }
-                    }
-                }
-            }
-        }
+        closePlaybackResources(
+            scope = scope,
+            main = dependencies.main,
+            beforeCancellation = listOf(noisy::close, foreground::close),
+            closeOwner = owner::close,
+            releases = listOf(
+                { raw.removeListener(interruption) },
+                target::close,
+                session::release,
+                player::release,
+            ),
+        )
     }
 }
