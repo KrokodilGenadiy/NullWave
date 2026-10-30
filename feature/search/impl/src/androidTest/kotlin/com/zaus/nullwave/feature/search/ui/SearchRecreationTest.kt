@@ -1,5 +1,6 @@
 package com.zaus.nullwave.feature.search.ui
 
+import com.zaus.nullwave.feature.search.testing.IdlePlaybackController
 import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
@@ -209,7 +210,7 @@ class SearchTestActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val fixture = checkNotNull(fixture)
         model = ViewModelProvider(this, viewModelFactory {
-            initializer { SearchViewModel(fixture.repository, createSavedStateHandle(), "en") }
+            initializer { SearchViewModel(fixture.repository, IdlePlaybackController, createSavedStateHandle(), "en") }
         })[SearchViewModel::class.java]
         setContent { SearchTestTheme { SearchRoot({}, fixture.access, viewModel = model) } }
     }

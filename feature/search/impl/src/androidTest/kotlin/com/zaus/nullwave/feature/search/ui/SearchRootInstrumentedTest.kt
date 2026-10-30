@@ -1,5 +1,6 @@
 package com.zaus.nullwave.feature.search.ui
 
+import com.zaus.nullwave.feature.search.testing.IdlePlaybackController
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
@@ -159,7 +160,7 @@ class SearchRootInstrumentedTest {
     private fun show(query: String = "") {
         compose.runOnUiThread {
             owner = RootOwner().apply { registry.currentState = Lifecycle.State.RESUMED }
-            vm = SearchViewModel(repository, SavedStateHandle(mapOf("search.query" to query)), "en")
+            vm = SearchViewModel(repository, IdlePlaybackController, SavedStateHandle(mapOf("search.query" to query)), "en")
             store.put("search", vm)
         }
         compose.setContent {

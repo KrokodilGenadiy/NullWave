@@ -29,6 +29,7 @@ dependencies {
     implementation(project(":core:navigation"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:mvi"))
+    implementation(project(":core:playback:api"))
     implementation(libs.androidx.lifecycle.viewmodel.savedstate)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

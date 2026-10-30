@@ -3,6 +3,7 @@ package com.zaus.nullwave.feature.search.di
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
+import com.zaus.nullwave.core.playback.api.PlaybackController
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchResults
 import com.zaus.nullwave.feature.library.api.repository.LibrarySearchRepository
@@ -11,6 +12,7 @@ import com.zaus.nullwave.feature.search.presentation.SearchAccess
 import com.zaus.nullwave.feature.search.presentation.SearchBody
 import com.zaus.nullwave.feature.search.presentation.SearchIntent
 import com.zaus.nullwave.feature.search.presentation.SearchViewModel
+import com.zaus.nullwave.feature.search.testing.IdlePlaybackController
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
@@ -53,7 +55,7 @@ class SearchGraphTest {
         val repository = FakeSearchRepository().apply {
             initialResult = AppResult.Success(LibrarySearchResults(emptyList(), emptyList(), emptyList()))
         }
-        val graph = createGraphFactory<SearchTestGraph.Factory>().create(repository, "ru")
+        val graph = createGraphFactory<SearchTestGraph.Factory>().create(repository, IdlePlaybackController, "ru")
         val factory = graph.factories.getValue(SearchViewModel::class).invoke() as SearchViewModel.Factory
         val first = factory.create(SavedStateHandle(mapOf("search.query" to "  ЁЛКА  ")))
         val second = factory.create(SavedStateHandle())
@@ -89,6 +91,7 @@ internal interface SearchTestGraph : ViewModelGraph {
     fun interface Factory {
         fun create(
             @Provides repository: LibrarySearchRepository,
+            @Provides playbackController: PlaybackController,
             @Provides @SearchInitialLocale locale: String,
         ): SearchTestGraph
     }

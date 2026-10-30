@@ -5,6 +5,10 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.zaus.nullwave.core.mvi.BaseMviViewModel
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
+import com.zaus.nullwave.core.playback.api.PlaybackController
+import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError
+import com.zaus.nullwave.core.playback.api.command.PlaybackQueueRequest
+import com.zaus.nullwave.core.result.EmptyResult
 import com.zaus.nullwave.feature.library.api.repository.LibrarySearchRepository
 import com.zaus.nullwave.feature.search.di.SearchInitialLocale
 import dev.zacsweers.metro.AppScope
@@ -17,12 +21,14 @@ import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactoryKey
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlin.time.Duration.Companion.milliseconds
 
 /** Presentation only. Root owns platform checks; the repository remains main-safe and cold. */
 @AssistedInject
 internal class SearchViewModel(
     private val repository: LibrarySearchRepository,
+    playbackController: PlaybackController,
     @Assisted savedStateHandle: SavedStateHandle,
     @SearchInitialLocale initialLocaleTag: String,
 ) : BaseMviViewModel<SearchState, SearchIntent, Nothing>(
@@ -31,6 +37,8 @@ internal class SearchViewModel(
     // Search is ephemeral: leaving the UI cancels pending debounce and observations immediately.
     sourceStopTimeoutMillis = 0,
 ) {
+    private val playbackObservation = SearchPlaybackObservation(playbackController)
+
     @AssistedFactory
     @ViewModelAssistedFactoryKey(SearchViewModel::class)
     @ContributesIntoMap(AppScope::class)
@@ -52,7 +60,29 @@ internal class SearchViewModel(
                     }
                 }
             },
-        ) { _, result -> applyResult(result) }
+        ) { _, result ->
+            // A playback/provider denial stays closed until Root supplies a fresh access check.
+            if (body == SearchBody.AccessRequired) this else applyResult(result)
+        }
+
+        val playTrack = latest<PlaybackQueueRequest, EmptyResult<PlaybackCommandError>>("search.playTrack") {
+            execute(playbackObservation::execute)
+            onAccepted { copy(playbackNotice = null, monitorPlayback = true) }
+            onResult { _, result -> withPlaybackResult(result) }
+        }
+        source(
+            name = "search.playback",
+            input = { monitorPlayback },
+            flow = { enabled -> if (enabled) playbackObservation.observe() else emptyFlow() },
+        ) { _, update -> withPlaybackConnection(update) }
+
+        on<SearchIntent.PlayTrack> { intent ->
+            if (state.body !is SearchBody.Ready) return@on
+            val selected = intent.displayedTracks.indexOfFirst { it.id == intent.trackId }
+            if (selected < 0) return@on
+            submit(playTrack, PlaybackQueueRequest.create(intent.displayedTracks.map { it.id }, selected))
+        }
+        on<SearchIntent.DismissPlaybackError> { reduce { copy(playbackNotice = null) } }
 
         on<SearchIntent.QueryChanged> { intent ->
             reduce { withInput(rawQuery = intent.value) }
@@ -64,8 +94,11 @@ internal class SearchViewModel(
             reduce { withInput(localeTag = intent.localeTag) }
         }
         on<SearchIntent.AccessChecked> { intent ->
+            if (!intent.granted) cancel(playTrack)
             // Fresh access checks re-read even an unchanged query; null input still performs no I/O.
-            refresh(results) { withAccess(intent.granted) }
+            refresh(results) {
+                withAccess(intent.granted).let { if (intent.granted) it else it.copy(playbackNotice = null) }
+            }
         }
         on<SearchIntent.Retry> {
             val body = state.body

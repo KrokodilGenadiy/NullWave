@@ -1,5 +1,6 @@
 package com.zaus.nullwave.feature.search.presentation
 
+import com.zaus.nullwave.feature.search.testing.IdlePlaybackController
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.ui.UiText
@@ -545,7 +546,7 @@ class SearchViewModelTest {
     }
 
     private fun createVm(handle: SavedStateHandle = SavedStateHandle(), localeTag: String = "ru-RU"): SearchViewModel =
-        SearchViewModel(repository, handle, localeTag).also { store.put("search-${nextKey++}", it) }
+        SearchViewModel(repository, IdlePlaybackController, handle, localeTag).also { store.put("search-${nextKey++}", it) }
 
     private fun TestScope.bind(vm: SearchViewModel): Job =
         backgroundScope.launch { vm.withUiBinding { awaitCancellation() } }.also { runCurrent() }

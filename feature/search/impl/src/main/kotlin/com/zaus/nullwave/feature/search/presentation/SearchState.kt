@@ -11,7 +11,14 @@ internal data class SearchState(
     /** Last platform check/input gate, not authorization that bypasses repository access checks. */
     val access: SearchAccess = SearchAccess.Unchecked,
     val body: SearchBody = SearchBody.Idle,
+    /** Playback failures do not replace the query/results and are never persisted. */
+    val playbackNotice: SearchPlaybackNotice? = null,
+    /** Enabled by the first admitted play intent, independently of its acknowledgement. */
+    val monitorPlayback: Boolean = false,
+    val lastPlaybackProblem: SearchPlaybackProblemKey? = null,
 ) : UiState {
+    val playbackError: UiText? get() = playbackNotice?.message
+
     val query: LibrarySearchQuery? = LibrarySearchQuery.fromInput(rawQuery, localeTag)
 
     /** Complete source input. Body changes must not change the source's own input. */

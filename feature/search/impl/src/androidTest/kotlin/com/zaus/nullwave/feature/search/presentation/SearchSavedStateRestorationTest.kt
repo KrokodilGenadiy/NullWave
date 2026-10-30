@@ -16,10 +16,12 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.MutableCreationExtras
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
+import com.zaus.nullwave.core.playback.api.PlaybackController
 import com.zaus.nullwave.feature.library.api.repository.LibrarySearchRepository
 import com.zaus.nullwave.feature.search.di.SearchInitialLocale
 import com.zaus.nullwave.feature.search.di.SearchPlatformBindings
 import com.zaus.nullwave.feature.search.ui.RecordingSearchRepository
+import com.zaus.nullwave.feature.search.testing.IdlePlaybackController
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
@@ -129,14 +131,18 @@ class SearchSavedStateRestorationTest {
     }
 
     private fun graph(repository: LibrarySearchRepository, locale: String) =
-        createGraphFactory<SearchRestorationGraph.Factory>().create(repository, locale)
+        createGraphFactory<SearchRestorationGraph.Factory>().create(repository, IdlePlaybackController, locale)
 }
 
 @DependencyGraph(AppScope::class, excludes = [SearchPlatformBindings::class])
 internal interface SearchRestorationGraph : ViewModelGraph {
     @DependencyGraph.Factory
     fun interface Factory {
-        fun create(@Provides repository: LibrarySearchRepository, @Provides @SearchInitialLocale locale: String): SearchRestorationGraph
+        fun create(
+            @Provides repository: LibrarySearchRepository,
+            @Provides playbackController: PlaybackController,
+            @Provides @SearchInitialLocale locale: String,
+        ): SearchRestorationGraph
     }
 }
 

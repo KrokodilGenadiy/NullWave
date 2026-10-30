@@ -28,4 +28,16 @@
     <plurals name="search_tracks"><item quantity="one">%d track</item><item quantity="other">%d tracks</item></plurals>
     <plurals name="search_albums"><item quantity="one">%d album</item><item quantity="other">%d albums</item></plurals>
     <plurals name="search_artists"><item quantity="one">%d artist</item><item quantity="other">%d artists</item></plurals>
+    <string name="search_playback_connection_failed">Could not connect to playback. Tap a track to try again.</string>
+    <string name="search_playback_start_not_allowed">Android blocked playback from starting. Keep the app open and tap a track again.</string>
+    <string name="search_playback_unavailable">Playback is unavailable. Tap a track to try again.</string>
+    <string name="search_playback_invalid_request">Could not start this queue. Search again and try another track.</string>
+    <string name="search_playback_access_denied">Audio access was denied. Check access before trying again.</string>
+    <string name="search_playback_not_found">A track in this queue could not be found. Search again and try another track.</string>
+    <string name="search_playback_read_failed">Could not read a track in this queue. Try again or search for another track.</string>
+    <string name="search_playback_dismiss">Dismiss</string>
+    <string name="search_playback_unsupported">This audio format is not supported. Choose another track.</string>
+    <string name="search_playback_decoder_failed">Could not decode this audio. Try again or choose another track.</string>
+    <string name="search_playback_output_unavailable">Audio output is unavailable. Check the connected audio device.</string>
+    <string name="search_playback_failed">Playback failed. Tap a track to try again.</string>
 </resources>

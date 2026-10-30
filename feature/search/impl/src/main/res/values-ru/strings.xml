@@ -28,4 +28,16 @@
     <plurals name="search_tracks"><item quantity="one">%d трек</item><item quantity="few">%d трека</item><item quantity="many">%d треков</item><item quantity="other">%d трека</item></plurals>
     <plurals name="search_albums"><item quantity="one">%d альбом</item><item quantity="few">%d альбома</item><item quantity="many">%d альбомов</item><item quantity="other">%d альбома</item></plurals>
     <plurals name="search_artists"><item quantity="one">%d исполнитель</item><item quantity="few">%d исполнителя</item><item quantity="many">%d исполнителей</item><item quantity="other">%d исполнителя</item></plurals>
+    <string name="search_playback_connection_failed">Не удалось подключиться к воспроизведению. Нажмите на трек, чтобы повторить.</string>
+    <string name="search_playback_start_not_allowed">Android заблокировал запуск воспроизведения. Оставьте приложение открытым и нажмите на трек ещё раз.</string>
+    <string name="search_playback_unavailable">Воспроизведение недоступно. Нажмите на трек, чтобы повторить.</string>
+    <string name="search_playback_invalid_request">Не удалось запустить эту очередь. Повторите поиск и выберите другой трек.</string>
+    <string name="search_playback_access_denied">Доступ к аудио отклонён. Проверьте доступ перед повторной попыткой.</string>
+    <string name="search_playback_not_found">Один из треков очереди не найден. Повторите поиск и выберите другой трек.</string>
+    <string name="search_playback_read_failed">Не удалось прочитать один из треков очереди. Попробуйте ещё раз или найдите другой трек.</string>
+    <string name="search_playback_dismiss">Закрыть</string>
+    <string name="search_playback_unsupported">Этот аудиоформат не поддерживается. Выберите другой трек.</string>
+    <string name="search_playback_decoder_failed">Не удалось декодировать аудио. Попробуйте ещё раз или выберите другой трек.</string>
+    <string name="search_playback_output_unavailable">Аудиовыход недоступен. Проверьте подключённое аудиоустройство.</string>
+    <string name="search_playback_failed">Ошибка воспроизведения. Нажмите на трек, чтобы повторить.</string>
 </resources>
