@@ -13,6 +13,7 @@ import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
 import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.feature.library.impl.R
+import com.zaus.nullwave.feature.library.testing.IdlePlaybackController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -524,7 +525,7 @@ class LibraryViewModelTest {
     }
 
     private fun createVm(handle: SavedStateHandle = SavedStateHandle(), localeTag: String = "ru"): LibraryViewModel =
-        LibraryViewModel(repository, handle, localeTag).also { store.put("library-${nextKey++}", it) }
+        LibraryViewModel(repository, handle, localeTag, IdlePlaybackController).also { store.put("library-${nextKey++}", it) }
 
     private fun TestScope.bind(vm: LibraryViewModel): Job =
         backgroundScope.launch { vm.withUiBinding { awaitCancellation() } }.also { runCurrent() }

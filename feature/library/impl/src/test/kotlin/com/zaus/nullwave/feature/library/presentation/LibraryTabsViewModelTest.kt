@@ -1,5 +1,7 @@
 package com.zaus.nullwave.feature.library.presentation
 
+import com.zaus.nullwave.feature.library.testing.IdlePlaybackController
+
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.ui.UiText
@@ -426,7 +428,7 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
     }
 
     private fun createVm(handle: SavedStateHandle = SavedStateHandle(), locale: String = "ru"): LibraryViewModel =
-        LibraryViewModel(repository, handle, locale).also { store.put("tabs-${nextKey++}", it) }
+        LibraryViewModel(repository, handle, locale, IdlePlaybackController).also { store.put("tabs-${nextKey++}", it) }
 
     private suspend fun TestScope.selectedVm(): LibraryViewModel = createVm().also {
         send(it, LibraryIntent.TabSelected(tab))
