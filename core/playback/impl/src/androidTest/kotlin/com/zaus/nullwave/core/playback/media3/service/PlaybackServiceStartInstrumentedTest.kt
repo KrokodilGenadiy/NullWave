@@ -1,5 +1,7 @@
 package com.zaus.nullwave.core.playback.media3.service
 
+import android.app.ActivityManager
+import android.app.Notification
 import android.app.NotificationManager
 import android.content.Intent
 import androidx.core.content.ContextCompat
@@ -10,13 +12,16 @@ import com.zaus.nullwave.core.playback.api.model.PlaybackSessionId
 import com.zaus.nullwave.core.playback.media3.session.PlaybackSessionProtocol
 import com.zaus.nullwave.core.playback.media3.testing.PlaybackTestActivity
 import com.zaus.nullwave.core.playback.media3.testing.PlaybackTestApplication
+import com.zaus.nullwave.core.playback.media3.testing.withPlaybackTestCleanup
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -24,7 +29,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -51,7 +55,16 @@ class PlaybackServiceStartInstrumentedTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         val attached = CompletableDeferred<PlaybackSessionId>()
         val detached = CompletableDeferred<Unit>()
-        try {
+        withPlaybackTestCleanup(
+            cleanup = listOf(
+                {
+                    withContext(Dispatchers.Main.immediate) { app.stopService(Intent(app, NullWavePlaybackService::class.java)) }
+                    awaitRetired(app)
+                },
+                { scope.cancel() },
+                { activity.close() },
+            ),
+        ) {
             withContext(Dispatchers.Main.immediate) {
                 assertNull("The preceding test must release its service", app.dependencies.registry.snapshot.value)
                 scope.launch(start = CoroutineStart.UNDISPATCHED) {
@@ -66,11 +79,39 @@ class PlaybackServiceStartInstrumentedTest {
                 assertNotEquals("expired-service", attached.await().value)
                 detached.await()
             }
-            assertTrue(app.getSystemService(NotificationManager::class.java).activeNotifications.isEmpty())
-        } finally {
-            withContext(Dispatchers.Main.immediate) { app.stopService(Intent(app, NullWavePlaybackService::class.java)) }
-            scope.cancel()
-            activity.close()
+            // Runtime detach is not an acknowledgement from ActivityManager/NotificationManager.
+            // Wait for both platform publications without creating a controller or another start.
+            awaitRetired(app)
         }
     }
+
+    private suspend fun awaitRetired(app: PlaybackTestApplication) {
+        val manager = app.getSystemService(NotificationManager::class.java)
+        try {
+            withTimeout(5_000.milliseconds) {
+                while (app.dependencies.registry.snapshot.value != null ||
+                    runningService(app) != null || manager.activeNotifications.isNotEmpty()
+                ) delay(25)
+            }
+        } catch (failure: TimeoutCancellationException) {
+            val service = runningService(app)
+            val notifications = manager.activeNotifications.joinToString { posted ->
+                val notification = posted.notification
+                "id=${posted.id}, title=${notification.extras.getCharSequence(Notification.EXTRA_TITLE)}, " +
+                    "actions=${notification.actions.orEmpty().map { it.title.toString() }}, flags=${notification.flags}"
+            }
+            throw AssertionError(
+                "Empty cold start must retire its service and notifications; " +
+                    "service=${service?.service}, started=${service?.started}, foreground=${service?.foreground}, " +
+                    "snapshot=${app.dependencies.registry.snapshot.value}, notifications=[$notifications]",
+                failure,
+            )
+        }
+    }
+
+    @Suppress("DEPRECATION") // The platform still reports this app's own services.
+    private fun runningService(app: PlaybackTestApplication): ActivityManager.RunningServiceInfo? =
+        app.getSystemService(ActivityManager::class.java).getRunningServices(Int.MAX_VALUE).singleOrNull {
+            it.service.className == NullWavePlaybackService::class.java.name
+        }
 }
