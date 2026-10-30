@@ -71,7 +71,6 @@ internal class PlaybackNotificationUpdates(
             ConfirmationState(version).also { confirmationState = it }
         }
         if (state.finished || confirmation?.isActive == true) return
-        cancelConfirmation()
         lateinit var work: Job
         work = scope.launch(start = CoroutineStart.LAZY) {
             fun ownsConfirmation(): Boolean = !closed && confirmationState === state &&
