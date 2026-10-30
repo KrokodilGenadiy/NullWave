@@ -5,12 +5,10 @@ import android.app.ForegroundServiceStartNotAllowedException
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import androidx.core.app.ServiceCompat
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaSession
@@ -38,9 +36,9 @@ internal class PlaybackForegroundNotification(
     scope: CoroutineScope,
     private val onStartNotAllowed: () -> Unit,
     private val startService: () -> Unit,
+    private val platform: PlaybackNotificationPlatform = AndroidPlaybackNotificationPlatform(service),
 ) : Player.Listener, AutoCloseable {
     private val instanceId = requireNotNull(session.sessionExtras.getString(PlaybackSessionProtocol.SESSION_ID))
-    private val manager = service.getSystemService(NotificationManager::class.java)
     private val policy = PlaybackForegroundPolicy()
     private var closed = false
     private var foreground = false
@@ -53,7 +51,7 @@ internal class PlaybackForegroundNotification(
     val keepStarted: Boolean get() = !closed && policy.shouldKeepStarted(player.mediaItemCount > 0)
 
     init {
-        manager.createNotificationChannel(
+        platform.createChannel(
             NotificationChannel(CHANNEL_ID, service.getString(R.string.playback_notification_channel), NotificationManager.IMPORTANCE_LOW),
         )
         player.addListener(this)
@@ -158,7 +156,7 @@ internal class PlaybackForegroundNotification(
                     notification = notification,
                     wasForeground = foreground,
                     updateForeground = ::updateForegroundNotification,
-                    notify = { manager.notify(NOTIFICATION_ID, it) },
+                    notify = { platform.notify(NOTIFICATION_ID, it) },
                     detach = { demote(remove = false) },
                 )
             }
@@ -188,7 +186,7 @@ internal class PlaybackForegroundNotification(
             },
             onUnconfirmed = {
                 Log.w(TAG, "unconfirmed instance=$instanceId version=$it action=${publication.appearance.primaryAction} " +
-                    "posted=${manager.activeNotifications.joinToString { posted ->
+                    "posted=${platform.activeNotifications().joinToString { posted ->
                         val value = posted.notification
                         "${posted.id}:${value.extras.getString(PlaybackNotificationMetadata.INSTANCE)}:" +
                             "${value.extras.getLong(PlaybackNotificationMetadata.VERSION, -1)}:" +
@@ -199,7 +197,7 @@ internal class PlaybackForegroundNotification(
     }
 
     private fun isPublished(publication: Publication): Boolean {
-        val actual = manager.activeNotifications.firstOrNull { it.id == NOTIFICATION_ID }?.notification ?: return false
+        val actual = platform.activeNotifications().firstOrNull { it.id == NOTIFICATION_ID }?.notification ?: return false
         if (actual.extras.getString(PlaybackNotificationMetadata.INSTANCE) != instanceId ||
             actual.extras.getLong(PlaybackNotificationMetadata.VERSION, -1) != publication.version
         ) return false
@@ -214,7 +212,7 @@ internal class PlaybackForegroundNotification(
 
     /** Refreshing an existing foreground payload does not enqueue another service start. */
     private fun updateForegroundNotification(notification: Notification) {
-        ServiceCompat.startForeground(service, NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+        platform.startForeground(NOTIFICATION_ID, notification)
     }
 
     private fun notification(value: Appearance, version: Long): Notification {
@@ -260,17 +258,17 @@ internal class PlaybackForegroundNotification(
     }
 
     private fun demote(remove: Boolean) {
-        ServiceCompat.stopForeground(service, if (remove) ServiceCompat.STOP_FOREGROUND_REMOVE else ServiceCompat.STOP_FOREGROUND_DETACH)
+        platform.stopForeground(remove)
         foreground = false
         if (remove) {
             updates.cancelScheduled()
             updates.cancelConfirmation()
-            manager.cancel(NOTIFICATION_ID)
+            platform.cancel(NOTIFICATION_ID)
             lastRequested = null
         }
         // Foreground priority and service ownership are independent: Pause/native Stop keep a
         // queue available for Resume after the last UI connection has gone away.
-        if (!keepStarted) service.stopSelf()
+        if (!keepStarted) platform.stopSelf()
     }
 
     /** A stale/cold FGS start must fulfil its platform deadline before the empty service stops. */
