@@ -1,10 +1,14 @@
 package com.zaus.nullwave.feature.search.ui
 
 import com.zaus.nullwave.feature.search.testing.IdlePlaybackController
+import com.zaus.nullwave.feature.search.testing.RecordingSearchPlaybackController
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -15,6 +19,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.zaus.nullwave.core.playback.api.PlaybackController
+import com.zaus.nullwave.core.playback.api.command.PlaybackCommand
+import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError
+import com.zaus.nullwave.core.playback.api.source.PlaybackSourceError
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.DataError
 import com.zaus.nullwave.feature.library.api.access.AccessAction
@@ -157,10 +165,48 @@ class SearchRootInstrumentedTest {
         compose.runOnIdle { assertEquals(1, repository.active) }
     }
 
-    private fun show(query: String = "") {
+    @Test
+    fun trackClickDispatchesDisplayedOrderAndSelectedTrackAndShowsTheCommandFailure() {
+        val playback = RecordingSearchPlaybackController()
+        val results = searchResults(3).let { it.copy(tracks = listOf(it.tracks[2], it.tracks[0], it.tracks[1])) }
+        access.access = LibraryAccess.Granted
+        repository.result.value = AppResult.Success(results)
+        show("Orbit", playback)
+        awaitTrack()
+        compose.onNodeWithTag("search_input").performImeAction()
+        compose.runOnIdle { assertTrue(playback.calls.isEmpty()) }
+
+        // The tag belongs to the bounds container; invoke its actual clickable descendant.
+        compose.onNode(hasClickAction() and hasAnyAncestor(hasTestTag("search_track:track:0"))).performClick()
+
+        compose.waitUntil { playback.calls.size == 1 }
+        compose.runOnIdle {
+            val request = (playback.calls.single().command as PlaybackCommand.ReplaceQueue).request
+            assertEquals(results.tracks.map { it.track.id }, request.trackIds)
+            assertEquals(1, request.startIndex)
+            assertEquals(results.tracks[1].track.id, request.trackIds[request.startIndex])
+            assertEquals(0L, request.startPositionMs)
+            assertTrue(request.playRequested)
+            playback.calls.single().reply.complete(AppResult.Failure(
+                PlaybackCommandError.SourceFailure(results.tracks[1].track.id, PlaybackSourceError.NotFound),
+            ))
+        }
+        compose.waitUntil { vm.snapshot.value.state.playbackError != null }
+        compose.onNodeWithTag("search_playback_error").assertIsDisplayed()
+        compose.onNodeWithText("A track in this queue could not be found. Search again and try another track.").assertIsDisplayed()
+        compose.onNodeWithText("Dismiss").performClick()
+        compose.onNodeWithTag("search_playback_error").assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals("Orbit", vm.snapshot.value.state.rawQuery)
+            assertEquals(results, (vm.snapshot.value.state.body as SearchBody.Ready).results)
+            assertEquals(1, playback.calls.size)
+        }
+    }
+
+    private fun show(query: String = "", playback: PlaybackController = IdlePlaybackController) {
         compose.runOnUiThread {
             owner = RootOwner().apply { registry.currentState = Lifecycle.State.RESUMED }
-            vm = SearchViewModel(repository, IdlePlaybackController, SavedStateHandle(mapOf("search.query" to query)), "en")
+            vm = SearchViewModel(repository, playback, SavedStateHandle(mapOf("search.query" to query)), "en")
             store.put("search", vm)
         }
         compose.setContent {
