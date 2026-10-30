@@ -7,6 +7,8 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.Bundle
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.media3.common.Player
@@ -18,6 +20,7 @@ import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError
 import com.zaus.nullwave.core.playback.impl.R
 import com.zaus.nullwave.core.playback.media3.session.PlaybackSessionProtocol
 import com.zaus.nullwave.core.result.AppResult
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * Owns the service's foreground/notification policy on Main. Media3's default notification manager
@@ -32,6 +35,7 @@ internal class PlaybackForegroundNotification(
     private val service: MediaSessionService,
     private val session: MediaSession,
     private val player: Player,
+    scope: CoroutineScope,
     private val onStartNotAllowed: () -> Unit,
     private val startService: () -> Unit,
 ) : Player.Listener, AutoCloseable {
@@ -40,9 +44,13 @@ internal class PlaybackForegroundNotification(
     private val policy = PlaybackForegroundPolicy()
     private var closed = false
     private var foreground = false
-    private var shown: Appearance? = null
+    // notify/startForeground returning is a request, not a delivery acknowledgement from NMS.
+    private var lastRequested: Publication? = null
+    private var nextVersion = 0L
+    private val updates = PlaybackNotificationUpdates(scope)
 
     val ongoing: Boolean get() = !closed && foreground
+    val keepStarted: Boolean get() = !closed && policy.shouldKeepStarted(player.mediaItemCount > 0)
 
     init {
         manager.createNotificationChannel(
@@ -86,17 +94,44 @@ internal class PlaybackForegroundNotification(
     /** Expected platform rejection is returned; manifest/configuration/programming failures escape. */
     // Session-associated media notifications are exempt from POST_NOTIFICATIONS permission.
     @SuppressLint("MissingPermission")
-    private fun render(): AppResult.Failure<PlaybackCommandError>? {
+    private fun render(deferContent: Boolean = true): AppResult.Failure<PlaybackCommandError>? {
         if (closed) return null
-        val activeState = player.playbackState == Player.STATE_BUFFERING || player.playbackState == Player.STATE_READY
-        val needsForeground = policy.needsForeground(player.playWhenReady, activeState)
-        val hasItem = player.currentMediaItem != null
-        if (!needsForeground && !hasItem) {
+        val appearance = appearance()
+        if (appearance == null) {
             demote(remove = true)
             return null
         }
+        val previous = lastRequested
+        if (previous?.appearance == appearance && foreground == appearance.foreground) {
+            updates.cancelScheduled()
+            confirm(previous)
+            return null
+        }
+        // First promotion and demotion/removal must run immediately. Only content changes at the
+        // same priority are conflated, avoiding a burst of preparation/timeline/Ready updates.
+        if (deferContent && previous != null && foreground == appearance.foreground) {
+            updates.cancelConfirmation()
+            updates.schedule { if (render(deferContent = false) != null) onStartNotAllowed() }
+            return null
+        }
+        updates.cancelScheduled()
+        updates.cancelConfirmation()
+        val version = ++nextVersion
+        val publication = Publication(appearance, version, notification(appearance, version))
+        val failure = publish(publication)
+        if (failure != null) return failure
+        lastRequested = publication
+        confirm(publication)
+        return null
+    }
+
+    private fun appearance(): Appearance? {
+        val activeState = player.playbackState == Player.STATE_BUFFERING || player.playbackState == Player.STATE_READY
+        val needsForeground = policy.needsForeground(player.playWhenReady, activeState)
+        val hasItem = player.currentMediaItem != null
+        if (!needsForeground && !hasItem) return null
         val metadata = player.mediaMetadata
-        val appearance = Appearance(
+        return Appearance(
             title = metadata.title?.toString()?.takeIf(String::isNotBlank)
                 ?: service.getString(if (policy.preparing && !hasItem) R.string.playback_notification_preparing else R.string.playback_notification_app_name),
             description = listOfNotNull(metadata.artist?.toString()?.takeIf(String::isNotBlank), metadata.albumTitle?.toString()?.takeIf(String::isNotBlank)).joinToString(" · "),
@@ -107,28 +142,82 @@ internal class PlaybackForegroundNotification(
             toggle = hasItem && player.isCommandAvailable(Player.COMMAND_PLAY_PAUSE),
             next = hasItem && player.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT),
         )
-        if (shown == appearance && foreground == needsForeground) return null
-        val notification = notification(appearance)
-        if (needsForeground) {
-            try {
+    }
+
+    @SuppressLint("MissingPermission") // A media-session notification is permission-exempt.
+    private fun publish(publication: Publication): AppResult.Failure<PlaybackCommandError>? {
+        val appearance = publication.appearance
+        val notification = publication.notification
+        try {
+            if (appearance.foreground) {
                 if (!foreground) startService()
-                ServiceCompat.startForeground(service, NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+                updateForegroundNotification(notification)
                 foreground = true
-            } catch (failure: IllegalStateException) {
-                if (Build.VERSION.SDK_INT >= 31 && failure is ForegroundServiceStartNotAllowedException) {
-                    return AppResult.Failure(PlaybackCommandError.StartNotAllowed, failure)
-                }
-                throw failure
+            } else {
+                publishRetainedNotification(
+                    notification = notification,
+                    wasForeground = foreground,
+                    updateForeground = ::updateForegroundNotification,
+                    notify = { manager.notify(NOTIFICATION_ID, it) },
+                    detach = { demote(remove = false) },
+                )
             }
-        } else {
-            manager.notify(NOTIFICATION_ID, notification)
-            demote(remove = false)
+        } catch (failure: IllegalStateException) {
+            if (Build.VERSION.SDK_INT >= 31 && failure is ForegroundServiceStartNotAllowedException) {
+                return AppResult.Failure(PlaybackCommandError.StartNotAllowed, failure)
+            }
+            throw failure
         }
-        shown = appearance
+        Log.d(TAG, "requested instance=$instanceId version=${publication.version} " +
+            "action=${appearance.primaryAction} foreground=${appearance.foreground}")
         return null
     }
 
-    private fun notification(value: Appearance): Notification {
+    private fun confirm(publication: Publication) {
+        updates.confirm(
+            version = publication.version,
+            isCurrent = { !closed && lastRequested?.version == it && appearance() == publication.appearance },
+            isPublished = { isPublished(publication) },
+            republish = {
+                // Read the raw player again: a late event may have changed it since publication.
+                if (appearance() != publication.appearance) update()
+                else if (publish(publication) != null) {
+                    updates.cancelConfirmation()
+                    onStartNotAllowed()
+                }
+            },
+            onUnconfirmed = {
+                Log.w(TAG, "unconfirmed instance=$instanceId version=$it action=${publication.appearance.primaryAction} " +
+                    "posted=${manager.activeNotifications.joinToString { posted ->
+                        val value = posted.notification
+                        "${posted.id}:${value.extras.getString(PlaybackNotificationMetadata.INSTANCE)}:" +
+                            "${value.extras.getLong(PlaybackNotificationMetadata.VERSION, -1)}:" +
+                            value.actions.orEmpty().joinToString { action -> action.title.toString() }
+                    }}")
+            },
+        )
+    }
+
+    private fun isPublished(publication: Publication): Boolean {
+        val actual = manager.activeNotifications.firstOrNull { it.id == NOTIFICATION_ID }?.notification ?: return false
+        if (actual.extras.getString(PlaybackNotificationMetadata.INSTANCE) != instanceId ||
+            actual.extras.getLong(PlaybackNotificationMetadata.VERSION, -1) != publication.version
+        ) return false
+        val expected = publication.notification
+        return actual.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty() ==
+            expected.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty() &&
+            actual.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty() ==
+            expected.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty() &&
+            actual.actions.orEmpty().map { it.title.toString() to it.actionIntent } ==
+            expected.actions.orEmpty().map { it.title.toString() to it.actionIntent }
+    }
+
+    /** Refreshing an existing foreground payload does not enqueue another service start. */
+    private fun updateForegroundNotification(notification: Notification) {
+        ServiceCompat.startForeground(service, NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+    }
+
+    private fun notification(value: Appearance, version: Long): Notification {
         val builder = NotificationCompat.Builder(service, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_playback_notification)
             .setContentTitle(value.title)
@@ -139,6 +228,12 @@ internal class PlaybackForegroundNotification(
             .setOngoing(value.foreground)
             .setShowWhen(false)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .addExtras(Bundle().apply {
+                putString(PlaybackNotificationMetadata.INSTANCE, instanceId)
+                putLong(PlaybackNotificationMetadata.VERSION, version)
+                putString(PlaybackNotificationMetadata.ACTION, value.primaryAction?.name)
+                putBoolean(PlaybackNotificationMetadata.FOREGROUND, value.foreground)
+            })
         val compact = mutableListOf<Int>()
         fun action(icon: Int, label: Int, action: PlaybackNotificationAction) {
             compact += compact.size
@@ -168,11 +263,14 @@ internal class PlaybackForegroundNotification(
         ServiceCompat.stopForeground(service, if (remove) ServiceCompat.STOP_FOREGROUND_REMOVE else ServiceCompat.STOP_FOREGROUND_DETACH)
         foreground = false
         if (remove) {
+            updates.cancelScheduled()
+            updates.cancelConfirmation()
             manager.cancel(NOTIFICATION_ID)
-            shown = null
+            lastRequested = null
         }
-        // A bound controller keeps the paused queue alive; an unbound idle service can terminate.
-        service.stopSelf()
+        // Foreground priority and service ownership are independent: Pause/native Stop keep a
+        // queue available for Resume after the last UI connection has gone away.
+        if (!keepStarted) service.stopSelf()
     }
 
     /** A stale/cold FGS start must fulfil its platform deadline before the empty service stops. */
@@ -182,10 +280,10 @@ internal class PlaybackForegroundNotification(
             service.getString(R.string.playback_notification_app_name), "",
             PlaybackNotificationAction.Play, preparing = false, foreground = false,
             previous = false, toggle = false, next = false,
-        ))
+        ), ++nextVersion)
         try {
             // Do not call startService: that would enqueue another start while retiring this one.
-            ServiceCompat.startForeground(service, NOTIFICATION_ID, shutdown, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            updateForegroundNotification(shutdown)
         } catch (failure: IllegalStateException) {
             if (Build.VERSION.SDK_INT >= 31 && failure is ForegroundServiceStartNotAllowedException) onStartNotAllowed()
             else throw failure
@@ -200,6 +298,7 @@ internal class PlaybackForegroundNotification(
     override fun close() {
         if (closed) return
         closed = true
+        updates.close()
         policy.close()
         player.removeListener(this)
         demote(remove = true)
@@ -214,9 +313,19 @@ internal class PlaybackForegroundNotification(
         val previous: Boolean,
         val toggle: Boolean,
         val next: Boolean,
-    )
+    ) {
+        val primaryAction: PlaybackNotificationAction?
+            get() = when {
+                preparing -> PlaybackNotificationAction.Stop
+                toggle -> playPause
+                else -> null
+            }
+    }
+
+    private data class Publication(val appearance: Appearance, val version: Long, val notification: Notification)
 
     private companion object {
+        const val TAG = "NWPlaybackNotification"
         const val CHANNEL_ID = "nullwave_playback"
         const val NOTIFICATION_ID = 1001
     }

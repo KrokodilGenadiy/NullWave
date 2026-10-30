@@ -76,7 +76,7 @@ class NullWavePlaybackService : MediaSessionService() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         // Media3's isPlaybackOngoing reads its default notification manager, which we replace.
-        if (runtime?.ongoing != true) stopSelf()
+        if (runtime?.keepStarted != true) stopSelf()
     }
 
     override fun onDestroy() {
@@ -124,7 +124,7 @@ private class ServicePlaybackRuntime(service: NullWavePlaybackService, private v
                 builder.setSessionActivity(PendingIntent.getActivity(service, 0, launch.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
             }
             session = builder.build().also { builtSession = it }
-            foreground = PlaybackForegroundNotification(service, session, raw, ::onStartNotAllowed, startService = {
+            foreground = PlaybackForegroundNotification(service, session, raw, scope, ::onStartNotAllowed, startService = {
                 ContextCompat.startForegroundService(
                     service,
                     Intent(service, NullWavePlaybackService::class.java)
@@ -155,6 +155,7 @@ private class ServicePlaybackRuntime(service: NullWavePlaybackService, private v
     }
 
     val ongoing: Boolean get() = foreground.ongoing
+    val keepStarted: Boolean get() = foreground.keepStarted
     val instanceId: String get() = identities.sessionId.value
 
     fun updateNotification() { if (!closed) foreground.update() }
@@ -162,7 +163,8 @@ private class ServicePlaybackRuntime(service: NullWavePlaybackService, private v
 
     private suspend fun execute(command: PlaybackCommand): EmptyResult<PlaybackCommandError> {
         val needsForeground = when (command) {
-            is PlaybackCommand.ReplaceQueue -> command.request.playRequested
+            // Even a paused replacement owns preparation and a started service beyond UI release.
+            is PlaybackCommand.ReplaceQueue -> true
             is PlaybackCommand.SetPlayRequested -> command.value
             is PlaybackCommand.Retry -> raw.playWhenReady
             is PlaybackCommand.SeekTo, PlaybackCommand.Next, PlaybackCommand.Previous -> raw.playWhenReady

@@ -44,13 +44,37 @@ class PlaybackForegroundPolicyTest {
     }
 
     @Test
+    fun `an installed paused stopped or ended queue retains started ownership without foreground`() {
+        val policy = PlaybackForegroundPolicy()
+        assertTrue(policy.shouldKeepStarted(hasItems = true))
+        assertFalse(policy.needsForeground(playRequested = false, readyOrBuffering = true))
+        assertFalse(policy.needsForeground(playRequested = true, readyOrBuffering = false))
+        assertFalse(policy.shouldKeepStarted(hasItems = false))
+    }
+
+    @Test
+    fun `an empty preparation retains started ownership until the last accepted request finishes`() {
+        val policy = PlaybackForegroundPolicy()
+        val older = policy.acquire()
+        val newer = policy.acquire()
+        older.close()
+        assertTrue(policy.shouldKeepStarted(hasItems = false))
+        newer.close()
+        assertFalse(policy.shouldKeepStarted(hasItems = false))
+        assertTrue(policy.shouldKeepStarted(hasItems = true))
+    }
+
+    @Test
     fun `close revokes all leases and late releases do not revive foreground`() {
         val policy = PlaybackForegroundPolicy()
         val lease = policy.acquire()
         policy.close()
         assertFalse(policy.preparing)
         assertFalse(policy.needsForeground(playRequested = true, readyOrBuffering = true))
+        assertFalse(policy.shouldKeepStarted(hasItems = false))
+        assertFalse(policy.shouldKeepStarted(hasItems = true))
         lease.close()
         assertFalse(policy.needsForeground(playRequested = true, readyOrBuffering = true))
+        assertFalse(policy.shouldKeepStarted(hasItems = true))
     }
 }

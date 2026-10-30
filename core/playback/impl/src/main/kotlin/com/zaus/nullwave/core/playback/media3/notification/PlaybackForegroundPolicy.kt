@@ -17,6 +17,9 @@ internal class PlaybackForegroundPolicy : AutoCloseable {
     fun needsForeground(playRequested: Boolean, readyOrBuffering: Boolean): Boolean =
         !closed && (preparing || (playRequested && readyOrBuffering))
 
+    /** A paused/stopped queue remains service-owned without retaining foreground priority. */
+    fun shouldKeepStarted(hasItems: Boolean): Boolean = !closed && (preparing || hasItems)
+
     override fun close() {
         closed = true
         requests.clear()
