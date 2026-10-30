@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasNoClickAction
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -42,9 +43,11 @@ import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.api.access.AccessAction
 import com.zaus.nullwave.feature.library.presentation.LibraryBody
 import com.zaus.nullwave.feature.library.presentation.LibraryIntent
+import com.zaus.nullwave.feature.library.presentation.LibraryPlaybackNotice
 import com.zaus.nullwave.feature.library.presentation.LibraryState
 import com.zaus.nullwave.feature.library.presentation.RefreshState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Rule
 import org.junit.Test
 
@@ -93,10 +96,10 @@ class LibraryScreenInstrumentedTest {
     }
 
     @Test
-    fun refreshFailureRetainsInformationalTrackAndOffersRetry() {
+    fun refreshFailureRetainsPlayableTrackAndOffersRetry() {
         robot.show(LibraryBody.Ready(listOf(track), RefreshState.Failed(UiText.Resource(R.string.library_refresh_failed))))
             .visible("library_refresh_error").visible("library_track:test:1")
-        compose.onNodeWithText(track.title).assertHasNoClickAction()
+        compose.onNodeWithText(track.title).assertHasClickAction()
         compose.onNodeWithText(robot.text(R.string.library_unknown_artist), substring = true).assertIsDisplayed()
         compose.onNodeWithText(robot.text(R.string.library_retry)).performClick()
         compose.runOnIdle { assertEquals(LibraryIntent.Retry, robot.intents.single()) }
@@ -167,7 +170,53 @@ class LibraryScreenInstrumentedTest {
         robot.show(LibraryBody.Ready(tracks), fontScale = 2f, direction = LayoutDirection.Rtl)
         compose.onNodeWithTag("library_list").performScrollToNode(hasTestTag("library_track:test:40"))
         compose.onNodeWithTag("library_track:test:40").assertIsDisplayed()
-        compose.onNodeWithText(tracks.last().title).assertHasNoClickAction()
+        compose.onNodeWithText(tracks.last().title).assertHasClickAction()
+    }
+
+    @Test
+    fun songClickDispatchesTheDisplayedSnapshotAndSelectedTrack() {
+        val tracks = listOf(
+            track.copy(id = TrackId("test:z"), title = "Zebra"),
+            track.copy(id = TrackId("test:a"), title = "Afterglow"),
+            track.copy(id = TrackId("test:m"), title = "Midnight"),
+        )
+        robot.show(LibraryBody.Ready(tracks))
+
+        compose.onNodeWithText("Afterglow").performClick()
+
+        compose.runOnIdle {
+            val intent = robot.intents.single() as LibraryIntent.PlaySong
+            assertEquals(tracks[1].id, intent.trackId)
+            assertSame("The click must refer to the snapshot rendered by the row", tracks, intent.displayedSongs)
+            assertEquals(listOf("test:z", "test:a", "test:m"), intent.displayedSongs.map { it.id.value })
+        }
+    }
+
+    @Test
+    fun playbackFailureCanBeDismissedWithoutMovingTheCatalog() {
+        val tracks = (1..40).map { track.copy(id = TrackId("test:$it"), title = "Track $it") }
+        robot.show(LibraryBody.Ready(tracks))
+        compose.onNodeWithTag("library_list").performScrollToNode(hasTestTag("library_track:test:25"))
+        val before = compose.onNodeWithTag("library_track:test:25").fetchSemanticsNode().boundsInRoot
+
+        robot.updatePlaybackError(UiText.Literal("Playback could not start"))
+            .visible("library_playback_error")
+        compose.onNodeWithText("Playback could not start").assertIsDisplayed()
+        assertEquals(before, compose.onNodeWithTag("library_track:test:25").fetchSemanticsNode().boundsInRoot)
+        compose.onNodeWithText(robot.text(R.string.library_playback_dismiss)).performClick()
+
+        robot.absent("library_playback_error")
+        compose.runOnIdle { assertEquals(LibraryIntent.DismissPlaybackError, robot.intents.single()) }
+        assertEquals(before, compose.onNodeWithTag("library_track:test:25").fetchSemanticsNode().boundsInRoot)
+    }
+
+    @Test
+    fun playbackFailureRemainsVisibleAlongsideThePermissionGate() {
+        robot.show(LibraryBody.AccessRequired(AccessAction.CheckAgain))
+        robot.updatePlaybackError(UiText.Literal("Audio access is unavailable"))
+            .visible("library_access").visible("library_playback_error").absent("library_empty")
+        compose.onNodeWithText(robot.text(R.string.library_playback_dismiss)).performClick()
+        robot.visible("library_access").absent("library_playback_error")
     }
 }
 
@@ -189,6 +238,7 @@ private class LibraryScreenRobot(private val compose: ComposeContentTestRule) {
                             intents += it
                             if (it is LibraryIntent.SortChanged) state.value = state.value.copy(
                                 query = state.value.query.copy(sort = it.sort, direction = it.direction))
+                            if (it == LibraryIntent.DismissPlaybackError) state.value = state.value.copy(playbackNotice = null)
                         }, onAboutClick = { aboutClicks++ }, accessUi = access)
                     }
                 }
@@ -197,6 +247,9 @@ private class LibraryScreenRobot(private val compose: ComposeContentTestRule) {
     }
     fun updateBody(body: LibraryBody<MediaTrack>) = apply {
         compose.runOnIdle { state.value = state.value.copy(body = body) }
+    }
+    fun updatePlaybackError(error: UiText) = apply {
+        compose.runOnIdle { state.value = state.value.copy(playbackNotice = LibraryPlaybackNotice.Command(error)) }
     }
     fun visible(tag: String) = apply { compose.onNodeWithTag(tag).assertIsDisplayed() }
     fun absent(tag: String) = apply { compose.onNodeWithTag(tag).assertDoesNotExist() }

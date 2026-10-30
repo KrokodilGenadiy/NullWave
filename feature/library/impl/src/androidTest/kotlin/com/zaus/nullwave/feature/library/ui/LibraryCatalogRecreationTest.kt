@@ -1,5 +1,7 @@
 package com.zaus.nullwave.feature.library.ui
 
+import com.zaus.nullwave.feature.library.testing.IdlePlaybackController
+
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -206,7 +208,7 @@ class LibraryCatalogTestActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val testFixture = checkNotNull(fixture)
         model = ViewModelProvider(this, viewModelFactory {
-            initializer { LibraryViewModel(testFixture.repository, createSavedStateHandle(), "en") }
+            initializer { LibraryViewModel(testFixture.repository, createSavedStateHandle(), "en", IdlePlaybackController) }
         })[LibraryViewModel::class.java]
         setContent {
             BoxWithConstraints(Modifier.fillMaxSize()) {

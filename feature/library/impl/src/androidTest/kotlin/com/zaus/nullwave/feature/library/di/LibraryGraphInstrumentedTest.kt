@@ -8,12 +8,14 @@ import androidx.lifecycle.ViewModelStore
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.zaus.nullwave.core.di.dispatchers.IoDispatcher
+import com.zaus.nullwave.core.playback.api.PlaybackController
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
 import com.zaus.nullwave.feature.library.api.repository.LibraryRepository
 import com.zaus.nullwave.feature.library.api.repository.LibrarySearchRepository
 import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
 import com.zaus.nullwave.feature.library.data.repository.MediaStoreLibraryRepository
 import com.zaus.nullwave.feature.library.presentation.LibraryViewModel
+import com.zaus.nullwave.feature.library.testing.IdlePlaybackController
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.ForScope
@@ -88,6 +90,9 @@ internal interface LibraryPlatformTestGraph : ViewModelGraph {
     val searchRepository: LibrarySearchRepository
     val artworkLoader: LibraryArtworkLoader
     val assistedFactories: Map<KClass<out ViewModel>, () -> ViewModelAssistedFactory>
+
+    @Provides
+    fun playback(): PlaybackController = IdlePlaybackController
 
     @DependencyGraph.Factory
     fun interface Factory {

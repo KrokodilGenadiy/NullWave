@@ -1,5 +1,7 @@
 package com.zaus.nullwave.feature.library.ui
 
+import com.zaus.nullwave.feature.library.testing.IdlePlaybackController
+
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.res.Configuration
@@ -327,7 +329,7 @@ class LibraryRootInstrumentedTest {
                 override fun observeTracks(query: LibraryTrackQuery) = observe(query, listOf(
                     MediaTrack(TrackId("test:1"), "Low Orbit", null, null, 203_000)))
             }
-            viewModel = LibraryViewModel(repository, savedState, "en")
+            viewModel = LibraryViewModel(repository, savedState, "en", IdlePlaybackController)
             store.put("library", viewModel)
             configuration.value = Configuration(InstrumentationRegistry.getInstrumentation().targetContext.resources.configuration)
         }

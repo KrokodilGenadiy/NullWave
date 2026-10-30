@@ -1,5 +1,8 @@
 package com.zaus.nullwave.feature.library.presentation
 
+import com.zaus.nullwave.core.playback.api.PlaybackController
+import com.zaus.nullwave.feature.library.testing.IdlePlaybackController
+
 import android.os.Bundle
 import android.os.Parcel
 import androidx.lifecycle.DEFAULT_ARGS_KEY
@@ -152,6 +155,9 @@ class LibrarySavedStateRestorationTest {
 
 @DependencyGraph(AppScope::class, excludes = [LibraryPlatformBindings::class, LibraryRepositoryBindings::class, LibraryEntries::class])
 internal interface LibraryRestorationGraph : ViewModelGraph {
+    @Provides
+    fun playback(): PlaybackController = IdlePlaybackController
+
     @DependencyGraph.Factory
     fun interface Factory {
         fun create(@Provides repository: LibraryCatalogRepository, @Provides @LibraryInitialLocale locale: String): LibraryRestorationGraph

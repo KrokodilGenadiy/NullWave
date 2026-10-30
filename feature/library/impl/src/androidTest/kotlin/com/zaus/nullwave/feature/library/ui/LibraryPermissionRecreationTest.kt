@@ -1,5 +1,7 @@
 package com.zaus.nullwave.feature.library.ui
 
+import com.zaus.nullwave.feature.library.testing.IdlePlaybackController
+
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -176,7 +178,7 @@ class LibraryPermissionTestActivity : ComponentActivity() {
             Bundle().also(results::onSaveInstanceState)
         }
         model = ViewModelProvider(this, viewModelFactory {
-            initializer { LibraryViewModel(testFixture.repository, createSavedStateHandle(), "en") }
+            initializer { LibraryViewModel(testFixture.repository, createSavedStateHandle(), "en", IdlePlaybackController) }
         })[LibraryViewModel::class.java]
         val registryOwner = object : ActivityResultRegistryOwner { override val activityResultRegistry = results }
         setContent {
