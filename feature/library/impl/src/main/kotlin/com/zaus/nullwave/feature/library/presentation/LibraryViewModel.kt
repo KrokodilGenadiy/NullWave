@@ -6,6 +6,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.zaus.nullwave.core.mvi.BaseMviViewModel
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
+import com.zaus.nullwave.core.playback.api.PlaybackController
+import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError
+import com.zaus.nullwave.core.playback.api.command.PlaybackQueueRequest
+import com.zaus.nullwave.core.result.EmptyResult
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.di.LibraryInitialLocale
@@ -16,6 +20,7 @@ import dev.zacsweers.metro.AssistedInject
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactory
 import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactoryKey
+import kotlinx.coroutines.flow.emptyFlow
 
 /** Entry-owned presentation logic. Platform access requests belong to LibraryRoot. */
 @AssistedInject
@@ -23,10 +28,13 @@ internal class LibraryViewModel(
     private val repository: LibraryCatalogRepository,
     @Assisted savedStateHandle: SavedStateHandle,
     @LibraryInitialLocale initialLocaleTag: String,
+    playback: PlaybackController,
 ) : BaseMviViewModel<LibraryState, LibraryIntent, Nothing>(
     initialState = LibraryState(LibraryTrackQuery(initialLocaleTag)),
     savedState = librarySavedState(savedStateHandle),
 ) {
+    private val playbackObservation = LibraryPlaybackObservation(playback)
+
     @AssistedFactory
     @ViewModelAssistedFactoryKey(LibraryViewModel::class)
     @ContributesIntoMap(AppScope::class)
@@ -41,8 +49,30 @@ internal class LibraryViewModel(
             input = { catalogRequest },
             flow = repository::observe,
         ) { _, result ->
-            applyResult(result)
+            // A confirmed access rejection must not be undone by a later catalog publication.
+            // AccessChecked(Granted) reopens the gate and explicitly refreshes this source.
+            if (selectedBody is LibraryBody.AccessRequired) this else applyResult(result)
         }
+
+        val playSong = latest<PlaybackQueueRequest, EmptyResult<PlaybackCommandError>>("library.playSong") {
+            execute(playbackObservation::execute)
+            onAccepted { copy(playbackNotice = null, monitorPlayback = true) }
+            onResult { _, result -> withPlaybackResult(result) }
+        }
+        source(
+            name = "library.playback",
+            input = { monitorPlayback },
+            flow = { enabled -> if (enabled) playbackObservation.observe() else emptyFlow() },
+        ) { _, connection -> withPlaybackConnection(connection) }
+
+        on<LibraryIntent.PlaySong> { intent ->
+            if (state.selectedTab != LibraryTab.Songs || state.body !is LibraryBody.Ready) return@on
+            val selected = intent.displayedSongs.indexOfFirst { it.id == intent.trackId }
+            if (selected < 0) return@on
+            val request = PlaybackQueueRequest.create(intent.displayedSongs.map { it.id }, selected)
+            submit(playSong, request)
+        }
+        on<LibraryIntent.DismissPlaybackError> { reduce { copy(playbackNotice = null) } }
 
         on<LibraryIntent.Refresh> {
             val ready = state.selectedBody as? LibraryBody.Ready<*> ?: return@on
@@ -57,10 +87,11 @@ internal class LibraryViewModel(
             refresh(catalog) { startReadingSelected() }
         }
         on<LibraryIntent.AccessChecked> { intent ->
+            if (intent.access is LibraryAccess.Required) cancel(playSong)
             refresh(catalog) {
                 when (val access = intent.access) {
                     LibraryAccess.Granted -> startReadingSelected()
-                    is LibraryAccess.Required -> requireAccess(access.action)
+                    is LibraryAccess.Required -> requireAccess(access.action).copy(playbackNotice = null)
                 }
             }
         }

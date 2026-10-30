@@ -19,6 +19,7 @@ import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.api.access.AccessAction
 import com.zaus.nullwave.feature.library.presentation.LibraryBody
 import com.zaus.nullwave.feature.library.presentation.LibraryIntent
+import com.zaus.nullwave.feature.library.presentation.LibraryPlaybackNotice
 import com.zaus.nullwave.feature.library.presentation.LibraryState
 import com.zaus.nullwave.feature.library.presentation.RefreshState
 import kotlinx.coroutines.delay
@@ -56,6 +57,26 @@ private fun LibraryPreview(@PreviewParameter(LibraryPreviewStates::class) state:
 private fun LibraryLargeTextPreview() {
     NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
         LibraryScreen(LibraryState(LibraryTrackQuery("ru"), LibraryBody.Ready(previewTracks)), {}, {})
+    }
+}
+
+@Preview(name = "Library playback error - RU", widthDp = 360, heightDp = 800, locale = "ru")
+@Preview(name = "Library playback error - EN", widthDp = 360, heightDp = 800, locale = "en")
+@Composable
+private fun LibraryPlaybackErrorPreview() {
+    var message by remember {
+        mutableStateOf<UiText?>(UiText.Resource(R.string.library_playback_connection_failed))
+    }
+    NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
+        LibraryScreen(
+            state = LibraryState(
+                query = LibraryTrackQuery("en"),
+                body = LibraryBody.Ready(previewTracks),
+                playbackNotice = message?.let(LibraryPlaybackNotice::Command),
+            ),
+            onIntent = { if (it == LibraryIntent.DismissPlaybackError) message = null },
+            onAboutClick = {},
+        )
     }
 }
 

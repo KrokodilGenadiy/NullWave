@@ -65,4 +65,16 @@
     <string name="library_cancel">Не сейчас</string>
     <string name="library_access_launch_failed">Не удалось открыть системный диалог. Попробуйте ещё раз или измените доступ к аудио в настройках Android.</string>
     <string name="library_search">Поиск по библиотеке</string>
+    <string name="library_playback_connection_failed">Не удалось подключиться к воспроизведению. Нажмите на трек, чтобы повторить.</string>
+    <string name="library_playback_start_not_allowed">Android заблокировал запуск воспроизведения. Оставьте приложение открытым и нажмите на трек ещё раз.</string>
+    <string name="library_playback_unavailable">Воспроизведение недоступно. Нажмите на трек, чтобы повторить.</string>
+    <string name="library_playback_invalid_request">Не удалось запустить эту очередь. Обновите медиатеку и попробуйте снова.</string>
+    <string name="library_playback_access_denied">Доступ к аудио отклонён. Проверьте доступ перед повторной попыткой.</string>
+    <string name="library_playback_not_found">Один из треков очереди не найден. Обновите медиатеку и попробуйте снова.</string>
+    <string name="library_playback_read_failed">Не удалось прочитать один из треков очереди. Попробуйте ещё раз или обновите медиатеку.</string>
+    <string name="library_playback_dismiss">Закрыть</string>
+    <string name="library_playback_unsupported">Этот аудиоформат не поддерживается. Выберите другой трек.</string>
+    <string name="library_playback_decoder_failed">Не удалось декодировать аудио. Попробуйте ещё раз или выберите другой трек.</string>
+    <string name="library_playback_output_unavailable">Аудиовыход недоступен. Проверьте подключённое аудиоустройство.</string>
+    <string name="library_playback_failed">Ошибка воспроизведения. Нажмите на трек, чтобы повторить.</string>
 </resources>

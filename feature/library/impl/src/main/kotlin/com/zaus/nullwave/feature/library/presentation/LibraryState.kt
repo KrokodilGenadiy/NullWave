@@ -19,7 +19,15 @@ internal data class LibraryState(
     val artistQuery: LibraryArtistQuery = LibraryArtistQuery(query.localeTag),
     val albums: LibraryBody<LibraryAlbum> = LibraryBody.Loading,
     val artists: LibraryBody<LibraryArtist> = LibraryBody.Loading,
+    /** Keeps error ownership separate from catalog errors; never persisted. */
+    val playbackNotice: LibraryPlaybackNotice? = null,
+    /** Opt-in on the first accepted play attempt, independently of its UI acknowledgement. */
+    val monitorPlayback: Boolean = false,
+    /** Dismissing a problem acknowledges its identity across state updates and UI rebindings. */
+    val lastPlaybackProblem: LibraryPlaybackProblemKey? = null,
 ) : UiState {
+    val playbackError: UiText? get() = playbackNotice?.message
+
     val selectedBody: LibraryBody<*>
         get() = when (selectedTab) {
             LibraryTab.Songs -> body

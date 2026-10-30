@@ -59,4 +59,16 @@
     <string name="library_cancel">Not now</string>
     <string name="library_access_launch_failed">Could not open the system dialog. Try again, or change audio access in Android settings.</string>
     <string name="library_search">Search library</string>
+    <string name="library_playback_connection_failed">Could not connect to playback. Tap a track to try again.</string>
+    <string name="library_playback_start_not_allowed">Android blocked playback from starting. Keep the app open and tap a track again.</string>
+    <string name="library_playback_unavailable">Playback is unavailable. Tap a track to try again.</string>
+    <string name="library_playback_invalid_request">Could not start this queue. Refresh the library and try again.</string>
+    <string name="library_playback_access_denied">Audio access was denied. Check access before trying again.</string>
+    <string name="library_playback_not_found">A track in this queue could not be found. Refresh the library and try again.</string>
+    <string name="library_playback_read_failed">Could not read a track in this queue. Try again or refresh the library.</string>
+    <string name="library_playback_dismiss">Dismiss</string>
+    <string name="library_playback_unsupported">This audio format is not supported. Choose another track.</string>
+    <string name="library_playback_decoder_failed">Could not decode this audio. Try again or choose another track.</string>
+    <string name="library_playback_output_unavailable">Audio output is unavailable. Check the connected audio device.</string>
+    <string name="library_playback_failed">Playback failed. Tap a track to try again.</string>
 </resources>

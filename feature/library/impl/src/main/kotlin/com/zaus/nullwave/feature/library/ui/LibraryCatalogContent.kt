@@ -103,6 +103,7 @@ internal fun LibraryReadyContent(
                     Column {
                         NullWaveTrackRow(
                             title = track.title,
+                            onClick = { onIntent(LibraryIntent.PlaySong(track.id, songs.items)) },
                             subtitle = librarySubtitle(track.artist, track.album, stringResource(R.string.library_unknown_artist)),
                             durationLabel = libraryDuration(track.durationMs),
                             modifier = Modifier.testTag("library_track:${track.id.value}"),

@@ -30,6 +30,7 @@ import com.zaus.nullwave.core.designsystem.components.feedback.NullWaveEmptyStat
 import com.zaus.nullwave.core.designsystem.components.feedback.NullWaveErrorState
 import com.zaus.nullwave.core.designsystem.components.feedback.NullWaveInlineMessage
 import com.zaus.nullwave.core.designsystem.components.feedback.NullWaveLoadingIndicator
+import com.zaus.nullwave.core.designsystem.components.feedback.NullWaveMessageAction
 import com.zaus.nullwave.core.designsystem.components.feedback.NullWaveMessageVariant
 import com.zaus.nullwave.core.designsystem.components.layout.NullWaveScaffold
 import com.zaus.nullwave.core.designsystem.components.navigation.NullWaveTopBar
@@ -81,6 +82,20 @@ internal fun LibraryScreen(
     }
     NullWaveScaffold(
         modifier = Modifier.fillMaxSize().testTag("library_screen"),
+        snackbarHost = {
+            state.playbackError?.let { message ->
+                NullWaveInlineMessage(
+                    message = message.asString(),
+                    modifier = Modifier.padding(spacing.md).testTag("library_playback_error")
+                        .semantics { liveRegion = LiveRegionMode.Polite },
+                    variant = NullWaveMessageVariant.Error,
+                    action = NullWaveMessageAction(
+                        label = stringResource(R.string.library_playback_dismiss),
+                        onClick = { onIntent(LibraryIntent.DismissPlaybackError) },
+                    ),
+                )
+            }
+        },
         topBar = {
             Column {
                 NullWaveTopBar(stringResource(R.string.library_title), actions = {
