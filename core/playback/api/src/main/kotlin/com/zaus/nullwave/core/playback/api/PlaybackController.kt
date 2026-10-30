@@ -4,6 +4,7 @@ import com.zaus.nullwave.core.playback.api.command.PlaybackCommand
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError
 import com.zaus.nullwave.core.playback.api.model.PlaybackConnection
 import com.zaus.nullwave.core.playback.api.model.PlaybackProgress
+import com.zaus.nullwave.core.playback.api.model.PlaybackSnapshot
 import com.zaus.nullwave.core.result.EmptyResult
 import kotlinx.coroutines.flow.Flow
 
@@ -31,6 +32,14 @@ interface PlaybackController {
      * cancellation/disconnection: their result may already have happened. Connection attempts are
      * bounded by the adapter. Expected failures retain cause/originalMessage in AppResult.Failure;
      * cancellation and unexpected programming failures propagate.
+     *
+     * [beforeDispatch] runs synchronously on Main once a live connection is confirmed, immediately
+     * before transport dispatch. It receives the pre-dispatch control snapshot, or null if that
+     * connection has not published one yet. It is not owner acceptance or command acknowledgement.
+     * The callback must not suspend; its exceptions propagate and cancellation prevents dispatch.
      */
-    suspend fun execute(command: PlaybackCommand): EmptyResult<PlaybackCommandError>
+    suspend fun execute(
+        command: PlaybackCommand,
+        beforeDispatch: (PlaybackSnapshot?) -> Unit = {},
+    ): EmptyResult<PlaybackCommandError>
 }

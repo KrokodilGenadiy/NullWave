@@ -7,6 +7,7 @@ import com.zaus.nullwave.core.playback.api.model.PlaybackConnection
 import com.zaus.nullwave.core.playback.api.model.PlaybackConnectionError
 import com.zaus.nullwave.core.playback.api.model.PlaybackProgress
 import com.zaus.nullwave.core.playback.api.model.PlaybackSessionId
+import com.zaus.nullwave.core.playback.api.model.PlaybackSnapshot
 import com.zaus.nullwave.core.playback.media3.session.PlaybackSessionProtocol
 import com.zaus.nullwave.core.playback.media3.state.PlaybackServiceRegistry
 import com.zaus.nullwave.core.result.AppResult
@@ -87,28 +88,41 @@ internal class SharedPlaybackClient(
         finally { release(progress = true) }
     }.flowOn(main).conflate()
 
-    override suspend fun execute(command: PlaybackCommand): EmptyResult<PlaybackCommandError> = withContext(main) {
+    override suspend fun execute(
+        command: PlaybackCommand,
+        beforeDispatch: (PlaybackSnapshot?) -> Unit,
+    ): EmptyResult<PlaybackCommandError> = withContext(main) {
         val reply = acquire(progress = false)
         try {
-            val connection = reply.await()
-            val snapshot = registry.snapshot.value
-            if (active?.connection !== connection || snapshot != null && connection.sessionId != snapshot.sessionId) {
-                active?.takeIf { it.connection === connection }?.let { disconnected(it.attempt) }
-                return@withContext AppResult.Failure(PlaybackCommandError.ConnectionUnavailable)
+            val connection = try {
+                reply.await()
+            } catch (failure: PlaybackConnectException) {
+                return@withContext AppResult.Failure(
+                    if (failure.reason == PlaybackConnectionError.StartNotAllowed) PlaybackCommandError.StartNotAllowed
+                    else PlaybackCommandError.ConnectionUnavailable,
+                    failure.cause ?: failure,
+                )
             }
             // Capabilities describe UI availability, not admission. Even a rejected transport
             // action must reach the owner to revoke an older pending replacement.
+            if (!isCurrent(connection)) return@withContext AppResult.Failure(PlaybackCommandError.ConnectionUnavailable)
             registry.clearConnectionError()
+            if (!isCurrent(connection)) return@withContext AppResult.Failure(PlaybackCommandError.ConnectionUnavailable)
+            beforeDispatch(registry.snapshot.value)
+            // A synchronous callback can cancel its caller or replace/disconnect the service.
+            currentCoroutineContext().ensureActive()
+            if (!isCurrent(connection)) return@withContext AppResult.Failure(PlaybackCommandError.ConnectionUnavailable)
             connection.execute(command)
-        } catch (failure: PlaybackConnectException) {
-            AppResult.Failure(
-                if (failure.reason == PlaybackConnectionError.StartNotAllowed) PlaybackCommandError.StartNotAllowed
-                else PlaybackCommandError.ConnectionUnavailable,
-                failure.cause ?: failure,
-            )
         } finally {
             release(progress = false)
         }
+    }
+
+    private fun isCurrent(connection: PlaybackClientConnection): Boolean {
+        val snapshot = registry.snapshot.value
+        if (active?.connection === connection && (snapshot == null || connection.sessionId == snapshot.sessionId)) return true
+        active?.takeIf { it.connection === connection }?.let { disconnected(it.attempt) }
+        return false
     }
 
     private fun acquire(progress: Boolean): CompletableDeferred<PlaybackClientConnection> {

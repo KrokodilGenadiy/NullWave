@@ -10,6 +10,9 @@ import com.zaus.nullwave.core.playback.api.model.PlaybackConnection
 import com.zaus.nullwave.core.playback.api.model.PlaybackConnectionError
 import com.zaus.nullwave.core.playback.api.model.PlaybackItemToken
 import com.zaus.nullwave.core.playback.api.model.PlaybackPhase
+import com.zaus.nullwave.core.playback.api.model.PlaybackProblem
+import com.zaus.nullwave.core.playback.api.model.PlaybackProblemCode
+import com.zaus.nullwave.core.playback.api.model.PlaybackProblemId
 import com.zaus.nullwave.core.playback.api.model.PlaybackProgress
 import com.zaus.nullwave.core.playback.api.model.PlaybackQueue
 import com.zaus.nullwave.core.playback.api.model.PlaybackSessionId
@@ -31,6 +34,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.job
@@ -42,6 +46,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -55,13 +60,15 @@ class SharedPlaybackClientTest {
             val cleanup = IllegalStateException("Connection release failed")
             original.addSuppressed(cleanup)
             connector.beforeConnect = { throw PlaybackConnectException(PlaybackConnectionError.ConnectionFailed, original) }
-            val first = backgroundScope.async { client.execute(PlaybackCommand.Next) }
+            var beforeDispatchCalls = 0
+            val first = backgroundScope.async { client.execute(PlaybackCommand.Next) { beforeDispatchCalls++ } }
             runCurrent()
             val rejection = first.await() as AppResult.Failure
             assertEquals(PlaybackCommandError.ConnectionUnavailable, rejection.error)
             assertSame(original, rejection.cause)
             assertEquals(listOf(cleanup), rejection.cause!!.suppressed.toList())
             assertTrue(connector.connections.isEmpty())
+            assertEquals(0, beforeDispatchCalls)
 
             connector.beforeConnect = {}
             val retry = backgroundScope.async { client.execute(PlaybackCommand.Previous) }
@@ -80,12 +87,14 @@ class SharedPlaybackClientTest {
             val cleanup = IllegalArgumentException("Failed release")
             original.addSuppressed(cleanup)
             connector.beforeConnect = { throw original }
-            val first = backgroundScope.async { runCatching { client.execute(PlaybackCommand.Next) } }
+            var beforeDispatchCalls = 0
+            val first = backgroundScope.async { runCatching { client.execute(PlaybackCommand.Next) { beforeDispatchCalls++ } } }
             runCurrent()
             val failure = first.await().exceptionOrNull()
             assertSame(original, failure)
             assertEquals(listOf(cleanup), failure!!.suppressed.toList())
             assertTrue(connector.connections.isEmpty())
+            assertEquals(0, beforeDispatchCalls)
 
             connector.beforeConnect = {}
             val retry = backgroundScope.async { client.execute(PlaybackCommand.Previous) }
@@ -94,6 +103,127 @@ class SharedPlaybackClientTest {
             assertEquals(2, connector.calls)
             assertEquals(listOf(PlaybackCommand.Previous), connector.connections.single().commands)
             assertEquals(1, connector.connections.single().closes)
+        }
+    }
+
+    @Test
+    fun `before dispatch receives the old snapshot before the command publishes its engine problem`() = runTest {
+        withFixture {
+            collect(client.observeState())
+            runCurrent()
+            val old = registry.snapshot.value!!
+            val failed = PlaybackSnapshot.create(
+                sessionId = session,
+                revision = old.revision + 1,
+                queue = old.queue,
+                transport = PlaybackTransport(problem = PlaybackProblem(
+                    PlaybackProblemId("new-engine-problem"), PlaybackProblemCode.DecoderFailure, old.queue.current,
+                )),
+            )
+            val order = mutableListOf<String>()
+            connector.connections.single().executeAction = {
+                order += "dispatch"
+                registry.publish(failed, null)
+                AppResult.Success(Unit)
+            }
+            var callbacks = 0
+            val result = backgroundScope.async {
+                client.execute(PlaybackCommand.Next) { baseline ->
+                    callbacks++
+                    assertSame(old, baseline)
+                    order += "baseline"
+                }
+            }
+            runCurrent()
+
+            assertEquals(AppResult.Success(Unit), result.await())
+            assertEquals(1, callbacks)
+            assertEquals(listOf("baseline", "dispatch"), order)
+            assertSame(failed, registry.snapshot.value)
+            assertEquals(1, connector.calls)
+        }
+    }
+
+    @Test
+    fun `before dispatch permits a confirmed connection without its first snapshot`() = runTest {
+        withFixture {
+            registry.detach(session)
+            var callbacks = 0
+            val result = backgroundScope.async {
+                client.execute(PlaybackCommand.Next) { baseline ->
+                    callbacks++
+                    assertNull(baseline)
+                }
+            }
+            runCurrent()
+
+            assertEquals(AppResult.Success(Unit), result.await())
+            assertEquals(1, callbacks)
+            assertEquals(listOf(PlaybackCommand.Next), connector.connections.single().commands)
+            assertEquals(1, connector.connections.single().closes)
+        }
+    }
+
+    @Test
+    fun `callback failure propagates without being classified as a connector rejection and releases its lease`() = runTest {
+        withFixture {
+            val original = PlaybackConnectException(
+                PlaybackConnectionError.ConnectionFailed,
+                DiagnosticConnectorFailure("Caller callback failed", "baseline"),
+            )
+            val result = backgroundScope.async {
+                runCatching { client.execute(PlaybackCommand.Next) { throw original } }
+            }
+            runCurrent()
+
+            assertSame(original, result.await().exceptionOrNull())
+            assertTrue(connector.connections.single().commands.isEmpty())
+            assertEquals(1, connector.connections.single().closes)
+
+            val retry = backgroundScope.async { client.execute(PlaybackCommand.Previous) }
+            runCurrent()
+            assertEquals(AppResult.Success(Unit), retry.await())
+            assertEquals(2, connector.calls)
+            assertEquals(listOf(PlaybackCommand.Previous), connector.connections.last().commands)
+        }
+    }
+
+    @Test
+    fun `cancellation inside before dispatch does not send the command`() = runTest {
+        withFixture {
+            var callbacks = 0
+            val result = backgroundScope.async {
+                val caller = currentCoroutineContext().job
+                client.execute(PlaybackCommand.Next) {
+                    callbacks++
+                    caller.cancel()
+                }
+            }
+            runCurrent()
+
+            assertTrue(result.isCancelled)
+            assertEquals(1, callbacks)
+            assertTrue(connector.connections.single().commands.isEmpty())
+            assertEquals(1, connector.connections.single().closes)
+        }
+    }
+
+    @Test
+    fun `callback reentry cannot dispatch through a disconnected or replaced service`() = runTest {
+        for (replaceSession in listOf(false, true)) {
+            withFixture(HandlerLikeImmediateDispatcher(StandardTestDispatcher(testScheduler))) {
+                val result = backgroundScope.async {
+                    client.execute(PlaybackCommand.Next) {
+                        if (replaceSession) replaceService(PlaybackSessionId("replacement-during-callback"))
+                        else connector.connections.single().disconnect()
+                    }
+                }
+                runCurrent()
+
+                assertEquals(PlaybackCommandError.ConnectionUnavailable, (result.await() as AppResult.Failure).error)
+                assertTrue(connector.connections.single().commands.isEmpty())
+                assertEquals(1, connector.connections.single().closes)
+            }
         }
     }
 
