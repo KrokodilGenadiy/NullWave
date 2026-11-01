@@ -1,4 +1,8 @@
 <resources>
+    <string name="player_reconnect">Reconnect</string>
+    <string name="player_open_library">Open library</string>
+    <string name="player_retry">Retry playback</string>
+    <string name="player_dismiss_notice">Dismiss playback message</string>
     <string name="player_connection_failed">Could not connect to playback. Try reconnecting.</string>
     <string name="player_start_not_allowed">Android could not start background playback. Open the app and try again.</string>
     <string name="player_command_unavailable">This playback action is no longer available.</string>

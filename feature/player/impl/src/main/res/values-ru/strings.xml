@@ -1,4 +1,8 @@
 <resources>
+    <string name="player_reconnect">Подключиться снова</string>
+    <string name="player_open_library">Открыть медиатеку</string>
+    <string name="player_retry">Повторить воспроизведение</string>
+    <string name="player_dismiss_notice">Закрыть сообщение воспроизведения</string>
     <string name="player_connection_failed">Не удалось подключиться к воспроизведению. Повторите подключение.</string>
     <string name="player_start_not_allowed">Android не разрешил фоновое воспроизведение. Откройте приложение и попробуйте снова.</string>
     <string name="player_command_unavailable">Это действие воспроизведения больше недоступно.</string>
