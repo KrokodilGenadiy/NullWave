@@ -54,7 +54,7 @@ class SearchErrorsImeInstrumentedTest {
         compose.runOnIdle {
             state.value = state.value.copy(
                 body = SearchBody.Ready(searchResults(), SearchRefresh.Failed(UiText.Resource(R.string.search_refresh_failed))),
-                playbackNotice = SearchPlaybackNotice.Command(UiText.Resource(R.string.search_playback_connection_failed)),
+                playbackNotice = SearchPlaybackNotice(UiText.Resource(R.string.search_playback_connection_failed)),
             )
         }
 

@@ -97,7 +97,7 @@ class SearchScreenInstrumentedTest {
         compose.onNodeWithTag("search_results").performScrollToIndex(41)
         val anchor = compose.onNodeWithTag("search_track:track:40").fetchSemanticsNode().boundsInRoot.top
         compose.runOnIdle {
-            state.value = state.value.copy(playbackNotice = SearchPlaybackNotice.Command(
+            state.value = state.value.copy(playbackNotice = SearchPlaybackNotice(
                 UiText.Resource(R.string.search_playback_not_found),
             ))
         }

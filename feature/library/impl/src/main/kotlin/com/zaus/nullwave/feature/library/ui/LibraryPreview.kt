@@ -72,7 +72,7 @@ private fun LibraryPlaybackErrorPreview() {
             state = LibraryState(
                 query = LibraryTrackQuery("en"),
                 body = LibraryBody.Ready(previewTracks),
-                playbackNotice = message?.let(LibraryPlaybackNotice::Command),
+                playbackNotice = message?.let(::LibraryPlaybackNotice),
             ),
             onIntent = { if (it == LibraryIntent.DismissPlaybackError) message = null },
             onAboutClick = {},

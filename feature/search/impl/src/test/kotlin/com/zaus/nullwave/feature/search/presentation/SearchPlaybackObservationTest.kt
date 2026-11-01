@@ -129,7 +129,7 @@ class SearchPlaybackObservationTest {
             send(vm, SearchIntent.PlayTrack(alpha.id, songs))
             respond(AppResult.Failure(PlaybackCommandError.SourceFailure(alpha.id, PlaybackSourceError.Io)))
             val notice = vm.snapshot.value.state.playbackNotice
-            assertTrue(notice is SearchPlaybackNotice.Command)
+            assertEquals(SearchPlaybackNotice(UiText.Resource(R.string.search_playback_read_failed)), notice)
 
             playback.states.value = healthySnapshot(entryId = "still-playing-beta", activation = 3)
             runCurrent()

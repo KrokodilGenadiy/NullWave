@@ -16,11 +16,7 @@ internal data class SearchPlaybackProblemKey(
 )
 
 /** Local ReplaceQueue failures belong to their initiator; Player presents engine problems. */
-internal sealed interface SearchPlaybackNotice {
-    val message: UiText
-
-    data class Command(override val message: UiText) : SearchPlaybackNotice
-}
+internal data class SearchPlaybackNotice(val message: UiText)
 
 /** Command messages are independent of catalog read errors; access denial closes the shared gate. */
 internal fun SearchState.withPlaybackResult(result: EmptyResult<PlaybackCommandError>): SearchState = when (result) {
@@ -32,7 +28,7 @@ internal fun SearchState.withPlaybackResult(result: EmptyResult<PlaybackCommandE
         if (message == null) this else {
             val denied = error is PlaybackCommandError.SourceFailure && error.error == PlaybackSourceError.AccessDenied
             val next = if (denied) copy(body = SearchBody.AccessRequired) else this
-            next.copy(playbackNotice = SearchPlaybackNotice.Command(message))
+            next.copy(playbackNotice = SearchPlaybackNotice(message))
         }
     }
 }

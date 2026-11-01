@@ -421,7 +421,7 @@ class LibraryPlaybackViewModelTest {
         send(vm, LibraryIntent.PlaySong(alpha.id, songs))
         respond(AppResult.Failure(PlaybackCommandError.SourceFailure(alpha.id, PlaybackSourceError.Io)))
         val notice = vm.snapshot.value.state.playbackNotice
-        assertTrue(notice is LibraryPlaybackNotice.Command)
+        assertEquals(LibraryPlaybackNotice(UiText.Resource(R.string.library_playback_read_failed)), notice)
 
         playback.states.value = healthySnapshot(entryId = "still-playing-beta", activation = 3)
         runCurrent()

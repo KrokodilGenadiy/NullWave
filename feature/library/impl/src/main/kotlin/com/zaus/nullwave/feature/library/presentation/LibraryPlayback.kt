@@ -17,11 +17,7 @@ internal data class LibraryPlaybackProblemKey(
 )
 
 /** Local ReplaceQueue failures belong to their initiator; Player presents engine problems. */
-internal sealed interface LibraryPlaybackNotice {
-    val message: UiText
-
-    data class Command(override val message: UiText) : LibraryPlaybackNotice
-}
+internal data class LibraryPlaybackNotice(val message: UiText)
 
 /** Command messages are independent of catalog read errors; access denial closes the shared gate. */
 internal fun LibraryState.withPlaybackResult(result: EmptyResult<PlaybackCommandError>): LibraryState = when (result) {
@@ -33,7 +29,7 @@ internal fun LibraryState.withPlaybackResult(result: EmptyResult<PlaybackCommand
         if (message == null) this else {
             val denied = error is PlaybackCommandError.SourceFailure && error.error == PlaybackSourceError.AccessDenied
             val next = if (denied) requireAccess(AccessAction.CheckAgain) else this
-            next.copy(playbackNotice = LibraryPlaybackNotice.Command(message))
+            next.copy(playbackNotice = LibraryPlaybackNotice(message))
         }
     }
 }

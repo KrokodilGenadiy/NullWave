@@ -71,7 +71,7 @@ private fun SearchPlaybackErrorPreview() {
     NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
         SearchScreen(
             SearchState("en", "stat", body = SearchBody.Ready(previewResults),
-                playbackNotice = SearchPlaybackNotice.Command(UiText.Resource(R.string.search_playback_not_found))),
+                playbackNotice = SearchPlaybackNotice(UiText.Resource(R.string.search_playback_not_found))),
             {}, {},
         )
     }

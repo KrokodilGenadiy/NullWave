@@ -249,7 +249,7 @@ private class LibraryScreenRobot(private val compose: ComposeContentTestRule) {
         compose.runOnIdle { state.value = state.value.copy(body = body) }
     }
     fun updatePlaybackError(error: UiText) = apply {
-        compose.runOnIdle { state.value = state.value.copy(playbackNotice = LibraryPlaybackNotice.Command(error)) }
+        compose.runOnIdle { state.value = state.value.copy(playbackNotice = LibraryPlaybackNotice(error)) }
     }
     fun visible(tag: String) = apply { compose.onNodeWithTag(tag).assertIsDisplayed() }
     fun absent(tag: String) = apply { compose.onNodeWithTag(tag).assertDoesNotExist() }
