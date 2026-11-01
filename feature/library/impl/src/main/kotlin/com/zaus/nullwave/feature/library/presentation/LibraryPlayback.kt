@@ -2,9 +2,6 @@ package com.zaus.nullwave.feature.library.presentation
 
 import com.zaus.nullwave.core.mvi.ui.UiText
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError
-import com.zaus.nullwave.core.playback.api.model.PlaybackConnection
-import com.zaus.nullwave.core.playback.api.model.PlaybackItemToken
-import com.zaus.nullwave.core.playback.api.model.PlaybackProblemCode
 import com.zaus.nullwave.core.playback.api.model.PlaybackProblemId
 import com.zaus.nullwave.core.playback.api.model.PlaybackSessionId
 import com.zaus.nullwave.core.playback.api.source.PlaybackSourceError
@@ -19,20 +16,16 @@ internal data class LibraryPlaybackProblemKey(
     val problemId: PlaybackProblemId,
 )
 
-/** Only an engine notice belongs to an activation; a command refusal may leave it playing. */
+/** Local ReplaceQueue failures belong to their initiator; Player presents engine problems. */
 internal sealed interface LibraryPlaybackNotice {
     val message: UiText
 
     data class Command(override val message: UiText) : LibraryPlaybackNotice
-    data class Engine(
-        override val message: UiText,
-        val target: PlaybackItemToken?,
-    ) : LibraryPlaybackNotice
 }
 
 /** Command messages are independent of catalog read errors; access denial closes the shared gate. */
 internal fun LibraryState.withPlaybackResult(result: EmptyResult<PlaybackCommandError>): LibraryState = when (result) {
-    // An engine failure can arrive before the command acknowledgement; do not erase it here.
+    // The access observer may already have closed the catalog before this acknowledgement.
     is AppResult.Success -> this
     is AppResult.Failure -> {
         val error = result.error
@@ -59,28 +52,8 @@ internal fun PlaybackCommandError.toLibraryPlaybackMessage(): UiText? = when (th
     })
 }
 
-/** Queue installation can succeed before the engine opens/decodes the current resource. */
-internal fun LibraryState.withPlaybackConnection(update: LibraryPlaybackUpdate): LibraryState {
-    val snapshot = (update.connection as? PlaybackConnection.Connected)?.snapshot ?: return this
-    val problem = snapshot.transport.problem
-    if (problem == null) {
-        val notice = playbackNotice as? LibraryPlaybackNotice.Engine ?: return this
-        return if (notice.target != snapshot.queue.current) copy(playbackNotice = null) else this
-    }
-    // The first pre-dispatch snapshot belongs to earlier playback, not this Library attempt.
-    val key = LibraryPlaybackProblemKey(snapshot.sessionId, problem.id)
-    if (key == update.initialProblem || key == lastPlaybackProblem) return this
-    val next = if (problem.code == PlaybackProblemCode.AccessDenied) requireAccess(AccessAction.CheckAgain) else this
-    return next.copy(
-        lastPlaybackProblem = key,
-        playbackNotice = LibraryPlaybackNotice.Engine(UiText.Resource(when (problem.code) {
-            PlaybackProblemCode.AccessDenied -> R.string.library_playback_access_denied
-            PlaybackProblemCode.NotFound -> R.string.library_playback_not_found
-            PlaybackProblemCode.Io -> R.string.library_playback_read_failed
-            PlaybackProblemCode.UnsupportedMedia -> R.string.library_playback_unsupported
-            PlaybackProblemCode.DecoderFailure -> R.string.library_playback_decoder_failed
-            PlaybackProblemCode.OutputUnavailable -> R.string.library_playback_output_unavailable
-            PlaybackProblemCode.Unknown -> R.string.library_playback_failed
-        }), problem.target ?: snapshot.queue.current),
-    )
+/** Engine denial closes the local catalog, without creating or replacing a command notice. */
+internal fun LibraryState.withPlaybackAccess(update: LibraryPlaybackAccessUpdate): LibraryState {
+    if (update.denial == update.initialDenial || update.denial == lastPlaybackDenial) return this
+    return requireAccess(AccessAction.CheckAgain).copy(lastPlaybackDenial = update.denial)
 }

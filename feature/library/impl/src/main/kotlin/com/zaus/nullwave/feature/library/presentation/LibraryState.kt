@@ -21,10 +21,10 @@ internal data class LibraryState(
     val artists: LibraryBody<LibraryArtist> = LibraryBody.Loading,
     /** Keeps error ownership separate from catalog errors; never persisted. */
     val playbackNotice: LibraryPlaybackNotice? = null,
-    /** Opt-in on the first accepted play attempt, independently of its UI acknowledgement. */
+    /** Access-only observation starts with the first accepted play attempt, before acknowledgement. */
     val monitorPlayback: Boolean = false,
-    /** Dismissing a problem acknowledges its identity across state updates and UI rebindings. */
-    val lastPlaybackProblem: LibraryPlaybackProblemKey? = null,
+    /** A handled access denial cannot close a freshly checked catalog again on rebind. */
+    val lastPlaybackDenial: LibraryPlaybackProblemKey? = null,
 ) : UiState {
     val playbackError: UiText? get() = playbackNotice?.message
 

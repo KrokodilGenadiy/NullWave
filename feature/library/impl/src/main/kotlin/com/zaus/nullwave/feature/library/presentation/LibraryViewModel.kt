@@ -60,10 +60,10 @@ internal class LibraryViewModel(
             onResult { _, result -> withPlaybackResult(result) }
         }
         source(
-            name = "library.playback",
+            name = "library.playbackAccess",
             input = { monitorPlayback },
             flow = { enabled -> if (enabled) playbackObservation.observe() else emptyFlow() },
-        ) { _, connection -> withPlaybackConnection(connection) }
+        ) { _, update -> withPlaybackAccess(update) }
 
         on<LibraryIntent.PlaySong> { intent ->
             if (state.selectedTab != LibraryTab.Songs || state.body !is LibraryBody.Ready) return@on

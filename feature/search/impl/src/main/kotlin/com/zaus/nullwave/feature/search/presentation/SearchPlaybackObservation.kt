@@ -5,35 +5,44 @@ import com.zaus.nullwave.core.playback.api.command.PlaybackCommand
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError
 import com.zaus.nullwave.core.playback.api.command.PlaybackQueueRequest
 import com.zaus.nullwave.core.playback.api.model.PlaybackConnection
+import com.zaus.nullwave.core.playback.api.model.PlaybackProblemCode
+import com.zaus.nullwave.core.playback.api.model.PlaybackSnapshot
 import com.zaus.nullwave.core.result.EmptyResult
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 
-internal data class SearchPlaybackUpdate(
-    val connection: PlaybackConnection,
-    val initialProblem: SearchPlaybackProblemKey?,
+internal data class SearchPlaybackAccessUpdate(
+    val denial: SearchPlaybackProblemKey,
+    val initialDenial: SearchPlaybackProblemKey?,
 )
 
 /**
  * Establishes the pre-dispatch baseline once per entry, through the command's own connection.
- * It owns no scope or audio work. Normal observation belongs to the MVI UI source, independently
- * of the command acknowledgement; a late source subscription still knows the original problem.
+ * Only later access denials reach the local catalog gate; Player owns engine presentation.
+ * This UI source owns no scope, progress lease or audio work and does not wait for an acknowledgement.
  */
 internal class SearchPlaybackObservation(private val controller: PlaybackController) {
-    private val initialProblem = CompletableDeferred<SearchPlaybackProblemKey?>()
+    private val initialDenial = CompletableDeferred<SearchPlaybackProblemKey?>()
 
     suspend fun execute(request: PlaybackQueueRequest): EmptyResult<PlaybackCommandError> =
         controller.execute(PlaybackCommand.ReplaceQueue(request)) { snapshot ->
-            initialProblem.complete(snapshot?.transport?.problem?.let {
-                SearchPlaybackProblemKey(snapshot.sessionId, it.id)
-            })
+            initialDenial.complete(snapshot?.accessDenial())
         }
 
-    fun observe(): Flow<SearchPlaybackUpdate> = flow {
-        val baseline = initialProblem.await()
-        emitAll(controller.observeState().map { SearchPlaybackUpdate(it, baseline) })
+    fun observe(): Flow<SearchPlaybackAccessUpdate> = flow {
+        val baseline = initialDenial.await()
+        emitAll(controller.observeState().mapNotNull { connection ->
+            (connection as? PlaybackConnection.Connected)?.snapshot?.accessDenial()?.let {
+                SearchPlaybackAccessUpdate(it, baseline)
+            }
+        })
     }
 }
+
+private fun PlaybackSnapshot.accessDenial(): SearchPlaybackProblemKey? =
+    transport.problem?.takeIf { it.code == PlaybackProblemCode.AccessDenied }?.let {
+        SearchPlaybackProblemKey(sessionId, it.id)
+    }

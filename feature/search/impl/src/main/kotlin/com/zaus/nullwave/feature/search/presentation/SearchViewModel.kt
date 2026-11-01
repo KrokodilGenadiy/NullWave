@@ -71,10 +71,10 @@ internal class SearchViewModel(
             onResult { _, result -> withPlaybackResult(result) }
         }
         source(
-            name = "search.playback",
+            name = "search.playbackAccess",
             input = { monitorPlayback },
             flow = { enabled -> if (enabled) playbackObservation.observe() else emptyFlow() },
-        ) { _, update -> withPlaybackConnection(update) }
+        ) { _, update -> withPlaybackAccess(update) }
 
         on<SearchIntent.PlayTrack> { intent ->
             if (state.body !is SearchBody.Ready) return@on

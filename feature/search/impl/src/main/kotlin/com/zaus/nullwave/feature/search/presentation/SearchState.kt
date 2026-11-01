@@ -13,9 +13,10 @@ internal data class SearchState(
     val body: SearchBody = SearchBody.Idle,
     /** Playback failures do not replace the query/results and are never persisted. */
     val playbackNotice: SearchPlaybackNotice? = null,
-    /** Enabled by the first admitted play intent, independently of its acknowledgement. */
+    /** Access-only observation starts with the first admitted play intent, before acknowledgement. */
     val monitorPlayback: Boolean = false,
-    val lastPlaybackProblem: SearchPlaybackProblemKey? = null,
+    /** A handled access denial cannot close freshly checked results again on rebind. */
+    val lastPlaybackDenial: SearchPlaybackProblemKey? = null,
 ) : UiState {
     val playbackError: UiText? get() = playbackNotice?.message
 

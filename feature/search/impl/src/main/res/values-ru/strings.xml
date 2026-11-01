@@ -36,8 +36,4 @@
     <string name="search_playback_not_found">Один из треков очереди не найден. Повторите поиск и выберите другой трек.</string>
     <string name="search_playback_read_failed">Не удалось прочитать один из треков очереди. Попробуйте ещё раз или найдите другой трек.</string>
     <string name="search_playback_dismiss">Закрыть</string>
-    <string name="search_playback_unsupported">Этот аудиоформат не поддерживается. Выберите другой трек.</string>
-    <string name="search_playback_decoder_failed">Не удалось декодировать аудио. Попробуйте ещё раз или выберите другой трек.</string>
-    <string name="search_playback_output_unavailable">Аудиовыход недоступен. Проверьте подключённое аудиоустройство.</string>
-    <string name="search_playback_failed">Ошибка воспроизведения. Нажмите на трек, чтобы повторить.</string>
 </resources>
