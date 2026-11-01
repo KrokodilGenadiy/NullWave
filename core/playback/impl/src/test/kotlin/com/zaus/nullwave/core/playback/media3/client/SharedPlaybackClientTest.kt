@@ -147,7 +147,7 @@ class SharedPlaybackClientTest {
     @Test
     fun `before dispatch permits a confirmed connection without its first snapshot`() = runTest {
         withFixture {
-            registry.detach(session)
+            registry.attach(session) { null }
             var callbacks = 0
             val result = backgroundScope.async {
                 client.execute(PlaybackCommand.Next) { baseline ->
@@ -161,6 +161,82 @@ class SharedPlaybackClientTest {
             assertEquals(1, callbacks)
             assertEquals(listOf(PlaybackCommand.Next), connector.connections.single().commands)
             assertEquals(1, connector.connections.single().closes)
+        }
+    }
+
+    @Test
+    fun `detachment inside before dispatch rejects the old connection until fresh demand reconnects`() = runTest {
+        val dispatchers = listOf(
+            StandardTestDispatcher(testScheduler),
+            HandlerLikeImmediateDispatcher(StandardTestDispatcher(testScheduler)),
+        )
+        for (main in dispatchers) {
+            withFixture(main) {
+                val observer = collect(client.observeState())
+                runCurrent()
+                val previous = connector.connections.single()
+                var callbacks = 0
+
+                val rejected = backgroundScope.async(main) {
+                    client.execute(PlaybackCommand.Next) {
+                        callbacks++
+                        // Service teardown is authoritative even before Media3 delivers disconnect.
+                        registry.detach(session)
+                    }
+                }
+                runCurrent()
+
+                assertEquals(PlaybackCommandError.ConnectionUnavailable, (rejected.await() as AppResult.Failure).error)
+                assertEquals(1, callbacks)
+                assertTrue(previous.commands.isEmpty())
+                assertEquals(1, previous.closes)
+                assertNull(registry.attachedSessionId)
+                assertEquals(1, connector.calls)
+
+                val replacement = PlaybackSessionId("replacement-after-detachment")
+                val replacementSnapshot = replaceService(replacement)
+                connector.sessionId = replacement
+                val fresh = backgroundScope.async(main) { client.execute(PlaybackCommand.Previous) }
+                runCurrent()
+
+                assertEquals(AppResult.Success(Unit), fresh.await())
+                assertEquals(2, connector.calls)
+                assertTrue(previous.commands.isEmpty())
+                assertEquals(1, previous.closes)
+                val connection = connector.connections.last()
+                assertEquals(listOf(PlaybackCommand.Previous), connection.commands)
+                assertEquals(0, connection.closes)
+                assertEquals(PlaybackConnection.Connected(replacementSnapshot), observer.values.last())
+
+                observer.job.cancel()
+                runCurrent()
+                assertEquals(1, connection.closes)
+                assertEquals(1, previous.closes)
+            }
+        }
+    }
+
+    @Test
+    fun `a replacement session without its first snapshot rejects the previous command connection`() = runTest {
+        withFixture {
+            collect(client.observeState())
+            runCurrent()
+            val previous = connector.connections.single()
+            val replacement = PlaybackSessionId("replacement-before-first-snapshot")
+
+            val result = backgroundScope.async {
+                client.execute(PlaybackCommand.Next) {
+                    registry.attach(replacement) { null }
+                    registry.startNotAllowed(replacement)
+                }
+            }
+            runCurrent()
+
+            assertEquals(PlaybackCommandError.ConnectionUnavailable, (result.await() as AppResult.Failure).error)
+            assertTrue(previous.commands.isEmpty())
+            assertEquals(1, previous.closes)
+            assertNull(registry.snapshot.value)
+            assertEquals(PlaybackConnectionError.StartNotAllowed, registry.failure.value)
         }
     }
 
