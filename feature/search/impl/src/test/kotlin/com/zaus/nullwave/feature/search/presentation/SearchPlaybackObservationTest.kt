@@ -26,7 +26,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** Engine snapshots, pre-dispatch baseline, access and UI observation lifetime. */
+/** Access-only control observation, dispatch baseline, denial deduplication and UI lifetime. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SearchPlaybackObservationTest {
     private val fixture = SearchPlaybackFixture()
@@ -54,70 +54,71 @@ class SearchPlaybackObservationTest {
     }
 
     @Test
-    fun `first attempt observes a new engine failure even before its install acknowledgement`() = with(fixture) {
+    fun `first attempt gates an engine denial before acknowledgement without a local banner`() = with(fixture) {
         runTest(dispatcher) {
             val vm = readyVm(songs)
             send(vm, SearchIntent.PlayTrack(beta.id, songs))
-            playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "before-first-ack")
+            playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "before-first-ack")
             runCurrent()
             assertTrue(vm.snapshot.value.state.monitorPlayback)
-            assertEquals(UiText.Resource(R.string.search_playback_read_failed), vm.snapshot.value.state.playbackError)
+            assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
+            assertNull(vm.snapshot.value.state.playbackError)
             assertEquals(1, playback.stateObservations)
 
             respond(AppResult.Success(Unit))
 
-            assertTrue(vm.snapshot.value.state.monitorPlayback)
+            assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
+            assertNull(vm.snapshot.value.state.playbackError)
             assertEquals(1, playback.stateObservations)
-            assertEquals(UiText.Resource(R.string.search_playback_read_failed), vm.snapshot.value.state.playbackError)
-            assertEquals(PlaybackProblemId("before-first-ack"), vm.snapshot.value.state.lastPlaybackProblem?.problemId)
+            assertEquals(PlaybackProblemId("before-first-ack"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
         }
     }
 
     @Test
-    fun `cancelled first acknowledgement and failed replacement still observe the installed queue`() = with(fixture) {
+    fun `cancelled acknowledgement and failed replacement still gate later denial while preserving the command notice`() = with(fixture) {
         runTest(dispatcher) {
             val vm = readyVm(songs)
             send(vm, SearchIntent.PlayTrack(beta.id, songs))
             val installed = playback.calls.single()
             playback.states.value = healthySnapshot()
             runCurrent()
-
             send(vm, SearchIntent.PlayTrack(alpha.id, songs))
             assertTrue(installed.waiterCancelled)
             respond(AppResult.Failure(PlaybackCommandError.SourceFailure(alpha.id, PlaybackSourceError.NotFound)))
+            val notice = vm.snapshot.value.state.playbackNotice
             installed.reply.complete(AppResult.Success(Unit))
             runCurrent()
-            assertEquals(UiText.Resource(R.string.search_playback_not_found), vm.snapshot.value.state.playbackError)
-
-            playback.states.value = problemSnapshot(PlaybackProblemCode.DecoderFailure, "installed-with-cancelled-ack")
+            playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "installed-with-cancelled-ack")
             runCurrent()
 
-            assertTrue(vm.snapshot.value.state.monitorPlayback)
+            assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
+            assertSame(notice, vm.snapshot.value.state.playbackNotice)
+            assertEquals(UiText.Resource(R.string.search_playback_not_found), vm.snapshot.value.state.playbackError)
+            assertEquals(PlaybackProblemId("installed-with-cancelled-ack"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
             assertEquals(1, playback.activeStateCollectors)
-            assertEquals(UiText.Resource(R.string.search_playback_decoder_failed), vm.snapshot.value.state.playbackError)
-            assertEquals(PlaybackProblemId("installed-with-cancelled-ack"), vm.snapshot.value.state.lastPlaybackProblem?.problemId)
             assertEquals(0, playback.progressObservations)
         }
     }
 
     @Test
-    fun `healthy replacement removes the previous activation failure even before the new acknowledgement`() = with(fixture) {
+    fun `engine snapshots during a replacement never create a local command notice`() = with(fixture) {
         runTest(dispatcher) {
             val vm = readyVm(songs)
             send(vm, SearchIntent.PlayTrack(beta.id, songs))
             respond(AppResult.Success(Unit))
             send(vm, SearchIntent.PlayTrack(alpha.id, songs))
+            val catalog = vm.snapshot.value.state.body
             playback.states.value = problemSnapshot(PlaybackProblemCode.DecoderFailure, "old-during-preparation")
             runCurrent()
-            assertNotNull(vm.snapshot.value.state.playbackError)
-
+            assertNull(vm.snapshot.value.state.playbackNotice)
+            assertSame(catalog, vm.snapshot.value.state.body)
             playback.states.value = healthySnapshot(entryId = "new-alpha", track = alpha, activation = 1)
             runCurrent()
-            assertNull(vm.snapshot.value.state.playbackError)
             respond(AppResult.Success(Unit))
 
-            assertNull(vm.snapshot.value.state.playbackError)
-            assertEquals(PlaybackProblemId("old-during-preparation"), vm.snapshot.value.state.lastPlaybackProblem?.problemId)
+            assertNull(vm.snapshot.value.state.playbackNotice)
+            assertNull(vm.snapshot.value.state.lastPlaybackDenial)
+            assertSame(catalog, vm.snapshot.value.state.body)
         }
     }
 
@@ -139,11 +140,13 @@ class SearchPlaybackObservationTest {
     }
 
     @Test
-    fun `new activation entry session and empty queue clear only an old engine notice`() = with(fixture) {
+    fun `new activation entry session and empty queue preserve a local command notice`() = with(fixture) {
         runTest(dispatcher) {
             val vm = readyVm(songs)
             send(vm, SearchIntent.PlayTrack(beta.id, songs))
-            respond(AppResult.Success(Unit))
+            respond(AppResult.Failure(PlaybackCommandError.ConnectionUnavailable))
+            val notice = vm.snapshot.value.state.playbackNotice
+            assertNotNull(notice)
             val replacements = listOf(
                 healthySnapshot(activation = 1),
                 healthySnapshot(entryId = "another-occurrence-of-beta"),
@@ -151,15 +154,11 @@ class SearchPlaybackObservationTest {
                 PlaybackConnection.Connected(PlaybackSnapshot.create(PlaybackSessionId("empty-service"))),
             )
 
-            for ((index, replacement) in replacements.withIndex()) {
-                playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "old-engine-$index")
-                runCurrent()
-                assertTrue(vm.snapshot.value.state.playbackNotice is SearchPlaybackNotice.Engine)
+            for (replacement in replacements) {
                 playback.states.value = replacement
                 runCurrent()
-
-                assertNull("The old activation must not own a notice after replacement $index", vm.snapshot.value.state.playbackError)
-                assertEquals(PlaybackProblemId("old-engine-$index"), vm.snapshot.value.state.lastPlaybackProblem?.problemId)
+                assertSame(notice, vm.snapshot.value.state.playbackNotice)
+                assertNull(vm.snapshot.value.state.lastPlaybackDenial)
             }
         }
     }
@@ -170,9 +169,7 @@ class SearchPlaybackObservationTest {
             val vm = readyVm(songs)
             val catalog = vm.snapshot.value.state.body
             playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "preexisting-denial")
-
             send(vm, SearchIntent.PlayTrack(beta.id, songs))
-
             assertEquals(1, playback.calls.size)
             assertSame(catalog, vm.snapshot.value.state.body)
             assertNull(vm.snapshot.value.state.playbackError)
@@ -180,12 +177,12 @@ class SearchPlaybackObservationTest {
             playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "preexisting-denial", revision = 1)
             runCurrent()
             assertSame(catalog, vm.snapshot.value.state.body)
-            assertNull(vm.snapshot.value.state.playbackError)
-
+            assertNull(vm.snapshot.value.state.lastPlaybackDenial)
             playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "new-denial", activation = 1)
             runCurrent()
+
             assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
-            assertEquals(UiText.Resource(R.string.search_playback_access_denied), vm.snapshot.value.state.playbackError)
+            assertNull(vm.snapshot.value.state.playbackError)
         }
     }
 
@@ -245,99 +242,114 @@ class SearchPlaybackObservationTest {
     }
 
     @Test
-    fun `problem identity is scoped to the service session for baseline and dismissal`() = with(fixture) {
+    fun `denial identity is scoped to the service session for baseline and deduplication`() = with(fixture) {
         runTest(dispatcher) {
             val vm = readyVm(songs)
-            playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "reused-id")
+            playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "reused-id")
             send(vm, SearchIntent.PlayTrack(beta.id, songs))
             respond(AppResult.Success(Unit))
-            assertNull(vm.snapshot.value.state.playbackError)
-
-            playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "reused-id", sessionId = "second-service")
+            assertEquals(SearchBody.Ready(results(songs)), vm.snapshot.value.state.body)
+            playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "reused-id", sessionId = "second-service")
             runCurrent()
-            assertEquals(UiText.Resource(R.string.search_playback_read_failed), vm.snapshot.value.state.playbackError)
+            assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
             assertEquals(SearchPlaybackProblemKey(PlaybackSessionId("second-service"), PlaybackProblemId("reused-id")),
-                vm.snapshot.value.state.lastPlaybackProblem)
-            send(vm, SearchIntent.DismissPlaybackError)
-            playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "reused-id", revision = 1, sessionId = "second-service")
+                vm.snapshot.value.state.lastPlaybackDenial)
+            send(vm, SearchIntent.AccessChecked(true))
+            settle()
+            reply(AppResult.Success(results(songs)))
+            val checkedCatalog = vm.snapshot.value.state.body
+            playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "reused-id", revision = 1, sessionId = "second-service")
             runCurrent()
-            assertNull(vm.snapshot.value.state.playbackError)
+            assertSame(checkedCatalog, vm.snapshot.value.state.body)
+            playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "reused-id", sessionId = "third-service")
+            runCurrent()
 
-            playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "reused-id", sessionId = "third-service")
-            runCurrent()
-            assertEquals(UiText.Resource(R.string.search_playback_read_failed), vm.snapshot.value.state.playbackError)
-            assertEquals(PlaybackSessionId("third-service"), vm.snapshot.value.state.lastPlaybackProblem?.sessionId)
+            assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
+            assertNull(vm.snapshot.value.state.playbackError)
+            assertEquals(PlaybackSessionId("third-service"), vm.snapshot.value.state.lastPlaybackDenial?.sessionId)
         }
     }
 
     @Test
-    fun `asynchronous engine failures produce localized messages without replacing catalog data`() = with(fixture) {
+    fun `non-access engine problems neither create nor erase local command notices`() = with(fixture) {
         runTest(dispatcher) {
             val vm = readyVm(songs)
             send(vm, SearchIntent.PlayTrack(beta.id, songs))
             respond(AppResult.Success(Unit))
             val catalog = vm.snapshot.value.state.body
-            val failures = listOf(
-                PlaybackProblemCode.NotFound to R.string.search_playback_not_found,
-                PlaybackProblemCode.Io to R.string.search_playback_read_failed,
-                PlaybackProblemCode.UnsupportedMedia to R.string.search_playback_unsupported,
-                PlaybackProblemCode.DecoderFailure to R.string.search_playback_decoder_failed,
-                PlaybackProblemCode.OutputUnavailable to R.string.search_playback_output_unavailable,
-                PlaybackProblemCode.Unknown to R.string.search_playback_failed,
-            )
+            val failures = PlaybackProblemCode.entries.filter { it != PlaybackProblemCode.AccessDenied }
 
-            for ((code, message) in failures) {
-                playback.states.value = problemSnapshot(code, "engine:$code")
+            for (code in failures) {
+                playback.states.value = problemSnapshot(code, "before-command:$code")
                 runCurrent()
-                assertEquals(UiText.Resource(message), vm.snapshot.value.state.playbackError)
-                assertEquals(PlaybackProblemId("engine:$code"), vm.snapshot.value.state.lastPlaybackProblem?.problemId)
+                assertNull(vm.snapshot.value.state.playbackNotice)
+                assertNull(vm.snapshot.value.state.lastPlaybackDenial)
                 assertSame(catalog, vm.snapshot.value.state.body)
             }
-            assertEquals(1, playback.calls.size)
+            send(vm, SearchIntent.PlayTrack(alpha.id, songs))
+            respond(AppResult.Failure(PlaybackCommandError.SourceFailure(alpha.id, PlaybackSourceError.Io)))
+            val notice = vm.snapshot.value.state.playbackNotice
+            assertNotNull(notice)
+            for (code in failures) {
+                playback.states.value = problemSnapshot(code, "after-command:$code")
+                runCurrent()
+                assertSame(notice, vm.snapshot.value.state.playbackNotice)
+                assertNull(vm.snapshot.value.state.lastPlaybackDenial)
+                assertSame(catalog, vm.snapshot.value.state.body)
+            }
+            assertEquals(2, playback.calls.size)
             assertEquals(1, playback.stateObservations)
             assertEquals(0, playback.progressObservations)
         }
     }
 
     @Test
-    fun `dismissed engine problem stays acknowledged across publications and a new problem appears`() = with(fixture) {
+    fun `fresh access survives repeated denial through healthy and other engine snapshots until a new denial`() = with(fixture) {
         runTest(dispatcher) {
             val vm = readyVm(songs)
             send(vm, SearchIntent.PlayTrack(beta.id, songs))
             respond(AppResult.Success(Unit))
-            playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "first")
+            playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "first")
             runCurrent()
-            assertNotNull(vm.snapshot.value.state.playbackError)
-            send(vm, SearchIntent.DismissPlaybackError)
+            assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
+            send(vm, SearchIntent.AccessChecked(true))
+            settle()
+            reply(AppResult.Success(results(songs)))
+            val checkedCatalog = vm.snapshot.value.state.body
+            for (connection in listOf(
+                healthySnapshot(),
+                problemSnapshot(PlaybackProblemCode.Io, "unrelated-io"),
+                problemSnapshot(PlaybackProblemCode.AccessDenied, "first", revision = 1),
+            )) {
+                playback.states.value = connection
+                runCurrent()
+                assertSame(checkedCatalog, vm.snapshot.value.state.body)
+                assertNull(vm.snapshot.value.state.playbackError)
+                assertEquals(PlaybackProblemId("first"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
+            }
+            playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "second", revision = 2)
+            runCurrent()
 
-            playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "first", revision = 1)
-            runCurrent()
+            assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
             assertNull(vm.snapshot.value.state.playbackError)
-            assertEquals(PlaybackProblemId("first"), vm.snapshot.value.state.lastPlaybackProblem?.problemId)
-
-            playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "second", revision = 2)
-            runCurrent()
-            assertEquals(UiText.Resource(R.string.search_playback_read_failed), vm.snapshot.value.state.playbackError)
-            assertEquals(PlaybackProblemId("second"), vm.snapshot.value.state.lastPlaybackProblem?.problemId)
+            assertEquals(PlaybackProblemId("second"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
         }
     }
 
     @Test
-    fun `fresh granted access on resume does not erase a playback failure`() = with(fixture) {
+    fun `fresh granted access on resume does not erase a command refusal`() = with(fixture) {
         runTest(dispatcher) {
             val vm = readyVm(songs)
             send(vm, SearchIntent.PlayTrack(beta.id, songs))
-            respond(AppResult.Success(Unit))
-            playback.states.value = problemSnapshot(PlaybackProblemCode.DecoderFailure, "decoder")
-            runCurrent()
-            val message = vm.snapshot.value.state.playbackError
-
+            respond(AppResult.Failure(PlaybackCommandError.SourceFailure(beta.id, PlaybackSourceError.Io)))
+            val notice = vm.snapshot.value.state.playbackNotice
+            assertNotNull(notice)
             send(vm, SearchIntent.AccessChecked(true))
             settle()
             reply(AppResult.Success(results(songs)))
 
-            assertSame(message, vm.snapshot.value.state.playbackError)
-            assertEquals(PlaybackProblemId("decoder"), vm.snapshot.value.state.lastPlaybackProblem?.problemId)
+            assertSame(notice, vm.snapshot.value.state.playbackNotice)
+            assertNull(vm.snapshot.value.state.lastPlaybackDenial)
             assertEquals(1, playback.calls.size)
         }
     }
@@ -397,12 +409,14 @@ class SearchPlaybackObservationTest {
             playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "denied-after-clear")
             runCurrent()
             assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
+            assertNull(vm.snapshot.value.state.playbackNotice)
             send(vm, SearchIntent.QueryChanged("another"))
             settle()
 
             assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
             assertEquals(SearchAccess.Required, vm.snapshot.value.state.access)
             assertEquals(reads, repository.calls.size)
+            assertNull(vm.snapshot.value.state.playbackNotice)
             send(vm, SearchIntent.AccessChecked(true))
             settle()
             reply(AppResult.Success(results(songs)))
@@ -411,7 +425,7 @@ class SearchPlaybackObservationTest {
     }
 
     @Test
-    fun `unbind immediately releases observations while an accepted command finishes independently`() = with(fixture) {
+    fun `unbind immediately releases observations and rebind gates a late denial without replaying commands`() = with(fixture) {
         runTest(dispatcher) {
             val vm = createVm()
             val binding = bind(vm)
@@ -421,27 +435,32 @@ class SearchPlaybackObservationTest {
             reply(AppResult.Success(results(songs)))
             send(vm, SearchIntent.PlayTrack(beta.id, songs))
             val accepted = playback.calls.single()
-
             binding.cancel()
             runCurrent()
-
             assertEquals(0, repository.activeCount)
             assertEquals(0, playback.activeStateCollectors)
             assertFalse(accepted.waiterCancelled)
             assertFalse(accepted.reply.isCancelled)
             respond(AppResult.Success(Unit))
-            playback.states.value = problemSnapshot(PlaybackProblemCode.DecoderFailure, "while-unbound")
+            playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "while-unbound")
             val rebound = bind(vm)
-            assertEquals(UiText.Resource(R.string.search_playback_decoder_failed), vm.snapshot.value.state.playbackError)
+            assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
+            assertNull(vm.snapshot.value.state.playbackError)
             assertEquals(1, playback.calls.size)
             assertEquals(0, playback.progressObservations)
-
-            send(vm, SearchIntent.DismissPlaybackError)
+            send(vm, SearchIntent.AccessChecked(true))
+            settle()
+            reply(AppResult.Success(results(songs)))
             rebound.cancel()
             runCurrent()
             bind(vm)
+            settle()
+            reply(AppResult.Success(results(songs)))
+
+            assertEquals(SearchBody.Ready(results(songs)), vm.snapshot.value.state.body)
             assertNull(vm.snapshot.value.state.playbackError)
             assertEquals(1, playback.calls.size)
+            assertEquals(PlaybackProblemId("while-unbound"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
             store.clear()
             runCurrent()
             assertEquals(0, playback.activeStateCollectors)
@@ -449,28 +468,28 @@ class SearchPlaybackObservationTest {
     }
 
     @Test
-    fun `restoration keeps raw query but never replays playback or restores its transient state`() = with(fixture) {
+    fun `restoration keeps raw query but never replays playback or restores command error and denial state`() = with(fixture) {
         runTest(dispatcher) {
             val handle = SavedStateHandle()
             val vm = readyVm(songs, handle)
             send(vm, SearchIntent.QueryChanged("  M4A  "))
             send(vm, SearchIntent.PlayTrack(beta.id, songs))
-            respond(AppResult.Success(Unit))
-            playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "not-persisted")
+            respond(AppResult.Failure(PlaybackCommandError.SourceFailure(beta.id, PlaybackSourceError.Io)))
+            playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "not-persisted")
             runCurrent()
             assertTrue(vm.snapshot.value.state.monitorPlayback)
             assertNotNull(vm.snapshot.value.state.playbackError)
+            assertNotNull(vm.snapshot.value.state.lastPlaybackDenial)
             val restoredHandle = SavedStateHandle(handle.keys().associateWith { handle.get<Any?>(it) })
             store.clear()
             runCurrent()
-
             val restored = createVm(restoredHandle)
             bind(restored)
 
             assertEquals("  M4A  ", restored.snapshot.value.state.rawQuery)
             assertEquals(SearchAccess.Unchecked, restored.snapshot.value.state.access)
             assertFalse(restored.snapshot.value.state.monitorPlayback)
-            assertNull(restored.snapshot.value.state.lastPlaybackProblem)
+            assertNull(restored.snapshot.value.state.lastPlaybackDenial)
             assertNull(restored.snapshot.value.state.playbackError)
             assertEquals(1, playback.calls.size)
             assertEquals(0, playback.activeStateCollectors)
@@ -478,7 +497,7 @@ class SearchPlaybackObservationTest {
     }
 
     @Test
-    fun `delayed state collection compares against dispatch baseline instead of hiding a new failure`() = with(fixture) {
+    fun `delayed state collection compares against dispatch baseline instead of missing a new denial`() = with(fixture) {
         runTest(dispatcher) {
             val vm = readyVm(songs)
             val allowObservation = CompletableDeferred<Unit>()
@@ -486,18 +505,18 @@ class SearchPlaybackObservationTest {
             playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "before-dispatch")
             send(vm, SearchIntent.PlayTrack(beta.id, songs))
             assertEquals(1, playback.calls.size)
-            assertNull(vm.snapshot.value.state.playbackError)
-
-            playback.states.value = problemSnapshot(PlaybackProblemCode.DecoderFailure, "before-collection", activation = 1)
+            assertEquals(SearchBody.Ready(results(songs)), vm.snapshot.value.state.body)
+            playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "before-collection", activation = 1)
             runCurrent()
-            assertNull(vm.snapshot.value.state.playbackError)
+            assertEquals(SearchBody.Ready(results(songs)), vm.snapshot.value.state.body)
             allowObservation.complete(Unit)
             runCurrent()
 
-            assertEquals(UiText.Resource(R.string.search_playback_decoder_failed), vm.snapshot.value.state.playbackError)
-            assertEquals(PlaybackProblemId("before-collection"), vm.snapshot.value.state.lastPlaybackProblem?.problemId)
+            assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
+            assertNull(vm.snapshot.value.state.playbackError)
+            assertEquals(PlaybackProblemId("before-collection"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
             respond(AppResult.Success(Unit))
-            assertNotNull(vm.snapshot.value.state.playbackError)
+            assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
         }
     }
 }

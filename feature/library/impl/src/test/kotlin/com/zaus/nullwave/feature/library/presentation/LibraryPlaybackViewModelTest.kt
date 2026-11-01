@@ -322,7 +322,7 @@ class LibraryPlaybackViewModelTest {
         assertEquals(SortDirection.Descending, restored.snapshot.value.state.query.direction)
         assertNull(restored.snapshot.value.state.playbackError)
         assertFalse(restored.snapshot.value.state.monitorPlayback)
-        assertNull(restored.snapshot.value.state.lastPlaybackProblem?.problemId)
+        assertNull(restored.snapshot.value.state.lastPlaybackDenial?.problemId)
         assertEquals(2, playback.calls.size)
     }
 
@@ -353,65 +353,66 @@ class LibraryPlaybackViewModelTest {
     }
 
     @Test
-    fun `first attempt observes a new engine failure even before its install acknowledgement`() = runTest(dispatcher) {
+    fun `first attempt gates an engine denial before acknowledgement without a local banner`() = runTest(dispatcher) {
         val vm = readyVm(songs)
         send(vm, LibraryIntent.PlaySong(beta.id, songs))
-        playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "before-first-ack")
+        playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "before-first-ack")
         runCurrent()
         assertTrue(vm.snapshot.value.state.monitorPlayback)
-        assertEquals(UiText.Resource(R.string.library_playback_read_failed), vm.snapshot.value.state.playbackError)
+        assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.snapshot.value.state.body)
+        assertNull(vm.snapshot.value.state.playbackError)
         assertEquals(1, playback.stateObservations)
 
         respond(AppResult.Success(Unit))
 
-        assertTrue(vm.snapshot.value.state.monitorPlayback)
+        assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.snapshot.value.state.body)
+        assertNull(vm.snapshot.value.state.playbackError)
         assertEquals(1, playback.stateObservations)
-        assertEquals(UiText.Resource(R.string.library_playback_read_failed), vm.snapshot.value.state.playbackError)
-        assertEquals(PlaybackProblemId("before-first-ack"), vm.snapshot.value.state.lastPlaybackProblem?.problemId)
+        assertEquals(PlaybackProblemId("before-first-ack"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
     }
 
     @Test
-    fun `cancelled first acknowledgement and failed replacement still observe the installed queue`() = runTest(dispatcher) {
+    fun `cancelled acknowledgement and failed replacement still gate later denial while preserving the command notice`() = runTest(dispatcher) {
         val vm = readyVm(songs)
         send(vm, LibraryIntent.PlaySong(beta.id, songs))
         val installed = playback.calls.single()
         playback.states.value = healthySnapshot()
         runCurrent()
-
         send(vm, LibraryIntent.PlaySong(alpha.id, songs))
         assertTrue(installed.waiterCancelled)
         respond(AppResult.Failure(PlaybackCommandError.SourceFailure(alpha.id, PlaybackSourceError.NotFound)))
+        val notice = vm.snapshot.value.state.playbackNotice
         installed.reply.complete(AppResult.Success(Unit))
         runCurrent()
-        assertEquals(UiText.Resource(R.string.library_playback_not_found), vm.snapshot.value.state.playbackError)
-
-        playback.states.value = problemSnapshot(PlaybackProblemCode.DecoderFailure, "installed-with-cancelled-ack")
+        playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "installed-with-cancelled-ack")
         runCurrent()
 
-        assertTrue(vm.snapshot.value.state.monitorPlayback)
+        assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.snapshot.value.state.body)
+        assertSame(notice, vm.snapshot.value.state.playbackNotice)
+        assertEquals(UiText.Resource(R.string.library_playback_not_found), vm.snapshot.value.state.playbackError)
+        assertEquals(PlaybackProblemId("installed-with-cancelled-ack"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
         assertEquals(1, playback.activeStateCollectors)
-        assertEquals(UiText.Resource(R.string.library_playback_decoder_failed), vm.snapshot.value.state.playbackError)
-        assertEquals(PlaybackProblemId("installed-with-cancelled-ack"), vm.snapshot.value.state.lastPlaybackProblem?.problemId)
         assertEquals(0, playback.progressObservations)
     }
 
     @Test
-    fun `healthy replacement removes the previous activation failure even before the new acknowledgement`() = runTest(dispatcher) {
+    fun `engine snapshots during a replacement never create a local command notice`() = runTest(dispatcher) {
         val vm = readyVm(songs)
         send(vm, LibraryIntent.PlaySong(beta.id, songs))
         respond(AppResult.Success(Unit))
         send(vm, LibraryIntent.PlaySong(alpha.id, songs))
+        val catalog = vm.snapshot.value.state.body
         playback.states.value = problemSnapshot(PlaybackProblemCode.DecoderFailure, "old-during-preparation")
         runCurrent()
-        assertNotNull(vm.snapshot.value.state.playbackError)
-
+        assertNull(vm.snapshot.value.state.playbackNotice)
+        assertSame(catalog, vm.snapshot.value.state.body)
         playback.states.value = healthySnapshot(entryId = "new-alpha", track = alpha, activation = 1)
         runCurrent()
-        assertNull(vm.snapshot.value.state.playbackError)
         respond(AppResult.Success(Unit))
 
-        assertNull(vm.snapshot.value.state.playbackError)
-        assertEquals(PlaybackProblemId("old-during-preparation"), vm.snapshot.value.state.lastPlaybackProblem?.problemId)
+        assertNull(vm.snapshot.value.state.playbackNotice)
+        assertNull(vm.snapshot.value.state.lastPlaybackDenial)
+        assertSame(catalog, vm.snapshot.value.state.body)
     }
 
     @Test
@@ -430,10 +431,12 @@ class LibraryPlaybackViewModelTest {
     }
 
     @Test
-    fun `new activation entry session and empty queue clear only an old engine notice`() = runTest(dispatcher) {
+    fun `new activation entry session and empty queue preserve a local command notice`() = runTest(dispatcher) {
         val vm = readyVm(songs)
         send(vm, LibraryIntent.PlaySong(beta.id, songs))
-        respond(AppResult.Success(Unit))
+        respond(AppResult.Failure(PlaybackCommandError.ConnectionUnavailable))
+        val notice = vm.snapshot.value.state.playbackNotice
+        assertNotNull(notice)
         val replacements = listOf(
             healthySnapshot(activation = 1),
             healthySnapshot(entryId = "another-occurrence-of-beta"),
@@ -441,32 +444,25 @@ class LibraryPlaybackViewModelTest {
             PlaybackConnection.Connected(PlaybackSnapshot.create(PlaybackSessionId("empty-service"))),
         )
 
-        for ((index, replacement) in replacements.withIndex()) {
-            playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "old-engine-$index")
-            runCurrent()
-            assertTrue(vm.snapshot.value.state.playbackNotice is LibraryPlaybackNotice.Engine)
+        for (replacement in replacements) {
             playback.states.value = replacement
             runCurrent()
-
-            assertNull("The old activation must not own a notice after replacement $index", vm.snapshot.value.state.playbackError)
-            assertEquals(PlaybackProblemId("old-engine-$index"), vm.snapshot.value.state.lastPlaybackProblem?.problemId)
+            assertSame(notice, vm.snapshot.value.state.playbackNotice)
+            assertNull(vm.snapshot.value.state.lastPlaybackDenial)
         }
     }
 
     @Test
-    fun `untargeted engine problem uses its snapshot activation for notice ownership`() = runTest(dispatcher) {
+    fun `untargeted engine access denial gates the catalog without a banner`() = runTest(dispatcher) {
         val vm = readyVm(songs)
         send(vm, LibraryIntent.PlaySong(beta.id, songs))
         respond(AppResult.Success(Unit))
-        playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "untargeted", includeTarget = false)
-        runCurrent()
-        val notice = vm.snapshot.value.state.playbackNotice as LibraryPlaybackNotice.Engine
-        assertEquals(healthySnapshot().snapshot.queue.current, notice.target)
-
-        playback.states.value = healthySnapshot(activation = 1)
+        playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "untargeted", includeTarget = false)
         runCurrent()
 
-        assertNull(vm.snapshot.value.state.playbackError)
+        assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.snapshot.value.state.body)
+        assertNull(vm.snapshot.value.state.playbackNotice)
+        assertEquals(PlaybackProblemId("untargeted"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
     }
 
     @Test
@@ -474,9 +470,7 @@ class LibraryPlaybackViewModelTest {
         val vm = readyVm(songs)
         val catalog = vm.snapshot.value.state.body
         playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "preexisting-denial")
-
         send(vm, LibraryIntent.PlaySong(beta.id, songs))
-
         assertEquals(1, playback.calls.size)
         assertSame(catalog, vm.snapshot.value.state.body)
         assertNull(vm.snapshot.value.state.playbackError)
@@ -484,34 +478,34 @@ class LibraryPlaybackViewModelTest {
         playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "preexisting-denial", revision = 1)
         runCurrent()
         assertSame(catalog, vm.snapshot.value.state.body)
-        assertNull(vm.snapshot.value.state.playbackError)
-
+        assertNull(vm.snapshot.value.state.lastPlaybackDenial)
         playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "new-denial", activation = 1)
         runCurrent()
+
         assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.snapshot.value.state.body)
-        assertEquals(UiText.Resource(R.string.library_playback_access_denied), vm.snapshot.value.state.playbackError)
+        assertNull(vm.snapshot.value.state.playbackError)
     }
 
     @Test
-    fun `delayed UI observation retains a new pre-ack failure instead of treating it as the baseline`() = runTest(dispatcher) {
+    fun `delayed UI observation gates a new pre-ack denial instead of treating it as the baseline`() = runTest(dispatcher) {
         val vm = readyVm(songs)
         val allowUiObservation = CompletableDeferred<Unit>()
         playback.beforeStateCollection = { observation -> if (observation == 1) allowUiObservation.await() }
         playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "old-before-dispatch")
         send(vm, LibraryIntent.PlaySong(beta.id, songs))
         assertEquals(1, playback.calls.size)
-        assertNull(vm.snapshot.value.state.playbackError)
-
-        playback.states.value = problemSnapshot(PlaybackProblemCode.DecoderFailure, "new-before-observer", activation = 1)
+        assertEquals(LibraryBody.Ready(songs), vm.snapshot.value.state.body)
+        playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "new-before-observer", activation = 1)
         runCurrent()
-        assertNull(vm.snapshot.value.state.playbackError)
+        assertEquals(LibraryBody.Ready(songs), vm.snapshot.value.state.body)
         allowUiObservation.complete(Unit)
         runCurrent()
 
-        assertEquals(UiText.Resource(R.string.library_playback_decoder_failed), vm.snapshot.value.state.playbackError)
-        assertEquals(PlaybackProblemId("new-before-observer"), vm.snapshot.value.state.lastPlaybackProblem?.problemId)
+        assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.snapshot.value.state.body)
+        assertNull(vm.snapshot.value.state.playbackNotice)
+        assertEquals(PlaybackProblemId("new-before-observer"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
         respond(AppResult.Success(Unit))
-        assertNotNull(vm.snapshot.value.state.playbackError)
+        assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.snapshot.value.state.body)
     }
 
     @Test
@@ -539,7 +533,7 @@ class LibraryPlaybackViewModelTest {
     }
 
     @Test
-    fun `first command can finish after UI observation expires and rebind catches its engine failure`() = runTest(dispatcher) {
+    fun `first command can finish after UI observation expires and rebind catches its access denial`() = runTest(dispatcher) {
         val vm = createVm()
         val binding = bind(vm)
         reply(AppResult.Success(songs))
@@ -547,23 +541,23 @@ class LibraryPlaybackViewModelTest {
         playback.beforeCommandDispatch = { allowConnection.await() }
         playback.states.value = PlaybackConnection.Connecting
         send(vm, LibraryIntent.PlaySong(beta.id, songs))
-
         binding.cancel()
         advanceTimeBy(5_000)
         runCurrent()
         assertTrue(playback.calls.isEmpty())
-        assertEquals("No observer is needed while the command connects without UI binding", 0, playback.activeStateCollectors)
+        assertEquals(0, playback.activeStateCollectors)
         playback.states.value = healthySnapshot()
         allowConnection.complete(Unit)
         runCurrent()
         assertEquals(1, playback.calls.size)
         respond(AppResult.Success(Unit))
         assertEquals(0, playback.activeStateCollectors)
-
-        playback.states.value = problemSnapshot(PlaybackProblemCode.DecoderFailure, "while-ui-stopped")
+        playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "while-ui-stopped")
         bind(vm)
+
         assertEquals(1, playback.activeStateCollectors)
-        assertEquals(UiText.Resource(R.string.library_playback_decoder_failed), vm.snapshot.value.state.playbackError)
+        assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.snapshot.value.state.body)
+        assertNull(vm.snapshot.value.state.playbackNotice)
         assertEquals(1, playback.calls.size)
     }
 
@@ -613,102 +607,115 @@ class LibraryPlaybackViewModelTest {
     }
 
     @Test
-    fun `problem identity is scoped to the service session for baseline and dismissal`() = runTest(dispatcher) {
+    fun `denial identity is scoped to the service session for baseline and deduplication`() = runTest(dispatcher) {
         val vm = readyVm(songs)
-        playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "reused-id")
+        playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "reused-id")
         send(vm, LibraryIntent.PlaySong(beta.id, songs))
         respond(AppResult.Success(Unit))
-        assertNull(vm.snapshot.value.state.playbackError)
-
-        playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "reused-id", sessionId = "second-service")
+        assertEquals(LibraryBody.Ready(songs), vm.snapshot.value.state.body)
+        playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "reused-id", sessionId = "second-service")
         runCurrent()
-        assertEquals(UiText.Resource(R.string.library_playback_read_failed), vm.snapshot.value.state.playbackError)
+        assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.snapshot.value.state.body)
         assertEquals(LibraryPlaybackProblemKey(PlaybackSessionId("second-service"), PlaybackProblemId("reused-id")),
-            vm.snapshot.value.state.lastPlaybackProblem)
-        send(vm, LibraryIntent.DismissPlaybackError)
-        playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "reused-id", revision = 1, sessionId = "second-service")
+            vm.snapshot.value.state.lastPlaybackDenial)
+        send(vm, LibraryIntent.AccessChecked(LibraryAccess.Granted))
+        reply(AppResult.Success(songs))
+        val checkedCatalog = vm.snapshot.value.state.body
+        playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "reused-id", revision = 1, sessionId = "second-service")
         runCurrent()
-        assertNull(vm.snapshot.value.state.playbackError)
+        assertSame(checkedCatalog, vm.snapshot.value.state.body)
+        playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "reused-id", sessionId = "third-service")
+        runCurrent()
 
-        playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "reused-id", sessionId = "third-service")
-        runCurrent()
-        assertEquals(UiText.Resource(R.string.library_playback_read_failed), vm.snapshot.value.state.playbackError)
-        assertEquals(PlaybackSessionId("third-service"), vm.snapshot.value.state.lastPlaybackProblem?.sessionId)
+        assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.snapshot.value.state.body)
+        assertNull(vm.snapshot.value.state.playbackError)
+        assertEquals(PlaybackSessionId("third-service"), vm.snapshot.value.state.lastPlaybackDenial?.sessionId)
     }
 
     @Test
-    fun `later successful reply does not erase an engine failure published while awaiting it`() = runTest(dispatcher) {
+    fun `later successful reply does not reopen a catalog closed by engine denial while awaiting it`() = runTest(dispatcher) {
         val vm = readyVm(songs)
         send(vm, LibraryIntent.PlaySong(beta.id, songs))
         respond(AppResult.Success(Unit))
         send(vm, LibraryIntent.PlaySong(beta.id, songs))
-        playback.states.value = problemSnapshot(PlaybackProblemCode.DecoderFailure, "before-next-ack", activation = 1)
+        playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "before-next-ack", activation = 1)
         runCurrent()
-        val message = vm.snapshot.value.state.playbackError
-        assertNotNull(message)
-
+        assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.snapshot.value.state.body)
         respond(AppResult.Success(Unit))
 
-        assertSame(message, vm.snapshot.value.state.playbackError)
-        assertEquals(PlaybackProblemId("before-next-ack"), vm.snapshot.value.state.lastPlaybackProblem?.problemId)
+        assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.snapshot.value.state.body)
+        assertNull(vm.snapshot.value.state.playbackNotice)
+        assertEquals(PlaybackProblemId("before-next-ack"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
         assertEquals(2, playback.calls.size)
         assertEquals(1, playback.stateObservations)
     }
 
     @Test
-    fun `asynchronous engine failures produce localized messages without replacing catalog data`() = runTest(dispatcher) {
+    fun `non-access engine problems neither create nor erase local command notices`() = runTest(dispatcher) {
         val vm = readyVm(songs)
         send(vm, LibraryIntent.PlaySong(beta.id, songs))
         respond(AppResult.Success(Unit))
         val catalog = vm.snapshot.value.state.body
-        val failures = listOf(
-            PlaybackProblemCode.NotFound to R.string.library_playback_not_found,
-            PlaybackProblemCode.Io to R.string.library_playback_read_failed,
-            PlaybackProblemCode.UnsupportedMedia to R.string.library_playback_unsupported,
-            PlaybackProblemCode.DecoderFailure to R.string.library_playback_decoder_failed,
-            PlaybackProblemCode.OutputUnavailable to R.string.library_playback_output_unavailable,
-            PlaybackProblemCode.Unknown to R.string.library_playback_failed,
-        )
+        val failures = PlaybackProblemCode.entries.filter { it != PlaybackProblemCode.AccessDenied }
 
-        for ((code, message) in failures) {
-            playback.states.value = problemSnapshot(code, "engine:$code")
+        for (code in failures) {
+            playback.states.value = problemSnapshot(code, "before-command:$code")
             runCurrent()
-            assertEquals(UiText.Resource(message), vm.snapshot.value.state.playbackError)
-            assertEquals(PlaybackProblemId("engine:$code"), vm.snapshot.value.state.lastPlaybackProblem?.problemId)
+            assertNull(vm.snapshot.value.state.playbackNotice)
+            assertNull(vm.snapshot.value.state.lastPlaybackDenial)
             assertSame(catalog, vm.snapshot.value.state.body)
         }
-        assertEquals(1, playback.calls.size)
+        send(vm, LibraryIntent.PlaySong(alpha.id, songs))
+        respond(AppResult.Failure(PlaybackCommandError.SourceFailure(alpha.id, PlaybackSourceError.Io)))
+        val notice = vm.snapshot.value.state.playbackNotice
+        assertNotNull(notice)
+        for (code in failures) {
+            playback.states.value = problemSnapshot(code, "after-command:$code")
+            runCurrent()
+            assertSame(notice, vm.snapshot.value.state.playbackNotice)
+            assertNull(vm.snapshot.value.state.lastPlaybackDenial)
+            assertSame(catalog, vm.snapshot.value.state.body)
+        }
+        assertEquals(2, playback.calls.size)
         assertEquals(1, playback.stateObservations)
         assertEquals(0, playback.progressObservations)
     }
 
     @Test
-    fun `dismissed engine problem stays acknowledged across publications and a new problem appears`() = runTest(dispatcher) {
+    fun `fresh access survives repeated denial through healthy and other engine snapshots until a new denial`() = runTest(dispatcher) {
         val vm = readyVm(songs)
         send(vm, LibraryIntent.PlaySong(beta.id, songs))
         respond(AppResult.Success(Unit))
-        playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "first")
+        playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "first")
         runCurrent()
-        assertNotNull(vm.snapshot.value.state.playbackError)
-        send(vm, LibraryIntent.DismissPlaybackError)
+        assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.snapshot.value.state.body)
+        send(vm, LibraryIntent.AccessChecked(LibraryAccess.Granted))
+        reply(AppResult.Success(songs))
+        val checkedCatalog = vm.snapshot.value.state.body
+        for (connection in listOf(
+            healthySnapshot(),
+            problemSnapshot(PlaybackProblemCode.Io, "unrelated-io"),
+            problemSnapshot(PlaybackProblemCode.AccessDenied, "first", revision = 1),
+        )) {
+            playback.states.value = connection
+            runCurrent()
+            assertSame(checkedCatalog, vm.snapshot.value.state.body)
+            assertNull(vm.snapshot.value.state.playbackError)
+            assertEquals(PlaybackProblemId("first"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
+        }
+        playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "second", revision = 2)
+        runCurrent()
 
-        playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "first", revision = 1)
-        runCurrent()
+        assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.snapshot.value.state.body)
         assertNull(vm.snapshot.value.state.playbackError)
-        assertEquals(PlaybackProblemId("first"), vm.snapshot.value.state.lastPlaybackProblem?.problemId)
-
-        playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "second", revision = 2)
-        runCurrent()
-        assertEquals(UiText.Resource(R.string.library_playback_read_failed), vm.snapshot.value.state.playbackError)
-        assertEquals(PlaybackProblemId("second"), vm.snapshot.value.state.lastPlaybackProblem?.problemId)
+        assertEquals(PlaybackProblemId("second"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
     }
 
     @Test
-    fun `late engine access rejection closes every protected catalog and blocks further taps`() = runTest(dispatcher) {
+    fun `late engine access rejection closes every protected catalog and blocks further taps without a local banner`() = runTest(dispatcher) {
         val vm = readyVm(songs)
         send(vm, LibraryIntent.PlaySong(beta.id, songs))
         respond(AppResult.Success(Unit))
-
         playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "engine-denied")
         runCurrent()
 
@@ -716,7 +723,7 @@ class LibraryPlaybackViewModelTest {
         assertEquals(gate, vm.snapshot.value.state.body)
         assertEquals(gate, vm.snapshot.value.state.albums)
         assertEquals(gate, vm.snapshot.value.state.artists)
-        assertEquals(UiText.Resource(R.string.library_playback_access_denied), vm.snapshot.value.state.playbackError)
+        assertNull(vm.snapshot.value.state.playbackError)
         reply(AppResult.Success(listOf(alpha)))
         assertEquals(gate, vm.snapshot.value.state.body)
         send(vm, LibraryIntent.PlaySong(alpha.id, songs))
@@ -724,17 +731,19 @@ class LibraryPlaybackViewModelTest {
     }
 
     @Test
-    fun `background lease expires and rebind does not replay commands or dismissed engine problems`() = runTest(dispatcher) {
+    fun `background lease expires and rebind preserves fresh access despite the same engine denial`() = runTest(dispatcher) {
         val vm = createVm()
         val binding = bind(vm)
         reply(AppResult.Success(songs))
         send(vm, LibraryIntent.PlaySong(beta.id, songs))
         respond(AppResult.Success(Unit))
-        playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "before-background")
+        playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "before-background")
         runCurrent()
-        send(vm, LibraryIntent.DismissPlaybackError)
+        assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.snapshot.value.state.body)
+        send(vm, LibraryIntent.AccessChecked(LibraryAccess.Granted))
+        reply(AppResult.Success(songs))
+        assertEquals(LibraryBody.Ready(songs), vm.snapshot.value.state.body)
         assertEquals(1, playback.activeStateCollectors)
-
         binding.cancel()
         runCurrent()
         assertEquals("The existing UI source grace period still applies", 1, playback.activeStateCollectors)
@@ -742,29 +751,29 @@ class LibraryPlaybackViewModelTest {
         runCurrent()
         assertEquals(0, playback.activeStateCollectors)
         bind(vm)
+        reply(AppResult.Success(songs))
 
+        assertEquals(LibraryBody.Ready(songs), vm.snapshot.value.state.body)
         assertEquals(1, playback.activeStateCollectors)
         assertEquals(2, playback.stateObservations)
         assertEquals(1, playback.calls.size)
         assertNull(vm.snapshot.value.state.playbackError)
-        assertEquals(PlaybackProblemId("before-background"), vm.snapshot.value.state.lastPlaybackProblem?.problemId)
+        assertEquals(PlaybackProblemId("before-background"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
         assertEquals(0, playback.progressObservations)
     }
 
     @Test
-    fun `fresh granted access on resume does not erase a playback failure`() = runTest(dispatcher) {
+    fun `fresh granted access on resume does not erase a command refusal`() = runTest(dispatcher) {
         val vm = readyVm(songs)
         send(vm, LibraryIntent.PlaySong(beta.id, songs))
-        respond(AppResult.Success(Unit))
-        playback.states.value = problemSnapshot(PlaybackProblemCode.DecoderFailure, "decoder")
-        runCurrent()
-        val message = vm.snapshot.value.state.playbackError
-
+        respond(AppResult.Failure(PlaybackCommandError.SourceFailure(beta.id, PlaybackSourceError.Io)))
+        val notice = vm.snapshot.value.state.playbackNotice
+        assertNotNull(notice)
         send(vm, LibraryIntent.AccessChecked(LibraryAccess.Granted))
         reply(AppResult.Success(songs))
 
-        assertSame(message, vm.snapshot.value.state.playbackError)
-        assertEquals(PlaybackProblemId("decoder"), vm.snapshot.value.state.lastPlaybackProblem?.problemId)
+        assertSame(notice, vm.snapshot.value.state.playbackNotice)
+        assertNull(vm.snapshot.value.state.lastPlaybackDenial)
         assertEquals(1, playback.calls.size)
     }
 
