@@ -4,6 +4,7 @@ import com.zaus.nullwave.core.playback.api.PlaybackController
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommand
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError
 import com.zaus.nullwave.core.playback.api.model.PlaybackConnection
+import com.zaus.nullwave.core.playback.api.model.PlaybackConnectionError
 import com.zaus.nullwave.core.playback.api.model.PlaybackProgress
 import com.zaus.nullwave.core.playback.api.model.PlaybackSessionId
 import com.zaus.nullwave.core.playback.api.model.PlaybackSnapshot
@@ -49,6 +50,8 @@ internal class ControlledLibraryPlaybackController : PlaybackController {
         progressObservations++
         return emptyFlow()
     }
+
+    override suspend fun reconnect(): EmptyResult<PlaybackConnectionError> = AppResult.Success(Unit)
 
     override suspend fun execute(
         command: PlaybackCommand,

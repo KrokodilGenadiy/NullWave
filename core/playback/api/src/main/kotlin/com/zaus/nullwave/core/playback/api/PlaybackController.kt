@@ -3,6 +3,7 @@ package com.zaus.nullwave.core.playback.api
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommand
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError
 import com.zaus.nullwave.core.playback.api.model.PlaybackConnection
+import com.zaus.nullwave.core.playback.api.model.PlaybackConnectionError
 import com.zaus.nullwave.core.playback.api.model.PlaybackProgress
 import com.zaus.nullwave.core.playback.api.model.PlaybackSnapshot
 import com.zaus.nullwave.core.result.EmptyResult
@@ -23,6 +24,19 @@ interface PlaybackController {
      * Null means no confirmed current position. Pair with control by target and positionRevision.
      */
     fun observeProgress(): Flow<PlaybackProgress?>
+
+    /**
+     * Confirms a current connection and clears a previous connection/start-denial diagnostic.
+     * Owns only a temporary control lease: it never dispatches a playback command, prepares
+     * media, clears the queue/engine problem or starts sound. Existing observers are notified
+     * through [observeState]; Success confirms the handshake, not the first snapshot or a retained
+     * UI lease. An already live connection may be reused rather than forcibly disconnected.
+     *
+     * Connection attempts are bounded. Expected failures preserve cause/originalMessage;
+     * cancellation and programming failures propagate. Cancellation after diagnostic publication
+     * does not roll that publication back. It never replays a previous command.
+     */
+    suspend fun reconnect(): EmptyResult<PlaybackConnectionError>
 
     /**
      * Success means dispatch through a live playback connection, not audible sound, universal

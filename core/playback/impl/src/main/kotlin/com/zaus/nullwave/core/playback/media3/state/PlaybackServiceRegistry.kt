@@ -43,6 +43,9 @@ internal class PlaybackServiceRegistry {
         if (session == id) mutableFailure.value = PlaybackConnectionError.StartNotAllowed
     }
 
+    /** Current service attachment, which may precede its first snapshot. Only the service writes it. */
+    val attachedSessionId: PlaybackSessionId? get() = session
+
     fun clearConnectionError() { mutableFailure.value = null }
 
     fun detach(id: PlaybackSessionId) {

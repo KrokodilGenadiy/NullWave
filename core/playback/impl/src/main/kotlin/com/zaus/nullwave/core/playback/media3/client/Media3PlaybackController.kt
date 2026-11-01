@@ -31,7 +31,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 
-/** App-scoped client facade. Only collecting/executing obtains a connection; construction is inert. */
+/** App-scoped facade. Construction is inert; observation, reconnect and commands acquire UI leases. */
 @UnstableApi
 internal class Media3PlaybackController(
     context: Context,

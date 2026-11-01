@@ -4,9 +4,11 @@ import com.zaus.nullwave.core.playback.api.PlaybackController
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommand
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError
 import com.zaus.nullwave.core.playback.api.model.PlaybackConnection
+import com.zaus.nullwave.core.playback.api.model.PlaybackConnectionError
 import com.zaus.nullwave.core.playback.api.model.PlaybackProgress
 import com.zaus.nullwave.core.playback.api.model.PlaybackSessionId
 import com.zaus.nullwave.core.playback.api.model.PlaybackSnapshot
+import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.EmptyResult
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CompletableDeferred
@@ -24,6 +26,8 @@ internal class RecordingSearchPlaybackController : PlaybackController {
 
     override fun observeState(): Flow<PlaybackConnection> = states
     override fun observeProgress(): Flow<PlaybackProgress?> = flowOf(null)
+
+    override suspend fun reconnect(): EmptyResult<PlaybackConnectionError> = AppResult.Success(Unit)
 
     override suspend fun execute(
         command: PlaybackCommand,

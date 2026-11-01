@@ -88,6 +88,38 @@ internal class SharedPlaybackClient(
         finally { release(progress = true) }
     }.flowOn(main).conflate()
 
+    override suspend fun reconnect(): EmptyResult<PlaybackConnectionError> = withContext(main) {
+        val context = currentCoroutineContext()
+        val reply = acquire(progress = false)
+        val outcome: EmptyResult<PlaybackConnectionError> = try {
+            run {
+                val connection = try {
+                    reply.await()
+                } catch (failure: PlaybackConnectException) {
+                    return@run AppResult.Failure(failure.reason, failure.cause ?: failure)
+                }
+                val confirmed = isCurrent(connection)
+                // Validation can close a stale connection, reenter Main and cancel this caller.
+                context.ensureActive()
+                if (!confirmed) return@run AppResult.Failure(PlaybackConnectionError.ServiceDisconnected)
+
+                registry.clearConnectionError()
+                val stillCurrent = isCurrent(connection)
+                // Both diagnostic publication and stale-connection cleanup permit immediate reentry.
+                context.ensureActive()
+                if (!stillCurrent) return@run AppResult.Failure(PlaybackConnectionError.ServiceDisconnected)
+
+                // Reentry may have reported a fresh refusal for the same session during the clear.
+                registry.failure.value?.let { AppResult.Failure(it) } ?: AppResult.Success(Unit)
+            }
+        } finally {
+            release(progress = false)
+        }
+        // A last-lease close can cancel the caller too. Check only normal completion, preserving errors.
+        context.ensureActive()
+        outcome
+    }
+
     override suspend fun execute(
         command: PlaybackCommand,
         beforeDispatch: (PlaybackSnapshot?) -> Unit,
@@ -120,7 +152,12 @@ internal class SharedPlaybackClient(
 
     private fun isCurrent(connection: PlaybackClientConnection): Boolean {
         val snapshot = registry.snapshot.value
-        if (active?.connection === connection && (snapshot == null || connection.sessionId == snapshot.sessionId)) return true
+        // The service attaches before the handshake. A missing snapshot can be startup;
+        // a missing attachment is teardown, even before Media3 delivers onDisconnected.
+        if (active?.connection === connection &&
+            registry.attachedSessionId == connection.sessionId &&
+            (snapshot == null || connection.sessionId == snapshot.sessionId)
+        ) return true
         active?.takeIf { it.connection === connection }?.let { disconnected(it.attempt) }
         return false
     }
