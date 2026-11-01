@@ -17,7 +17,13 @@ class MainActivity : ComponentActivity() {
         val graph = (application as NullWaveApplication).appGraph
         setContent {
             NullWaveTheme {
-                NullWaveNavigation(graph.entryProviderInstallers, graph.metroViewModelFactory)
+                NullWaveApp(
+                    entryProviderInstallers = graph.entryProviderInstallers,
+                    viewModelFactory = graph.metroViewModelFactory,
+                    playerHost = graph.playerHost,
+                    owner = this,
+                    lifecycleOwner = this,
+                )
             }
         }
     }

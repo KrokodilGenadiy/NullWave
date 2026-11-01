@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -22,6 +23,7 @@ import com.zaus.nullwave.feature.about.api.AboutKey
 import com.zaus.nullwave.feature.library.api.LibraryKey
 import dev.zacsweers.metro.createGraph
 import dev.zacsweers.metrox.viewmodel.metroViewModel
+import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
@@ -54,7 +56,11 @@ class NavigationViewModelInstrumentedTest {
             }
         })
         compose.setContent {
-            NullWaveTheme { NullWaveNavigation(entries, graph.metroViewModelFactory) }
+            NullWaveTheme {
+                CompositionLocalProvider(LocalMetroViewModelFactory provides graph.metroViewModelFactory) {
+                    NullWaveNavigation(entries, rememberNullWaveNavigationScope())
+                }
+            }
         }
         val originalRoot = compose.runOnIdle { root }
         compose.onNodeWithText("Edit root").performClick()

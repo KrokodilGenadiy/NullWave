@@ -5,6 +5,7 @@ import android.content.Context
 import com.zaus.nullwave.core.navigation.EntryProviderInstaller
 import com.zaus.nullwave.core.playback.api.PlaybackController
 import com.zaus.nullwave.core.playback.media3.service.PlaybackServiceComponent
+import com.zaus.nullwave.feature.player.api.ui.PlayerHost
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Binds
 import dev.zacsweers.metro.DependencyGraph
@@ -19,6 +20,8 @@ interface AppGraph : ViewModelGraph, PlaybackServiceComponent {
     val application: Application
 
     val playbackController: PlaybackController
+
+    val playerHost: PlayerHost
 
     @ForScope(AppScope::class)
     val applicationContext: Context

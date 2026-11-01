@@ -1,5 +1,6 @@
 package com.zaus.nullwave
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -8,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
+import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 import org.junit.Rule
 import org.junit.Test
 import com.zaus.nullwave.feature.library.impl.R as LibraryR
@@ -25,10 +27,12 @@ class NavigationRestorationTest {
         val restoration = StateRestorationTester(compose)
         restoration.setContent {
             NullWaveTheme {
-                NullWaveNavigation(
-                    application.appGraph.entryProviderInstallers,
-                    application.appGraph.metroViewModelFactory,
-                )
+                CompositionLocalProvider(LocalMetroViewModelFactory provides application.appGraph.metroViewModelFactory) {
+                    NullWaveNavigation(
+                        application.appGraph.entryProviderInstallers,
+                        rememberNullWaveNavigationScope(),
+                    )
+                }
             }
         }
 

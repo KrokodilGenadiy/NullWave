@@ -27,6 +27,7 @@ android {
 
 dependencies {
     implementation(project(":feature:library:api"))
+    implementation(project(":feature:player:api"))
     implementation(libs.androidx.navigation3.ui)
     implementation(libs.androidx.lifecycle.viewmodel.navigation3)
     implementation(project(":core:di"))
