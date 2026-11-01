@@ -7,7 +7,7 @@
     <string name="player_start_not_allowed">Android не разрешил фоновое воспроизведение. Откройте приложение и попробуйте снова.</string>
     <string name="player_command_unavailable">Это действие воспроизведения больше недоступно.</string>
     <string name="player_invalid_request">Не удалось выполнить действие воспроизведения.</string>
-    <string name="player_access_denied">Доступ к аудиофайлу потерян. Проверьте доступ в медиатеке.</string>
+    <string name="player_access_denied">Нет доступа к аудиофайлу. Проверьте разрешение на аудио. Если оно выдано, попробуйте снова выбрать трек в медиатеке.</string>
     <string name="player_not_found">Аудиофайл больше недоступен.</string>
     <string name="player_read_failed">Не удалось прочитать аудиофайл.</string>
     <string name="player_unsupported">Этот аудиоформат не поддерживается.</string>

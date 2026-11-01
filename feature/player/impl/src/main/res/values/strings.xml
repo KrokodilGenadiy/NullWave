@@ -7,7 +7,7 @@
     <string name="player_start_not_allowed">Android could not start background playback. Open the app and try again.</string>
     <string name="player_command_unavailable">This playback action is no longer available.</string>
     <string name="player_invalid_request">Could not perform this playback action.</string>
-    <string name="player_access_denied">Access to this audio file was lost. Check access in your library.</string>
+    <string name="player_access_denied">Cannot access this audio file. Check audio permission. If it is allowed, try selecting the track again in your library.</string>
     <string name="player_not_found">This audio file is no longer available.</string>
     <string name="player_read_failed">Could not read this audio file.</string>
     <string name="player_unsupported">This audio format is not supported.</string>
