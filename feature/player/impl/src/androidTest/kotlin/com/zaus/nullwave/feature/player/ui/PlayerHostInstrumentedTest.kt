@@ -54,6 +54,8 @@ class PlayerHostInstrumentedTest {
 
         compose.onNodeWithTag("host_open_search").performClick()
         compose.onNodeWithTag("host_search").assertIsDisplayed()
+        compose.onNodeWithTag("player_mini").assertIsDisplayed()
+        compose.onNodeWithText("Host track").assertIsDisplayed()
         compose.onNodeWithTag("player_notice").assertDoesNotExist()
         activity.onActivity {
             assertSame(original, it.playerViewModel())
@@ -68,6 +70,7 @@ class PlayerHostInstrumentedTest {
         }
         compose.onNodeWithTag("host_back_library").performClick()
         compose.onNodeWithTag("host_library").assertIsDisplayed()
+        compose.onNodeWithTag("player_mini").assertIsDisplayed()
         compose.onNodeWithTag("player_notice").assertDoesNotExist()
         activity.onActivity {
             assertSame(original, it.playerViewModel())
@@ -93,6 +96,8 @@ class PlayerHostInstrumentedTest {
         activity.recreate()
         awaitSubscriptions(1)
         compose.onNodeWithTag("host_library").assertIsDisplayed()
+        compose.onNodeWithTag("player_mini").assertIsDisplayed()
+        compose.onNodeWithText("Host track").assertIsDisplayed()
         compose.onNodeWithTag("player_notice").assertDoesNotExist()
         activity.onActivity {
             assertNotSame(firstActivity, it)

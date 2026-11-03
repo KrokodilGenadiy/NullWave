@@ -1,12 +1,18 @@
 package com.zaus.nullwave.feature.player.ui
 
+import android.content.res.Configuration
 import android.os.Bundle
+import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
@@ -14,7 +20,15 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
@@ -24,9 +38,12 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
+import com.zaus.nullwave.core.designsystem.theme.NullWaveEffects
+import com.zaus.nullwave.core.media.model.ArtworkRef
 import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.core.playback.api.PlaybackController
+import com.zaus.nullwave.core.playback.api.PlaybackClock
 import com.zaus.nullwave.core.playback.api.command.PlaybackCapability
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommand
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError
@@ -46,6 +63,7 @@ import com.zaus.nullwave.core.playback.api.model.QueueEntryId
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.EmptyResult
 import com.zaus.nullwave.feature.player.api.ui.PlayerHost
+import com.zaus.nullwave.feature.library.api.ui.LibraryArtworkRenderer
 import com.zaus.nullwave.feature.player.presentation.PlayerViewModel
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.DependencyGraph
@@ -53,7 +71,9 @@ import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.createGraphFactory
 import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 import dev.zacsweers.metrox.viewmodel.ViewModelGraph
+import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
@@ -66,13 +86,22 @@ internal interface PlayerHostTestGraph : ViewModelGraph {
 
     @DependencyGraph.Factory
     fun interface Factory {
-        fun create(@Provides playback: PlaybackController): PlayerHostTestGraph
+        fun create(
+            @Provides playback: PlaybackController,
+            @Provides clock: PlaybackClock,
+            @Provides artwork: LibraryArtworkRenderer,
+        ): PlayerHostTestGraph
     }
 }
 
-internal class PlayerHostActivityFixture {
+internal class PlayerHostActivityFixture(
+    val viewport: DpSize? = null,
+    val fontScale: Float? = null,
+    val locale: Locale? = null,
+) {
     val playback = RecordingHostPlaybackController()
-    val graph = createGraphFactory<PlayerHostTestGraph.Factory>().create(playback)
+    val artwork = RecordingHostArtworkRenderer()
+    val graph = createGraphFactory<PlayerHostTestGraph.Factory>().create(playback, PlaybackClock { 10_000 }, artwork)
     val hostVisible = mutableStateOf(true)
     val entryOwners = mutableMapOf<HostDestination, ViewModelStoreOwner>()
     var libraryRequests = 0
@@ -80,23 +109,45 @@ internal class PlayerHostActivityFixture {
 
 class PlayerHostTestActivity : ComponentActivity() {
     private lateinit var activeFixture: PlayerHostActivityFixture
+    internal var composeView: View? = null
+        private set
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         activeFixture = checkNotNull(fixture)
         setContent {
-            NullWaveTheme {
-                CompositionLocalProvider(LocalMetroViewModelFactory provides activeFixture.graph.metroViewModelFactory) {
-                    if (activeFixture.hostVisible.value) {
-                        activeFixture.graph.playerHost.Content(
-                            owner = this,
-                            lifecycleOwner = this,
-                            onOpenLibrary = { activeFixture.libraryRequests++ },
-                        ) {
-                            ProbeNavigation(activeFixture)
+            val view = LocalView.current
+            SideEffect { composeView = view }
+            val baseContext = LocalContext.current
+            val baseConfiguration = LocalConfiguration.current
+            val density = LocalDensity.current
+            val context = remember(baseContext, baseConfiguration) {
+                if (activeFixture.locale == null && activeFixture.fontScale == null) baseContext
+                else baseContext.createConfigurationContext(Configuration(baseConfiguration).apply {
+                    activeFixture.locale?.let(::setLocale)
+                    activeFixture.fontScale?.let { fontScale = it }
+                })
+            }
+            CompositionLocalProvider(
+                LocalContext provides context,
+                LocalConfiguration provides context.resources.configuration,
+                LocalDensity provides (activeFixture.fontScale?.let { Density(density.density, it) } ?: density),
+                LocalMetroViewModelFactory provides activeFixture.graph.metroViewModelFactory,
+            ) {
+                NullWaveTheme(effects = NullWaveEffects(reduceMotion = true, glowEnabled = false)) {
+                    val viewport = activeFixture.viewport
+                    Box(if (viewport == null) Modifier else Modifier.size(viewport.width, viewport.height).testTag("host_test_viewport")) {
+                        if (activeFixture.hostVisible.value) {
+                            activeFixture.graph.playerHost.Content(
+                                owner = this@PlayerHostTestActivity,
+                                lifecycleOwner = this@PlayerHostTestActivity,
+                                onOpenLibrary = { activeFixture.libraryRequests++ },
+                            ) {
+                                ProbeNavigation(activeFixture)
+                            }
+                        } else {
+                            Text("Host removed")
                         }
-                    } else {
-                        Text("Host removed")
                     }
                 }
             }
@@ -140,6 +191,13 @@ private fun ProbeNavigation(fixture: PlayerHostActivityFixture) {
                             modifier = Modifier.testTag("host_open_search"),
                         ) { Text("Open Search") }
                     } else {
+                        val query = remember { mutableStateOf("") }
+                        TextField(
+                            value = query.value,
+                            onValueChange = { query.value = it },
+                            modifier = Modifier.testTag("host_search_input"),
+                            singleLine = true,
+                        )
                         Button(
                             onClick = { backStack.removeLast() },
                             modifier = Modifier.testTag("host_back_library"),
@@ -161,6 +219,7 @@ internal class RecordingHostPlaybackController : PlaybackController {
     val activeProgress = AtomicInteger()
     val commands = mutableListOf<PlaybackCommand>()
     var commandReply: EmptyResult<PlaybackCommandError> = AppResult.Success(Unit)
+    var commandGate: CompletableDeferred<Unit>? = null
     var reconnects = 0
 
     override fun observeState(): Flow<PlaybackConnection> = flow {
@@ -181,12 +240,25 @@ internal class RecordingHostPlaybackController : PlaybackController {
     ): EmptyResult<PlaybackCommandError> {
         beforeDispatch((connection.value as? PlaybackConnection.Connected)?.snapshot)
         commands.add(command)
+        commandGate?.await()
         return commandReply
     }
 
     override suspend fun reconnect(): EmptyResult<PlaybackConnectionError> {
         reconnects++
         return AppResult.Success(Unit)
+    }
+}
+
+/** Records the production adapter's arguments without MediaStore, permissions or async image I/O. */
+internal class RecordingHostArtworkRenderer : LibraryArtworkRenderer {
+    data class Request(val artwork: ArtworkRef?, val title: String, val size: Dp)
+    val requests = mutableListOf<Request>()
+
+    @Composable
+    override fun Artwork(artwork: ArtworkRef?, title: String, size: Dp, modifier: Modifier) {
+        SideEffect { requests += Request(artwork, title, size) }
+        Box(modifier.size(size).background(Color.Magenta))
     }
 }
 

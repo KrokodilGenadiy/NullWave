@@ -1,5 +1,6 @@
 package com.zaus.nullwave.feature.player.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -29,6 +30,7 @@ internal fun PlayerNotice(
     canSubmit: Boolean,
     onIntent: (PlayerIntent) -> Unit,
     onOpenLibrary: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val command = state.commandNotice
     val connection = state.connectionMessage
@@ -59,15 +61,17 @@ internal fun PlayerNotice(
         connection == null && problemKey != null -> { { onIntent(PlayerIntent.DismissProblem(problemKey)) } }
         else -> null
     }
-    NullWaveInlineMessage(
-        message = message.asString(),
-        modifier = Modifier.padding(NullWaveTheme.spacing.sm).testTag("player_notice")
-            .semantics { liveRegion = LiveRegionMode.Polite },
-        variant = NullWaveMessageVariant.Error,
-        action = action,
-        onDismiss = dismiss,
-        dismissDescription = stringResource(R.string.player_dismiss_notice),
-    )
+    // Tag/semantics describe the viewport, including when the host supplies vertical scrolling.
+    Box(Modifier.testTag("player_notice").semantics { liveRegion = LiveRegionMode.Polite }.then(modifier)) {
+        NullWaveInlineMessage(
+            message = message.asString(),
+            modifier = Modifier.padding(NullWaveTheme.spacing.sm),
+            variant = NullWaveMessageVariant.Error,
+            action = action,
+            onDismiss = dismiss,
+            dismissDescription = stringResource(R.string.player_dismiss_notice),
+        )
+    }
 }
 
 @Preview(name = "Player connection notice", showBackground = true)

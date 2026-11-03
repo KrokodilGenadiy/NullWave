@@ -2,6 +2,8 @@ package com.zaus.nullwave.feature.player.di
 
 import androidx.lifecycle.ViewModel
 import com.zaus.nullwave.core.playback.api.PlaybackController
+import com.zaus.nullwave.core.playback.api.PlaybackClock
+import com.zaus.nullwave.feature.library.api.ui.LibraryArtworkRenderer
 import com.zaus.nullwave.feature.player.api.ui.PlayerHost
 import com.zaus.nullwave.feature.player.presentation.PlayerViewModel
 import dev.zacsweers.metro.AppScope
@@ -16,7 +18,8 @@ import dev.zacsweers.metrox.viewmodel.ViewModelKey
 @ContributesTo(AppScope::class)
 object PlayerBindings {
     @Provides
-    private fun host(): PlayerHost = DefaultPlayerHost()
+    private fun host(clock: PlaybackClock, artwork: () -> LibraryArtworkRenderer): PlayerHost =
+        DefaultPlayerHost(clock, artwork)
 
     // Unscoped provider: Metro constructs, the explicit ViewModelStore retains and clears.
     @Provides

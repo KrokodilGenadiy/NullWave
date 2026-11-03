@@ -1,7 +1,13 @@
 package com.zaus.nullwave.feature.player.di
 
 import androidx.lifecycle.viewmodel.CreationExtras
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
+import com.zaus.nullwave.core.media.model.ArtworkRef
+import com.zaus.nullwave.core.playback.api.PlaybackClock
 import com.zaus.nullwave.core.playback.api.PlaybackController
+import com.zaus.nullwave.feature.library.api.ui.LibraryArtworkRenderer
 import com.zaus.nullwave.feature.player.api.ui.PlayerHost
 import com.zaus.nullwave.feature.player.presentation.PlayerFixture
 import com.zaus.nullwave.feature.player.presentation.PlayerViewModel
@@ -30,7 +36,7 @@ class PlayerGraphTest {
     @Test
     fun `production contribution reaches Metro factory and creates unscoped Player instances`() = with(fixture) {
         runTest(dispatcher) {
-            val graph = createGraphFactory<PlayerTestGraph.Factory>().create(playback)
+            val graph = createGraphFactory<PlayerTestGraph.Factory>().create(playback, PlaybackClock { 0L }, NoArtwork)
             val first = graph.metroViewModelFactory.create(PlayerViewModel::class, CreationExtras.Empty)
                 .also { store.put("first", it) }
             val second = graph.metroViewModelFactory.create(PlayerViewModel::class, CreationExtras.Empty)
@@ -55,6 +61,17 @@ internal interface PlayerTestGraph : ViewModelGraph {
 
     @DependencyGraph.Factory
     fun interface Factory {
-        fun create(@Provides controller: PlaybackController): PlayerTestGraph
+        fun create(
+            @Provides controller: PlaybackController,
+            @Provides clock: PlaybackClock,
+            @Provides artwork: LibraryArtworkRenderer,
+        ): PlayerTestGraph
+    }
+}
+
+private object NoArtwork : LibraryArtworkRenderer {
+    @Composable
+    override fun Artwork(artwork: ArtworkRef?, title: String, size: Dp, modifier: Modifier) {
+        error("Creating a host must not render artwork")
     }
 }
