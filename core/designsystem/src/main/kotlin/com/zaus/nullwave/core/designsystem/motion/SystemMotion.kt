@@ -13,7 +13,12 @@ internal fun systemAnimationsEnabled(): Boolean {
     return (scope.coroutineContext[MotionDurationScale]?.scaleFactor ?: 1f) > 0f
 }
 
-/** For continuous/scanner/marquee or spatial motion; reduced fades may use the system gate alone. */
+/**
+ * Shared gate for continuous or spatial motion, including marquee and progress interpolation.
+ * Theme restrictions, a local [reduceMotion] request, and the system's zero animation scale can
+ * each disable it. Observable system scale changes are read in composition and take effect live.
+ * Callers own their static fallback and preview policy; reduced fades may use the system gate alone.
+ */
 @Composable
-internal fun decorativeMotionEnabled(reduceMotion: Boolean = false): Boolean =
+fun decorativeMotionEnabled(reduceMotion: Boolean = false): Boolean =
     !NullWaveTheme.effects.withRestrictions(reduceMotion = reduceMotion).reduceMotion && systemAnimationsEnabled()

@@ -27,7 +27,8 @@ class PlaybackServiceDependencies internal constructor(
     internal val main: CoroutineDispatcher,
     internal val registry: PlaybackServiceRegistry,
     internal val tickets: PlaybackCommandTickets,
-    internal val clock: PlaybackClock,
+    /** Shared time base for engine anchors and UI interpolation; reading it does not connect. */
+    val clock: PlaybackClock,
     private val client: PlaybackController,
 ) {
     fun controller(): PlaybackController = client

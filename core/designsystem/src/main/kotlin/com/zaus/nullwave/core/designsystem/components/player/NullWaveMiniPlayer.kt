@@ -42,9 +42,13 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 /**
  * Display-only compact player. The host owns visibility, insets, expansion and playback.
  * [isPlaying] describes playback intent, not whether audio is currently flowing during buffering.
- * Artwork/title form the expand target; play/next are sibling targets (disabled taps cannot expand).
- * [playbackEnabled] gates transport only, leaving details reachable. [progress] is a finite 0..1
+ * Artwork/title form the expand target when [onExpand] is non-null; otherwise they are plain content.
+ * Play/next are sibling targets (disabled taps cannot expand). [playbackEnabled] gates transport
+ * only; [canPlayPause] and [canNext] further restrict each control independently. [progress] is a finite 0..1
  * fraction, clamped for display; null omits it. The thin strip is decorative, never a seek target.
+ * When supplied, [progressProvider] replaces [progress] (including when it returns null) and is read
+ * only while drawing. It follows the same finite/null contract and can read animated state without
+ * recomposing the metadata, artwork or controls. The provider must be side-effect-free.
  * [artwork] fills 40 dp and must be decorative/noninteractive. Long titles marquee; subtitles stay
  * single-line ellipsis. [reduceMotion] or system scale=0 makes the title single-line ellipsis too.
  * [playPauseGlowEnabled] controls a compact static halo on Play/Pause, not on the whole panel.
@@ -56,7 +60,7 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 fun NullWaveMiniPlayer(
     title: String,
     isPlaying: Boolean,
-    onExpand: () -> Unit,
+    onExpand: (() -> Unit)?,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
     modifier: Modifier = Modifier,
@@ -70,10 +74,13 @@ fun NullWaveMiniPlayer(
     expandInteractionSource: MutableInteractionSource? = null,
     playPauseGlowEnabled: Boolean = true,
     progressGlowEnabled: Boolean = true,
+    progressProvider: (() -> Float?)? = null,
+    canPlayPause: Boolean = true,
 ) {
     require(title.isNotBlank()) { "MiniPlayer title must not be blank" }
-    require(progress == null || progress.isFinite()) { "Unknown progress must be null, not NaN/Infinity" }
-    val fraction = progress?.coerceIn(0f, 1f)
+    if (progressProvider == null) require(progress == null || progress.isFinite()) {
+        "Unknown progress must be null, not NaN/Infinity"
+    }
     val colors = NullWaveTheme.colors
     val dimens = NullWaveTheme.dimens
     val spacing = NullWaveTheme.spacing
@@ -87,6 +94,9 @@ fun NullWaveMiniPlayer(
                 val glow = PlayerLineGlow(colors.secondary, MiniProgressGlowRadius.toPx(), MiniProgressGlowAlpha)
                 val stroke = MiniProgressHeight.toPx()
                 onDrawBehind {
+                    val value = if (progressProvider != null) progressProvider() else progress
+                    require(value == null || value.isFinite()) { "Unknown progress must be null, not NaN/Infinity" }
+                    val fraction = value?.coerceIn(0f, 1f)
                     // The divider is behind the halo, not a dark cut across its upper half.
                     drawRect(colors.outline, size = Size(size.width, dimens.hairline.toPx()))
                     val width = size.width * (fraction ?: 0f)
@@ -109,8 +119,9 @@ fun NullWaveMiniPlayer(
     ) {
         Row(
             Modifier.weight(1f).defaultMinSize(minHeight = dimens.touchTarget)
-                .then(if (focused) Modifier.border(dimens.focusBorder, colors.textPrimary, RectangleShape) else Modifier)
-                .clickable(source, ripple(), role = Role.Button, onClickLabel = stringResource(R.string.nw_player_expand), onClick = onExpand),
+                .then(if (onExpand != null && focused) Modifier.border(dimens.focusBorder, colors.textPrimary, RectangleShape) else Modifier)
+                .then(if (onExpand != null) Modifier.clickable(source, ripple(), role = Role.Button,
+                    onClickLabel = stringResource(R.string.nw_player_expand), onClick = onExpand) else Modifier),
             horizontalArrangement = Arrangement.spacedBy(spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -123,7 +134,7 @@ fun NullWaveMiniPlayer(
                     color = colors.textSecondary, style = NullWaveTheme.typography.caption)
             }
         }
-        NullWavePlayPauseButton(isPlaying, onPlayPause, buffering = buffering, enabled = playbackEnabled,
+        NullWavePlayPauseButton(isPlaying, onPlayPause, buffering = buffering, enabled = playbackEnabled && canPlayPause,
             size = NullWavePlayPauseButtonSize.Compact, reduceMotion = reduceMotion, glowEnabled = playPauseGlowEnabled)
         NullWaveIconButton(NullWaveIcons.Next, stringResource(R.string.nw_player_next), onNext, enabled = playbackEnabled && canNext)
     }

@@ -4,6 +4,7 @@ import android.content.Context
 import com.zaus.nullwave.core.di.dispatchers.DefaultDispatcher
 import com.zaus.nullwave.core.di.dispatchers.MainDispatcher
 import com.zaus.nullwave.core.playback.api.PlaybackController
+import com.zaus.nullwave.core.playback.api.PlaybackClock
 import com.zaus.nullwave.core.playback.api.source.PlaybackSourceResolver
 import com.zaus.nullwave.core.playback.media3.service.PlaybackServiceDependencies
 import dev.zacsweers.metro.AppScope
@@ -30,4 +31,7 @@ object PlaybackBindings {
     @Provides
     @SingleIn(AppScope::class)
     private fun controller(dependencies: PlaybackServiceDependencies): PlaybackController = dependencies.controller()
+
+    @Provides
+    private fun clock(dependencies: PlaybackServiceDependencies): PlaybackClock = dependencies.clock
 }
