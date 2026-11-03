@@ -1,4 +1,5 @@
 <resources>
+    <string name="player_unknown_artist">Неизвестный исполнитель</string>
     <string name="player_reconnect">Подключиться снова</string>
     <string name="player_open_library">Открыть медиатеку</string>
     <string name="player_retry">Повторить воспроизведение</string>

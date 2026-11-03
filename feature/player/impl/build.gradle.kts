@@ -18,6 +18,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation(project(":feature:player:api"))
+    implementation(project(":feature:library:api"))
     implementation(project(":core:playback:api"))
     implementation(project(":core:di"))
     implementation(project(":core:navigation"))
