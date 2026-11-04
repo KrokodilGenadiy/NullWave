@@ -20,17 +20,19 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import coil3.ColorImage
+import coil3.EventListener
 import coil3.decode.DataSource
 import coil3.fetch.Fetcher
 import coil3.fetch.ImageFetchResult
 import coil3.ImageLoader
 import coil3.request.ErrorResult
+import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import coil3.size.Size
 import coil3.Uri
-import com.zaus.nullwave.core.designsystem.theme.NullWaveColors
 import com.zaus.nullwave.core.designsystem.theme.NullWaveEffects
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.media.model.ArtworkRef
@@ -95,7 +97,8 @@ class LibraryArtworkInstrumentedTest {
         )
         val entered = List(failures.size) { CompletableDeferred<Unit>() }
         val release = List(failures.size) { CompletableDeferred<Unit>() }
-        val loader = loader { data ->
+        val errors = AtomicInteger()
+        val loader = loader(onError = { errors.incrementAndGet() }) { data ->
             val index = data.toString().substringAfterLast('/').toInt() - 1
             if (index in failures.indices) {
                 entered[index].complete(Unit)
@@ -116,15 +119,125 @@ class LibraryArtworkInstrumentedTest {
                     current.value = track.copy(artwork = ArtworkRef("external_primary:${index + 1}", "v1"))
                 }
                 compose.waitUntil(5_000) { entered[index].isCompleted }
-                // Observe each new request before completing it, so an old monogram cannot pass.
-                awaitTopColor(NullWaveColors.Cyberpunk.surfaceRaised)
+                // Optional artwork uses the same monogram while loading and after a failure.
+                // Wait for the real error callback too: a previous monogram alone proves nothing.
+                awaitTopColor(Color(0xFFEDE8DC))
                 release[index].complete(Unit)
+                compose.waitUntil(5_000) { errors.get() == index + 1 }
                 awaitTopColor(Color(0xFFEDE8DC))
             }
             compose.runOnIdle {
                 current.value = track.copy(artwork = ArtworkRef("external_primary:${failures.size + 1}", "v1"))
             }
             awaitTopColor(Color.Red)
+        } finally { loader.shutdown() }
+    }
+
+    @Test
+    fun cachedThumbnailRemainsVisibleDuringLargerLoadButDoesNotCrossArtworkRevision() = runBlocking {
+        val reference = ArtworkRef("external_primary:1", "v1")
+        val current = mutableStateOf(reference)
+        val reads = AtomicInteger()
+        val entered = List(2) { CompletableDeferred<Unit>() }
+        val release = List(2) { CompletableDeferred<Unit>() }
+        val loader = loader {
+            val read = reads.getAndIncrement()
+            if (read == 0) {
+                // A sampled row thumbnail is deliberately too small for the full-size request.
+                ImageFetchResult(ColorImage(Color.Red.toArgb(), 64, 64, 64 * 64 * 4L), true, DataSource.DISK)
+            } else {
+                entered[read - 1].complete(Unit)
+                release[read - 1].await()
+                ImageFetchResult(ColorImage(Color.Blue.toArgb(), 1024, 1024), false, DataSource.DISK)
+            }
+        }
+        val service = LibraryArtworkLoader(loader)
+        try {
+            assertTrue(loader.execute(checkNotNull(artworkRequest(context, reference, 64))) is SuccessResult)
+            compose.setContent {
+                NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
+                    LibraryArtwork(current.value, "Transmission", service,
+                        Modifier.testTag("artwork"), size = 160.dp)
+                }
+            }
+            compose.waitUntil(5_000) { entered[0].isCompleted }
+            awaitTopColor(Color.Red)
+            release[0].complete(Unit)
+            awaitTopColor(Color.Blue)
+
+            // Same album URI with a changed revision must not show the prior cached image.
+            compose.runOnIdle { current.value = reference.copy(revision = "v2") }
+            compose.waitUntil(5_000) { entered[1].isCompleted }
+            awaitTopColor(Color(0xFFEDE8DC))
+            release[1].complete(Unit)
+            awaitTopColor(Color.Blue)
+            assertEquals(3, reads.get())
+        } finally { loader.shutdown() }
+    }
+
+    @Test
+    fun missingThumbnailKeepsTheMonogramWhenReopenedAtPlayerSizeAndStillRetries() {
+        val reference = ArtworkRef("external_primary:1", "v1")
+        val size = mutableStateOf(40.dp)
+        val reads = AtomicInteger()
+        val errors = AtomicInteger()
+        val entered = List(2) { CompletableDeferred<Unit>() }
+        val release = List(2) { CompletableDeferred<Unit>() }
+        val loader = loader(onError = { errors.incrementAndGet() }) {
+            val index = reads.getAndIncrement()
+            entered[index].complete(Unit)
+            release[index].await()
+            throw FileNotFoundException("No album thumbnail")
+        }
+        val service = LibraryArtworkLoader(loader)
+        try {
+            compose.setContent {
+                NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
+                    LibraryArtwork(reference, "Transmission", service, Modifier.testTag("artwork"), size.value)
+                }
+            }
+            repeat(2) { index ->
+                if (index == 1) compose.runOnIdle { size.value = 160.dp }
+                compose.waitUntil(5_000) { entered[index].isCompleted }
+                awaitTopColor(Color(0xFFEDE8DC))
+                release[index].complete(Unit)
+                compose.waitUntil(5_000) { errors.get() == index + 1 }
+                awaitTopColor(Color(0xFFEDE8DC))
+            }
+            assertEquals(2, reads.get())
+        } finally { loader.shutdown() }
+    }
+
+    @Test
+    fun cachedPreviewIsRemovedWhenTheLargerRequestLosesAccess() = runBlocking {
+        val reference = ArtworkRef("external_primary:1", "v1")
+        val reads = AtomicInteger()
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val failed = CompletableDeferred<Unit>()
+        val loader = loader(onError = { failed.complete(Unit) }) {
+            if (reads.getAndIncrement() == 0) {
+                ImageFetchResult(ColorImage(Color.Red.toArgb(), 64, 64, 64 * 64 * 4L), true, DataSource.DISK)
+            } else {
+                entered.complete(Unit)
+                release.await()
+                throw SecurityException("Audio permission revoked")
+            }
+        }
+        val service = LibraryArtworkLoader(loader)
+        try {
+            assertTrue(loader.execute(checkNotNull(artworkRequest(context, reference, 64))) is SuccessResult)
+            compose.setContent {
+                NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
+                    LibraryArtwork(reference, "Transmission", service, Modifier.testTag("artwork"), size = 160.dp)
+                }
+            }
+            compose.waitUntil(5_000) { entered.isCompleted }
+            awaitTopColor(Color.Red)
+            release.complete(Unit)
+            compose.waitUntil(5_000) { failed.isCompleted }
+            awaitTopColor(Color(0xFFEDE8DC))
+            assertEquals(2, reads.get())
         } finally { loader.shutdown() }
     }
 
@@ -150,6 +263,7 @@ class LibraryArtworkInstrumentedTest {
                     }
                 }
             }
+            compose.waitUntil(5_000) { provider.reads.get() == 2 }
             awaitTopColor(Color(0xFFEDE8DC))
             assertEquals(2, provider.reads.get())
         } finally { loader.shutdown() }
@@ -177,8 +291,11 @@ class LibraryArtworkInstrumentedTest {
         } finally { loader.shutdown() }
     }
 
-    private fun loader(fetch: suspend (Uri) -> ImageFetchResult): ImageLoader = ImageLoader.Builder(context)
+    private fun loader(onError: () -> Unit = {}, fetch: suspend (Uri) -> ImageFetchResult): ImageLoader = ImageLoader.Builder(context)
         .diskCache(null)
+        .eventListener(object : EventListener() {
+            override fun onError(request: ImageRequest, result: ErrorResult) { onError() }
+        })
         .components { add(Fetcher.Factory<Uri> { data, _, _ -> Fetcher { fetch(data) } }) }
         .build()
 
