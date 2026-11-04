@@ -44,6 +44,18 @@ internal class PlayerViewModel(private val playbackController: PlaybackControlle
         on<PlayerIntent.Next> {
             if (state.supportsItemCommand(PlaybackCapability.Next)) submit(request, PlayerRequest.Transport(PlaybackCommand.Next))
         }
+        on<PlayerIntent.Previous> {
+            if (state.supportsItemCommand(PlaybackCapability.Previous)) submit(request, PlayerRequest.Transport(PlaybackCommand.Previous))
+        }
+        on<PlayerIntent.SeekTo> { intent ->
+            val snapshot = state.liveSnapshot ?: return@on
+            if (!state.supportsItemCommand(PlaybackCapability.SeekTo) || snapshot.queue.current != intent.target ||
+                intent.positionMs < 0
+            ) return@on
+            val duration = state.progress?.takeIf { it.matches(snapshot) }?.durationMs?.takeIf { it > 0 } ?: return@on
+            // Use engine duration, not catalog metadata; the service checks the captured token again.
+            submit(request, PlayerRequest.Transport(PlaybackCommand.SeekTo(intent.target, intent.positionMs.coerceAtMost(duration))))
+        }
         on<PlayerIntent.Reconnect> { submit(request, PlayerRequest.Reconnect) }
         on<PlayerIntent.RetryProblem> { intent ->
             val snapshot = state.liveSnapshot ?: return@on
