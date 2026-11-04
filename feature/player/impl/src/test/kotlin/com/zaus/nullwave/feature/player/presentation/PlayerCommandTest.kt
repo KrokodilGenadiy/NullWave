@@ -82,12 +82,14 @@ class PlayerCommandTest {
                 control(connection)
                 send(vm, PlayerIntent.SetPlayRequested(true))
                 send(vm, PlayerIntent.Next)
+                send(vm, PlayerIntent.Previous)
             }
             assertTrue(playback.calls.isEmpty())
             assertNull(vm.snapshot.value.state.commandNotice)
 
             control(connected(capabilities = setOf(PlaybackCapability.Next)))
             send(vm, PlayerIntent.SetPlayRequested(true))
+            send(vm, PlayerIntent.Previous)
             send(vm, PlayerIntent.Next)
             assertEquals(PlaybackCommand.Next, playback.calls.single().command)
             respond(AppResult.Success(Unit))
@@ -102,6 +104,7 @@ class PlayerCommandTest {
             val accepted = playback.calls.single()
 
             repeat(3) { send(vm, PlayerIntent.Next) }
+            send(vm, PlayerIntent.Previous)
             send(vm, PlayerIntent.SetPlayRequested(false))
             send(vm, PlayerIntent.Reconnect)
 
@@ -132,6 +135,7 @@ class PlayerCommandTest {
 
             control(connected())
             send(vm, PlayerIntent.Next)
+            send(vm, PlayerIntent.Previous)
             send(vm, PlayerIntent.SetPlayRequested(true))
             assertTrue(playback.calls.isEmpty())
             assertTrue(vm.snapshot.value.operations[PlayerViewModel.RequestKey].isBusy)
