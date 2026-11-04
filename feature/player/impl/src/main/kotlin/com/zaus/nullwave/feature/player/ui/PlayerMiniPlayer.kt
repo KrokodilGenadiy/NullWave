@@ -14,7 +14,6 @@ import androidx.lifecycle.compose.currentStateAsState
 import com.zaus.nullwave.core.designsystem.components.player.NullWaveMiniPlayer
 import com.zaus.nullwave.core.playback.api.PlaybackClock
 import com.zaus.nullwave.core.playback.api.command.PlaybackCapability
-import com.zaus.nullwave.core.playback.api.model.PlaybackPhase
 import com.zaus.nullwave.feature.library.api.ui.LibraryArtworkRenderer
 import com.zaus.nullwave.feature.player.impl.R
 import com.zaus.nullwave.feature.player.presentation.PlayerIntent
@@ -29,6 +28,8 @@ internal fun PlayerMiniPlayer(
     clock: PlaybackClock,
     artwork: () -> LibraryArtworkRenderer,
     lifecycleOwner: LifecycleOwner,
+    onExpand: (() -> Unit)? = null,
+    active: Boolean = true,
 ) {
     // Queue/metadata references survive progress-only emissions; never scan entries per frame.
     val queue = state.displaySnapshot?.queue
@@ -37,23 +38,23 @@ internal fun PlayerMiniPlayer(
     val lifecycle by lifecycleOwner.lifecycle.currentStateAsState()
     val live = state.liveSnapshot
     val playRequested = state.displaySnapshot?.transport?.playRequested == true
-    val progress = rememberPlayerProgress(state, clock, lifecycleOwner)
+    val progress = if (active) rememberPlayerProgress(state, clock, lifecycleOwner) else { { null } }
     NullWaveMiniPlayer(
         title = track.title,
         subtitle = track.artist ?: stringResource(R.string.player_unknown_artist),
         isPlaying = playRequested,
-        onExpand = null,
+        onExpand = onExpand.takeIf { active && lifecycle.isAtLeast(Lifecycle.State.STARTED) },
         onPlayPause = { onIntent(PlayerIntent.SetPlayRequested(!playRequested)) },
         onNext = { onIntent(PlayerIntent.Next) },
         modifier = Modifier.testTag("player_mini").alpha(if (live == null) DisconnectedAlpha else 1f),
         artwork = { renderer.Artwork(track.artwork, track.album ?: track.title, MiniArtworkSize) },
         progressProvider = progress,
-        buffering = live?.transport?.phase == PlaybackPhase.Buffering,
-        playbackEnabled = live != null && canSubmit && lifecycle.isAtLeast(Lifecycle.State.STARTED),
+        playbackEnabled = active && live != null && canSubmit && lifecycle.isAtLeast(Lifecycle.State.STARTED),
         canPlayPause = state.supportsItemCommand(PlaybackCapability.SetPlayRequested),
         canNext = state.supportsItemCommand(PlaybackCapability.Next),
-        playPauseGlowEnabled = live?.transport?.isPlaying == true,
+        playPauseGlowEnabled = false,
         progressGlowEnabled = live?.transport?.isPlaying == true,
+        reduceMotion = !active,
     )
 }
 

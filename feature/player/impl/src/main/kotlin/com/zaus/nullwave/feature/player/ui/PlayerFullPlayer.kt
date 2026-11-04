@@ -1,0 +1,207 @@
+package com.zaus.nullwave.feature.player.ui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.compose.currentStateAsState
+import com.zaus.nullwave.core.designsystem.components.control.iconButton.NullWaveIconButton
+import com.zaus.nullwave.core.designsystem.components.player.NullWaveSeekBar
+import com.zaus.nullwave.core.designsystem.components.player.NullWaveTransportControls
+import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
+import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
+import com.zaus.nullwave.core.playback.api.PlaybackClock
+import com.zaus.nullwave.core.playback.api.command.PlaybackCapability
+import com.zaus.nullwave.feature.library.api.ui.LibraryArtworkRenderer
+import com.zaus.nullwave.feature.library.api.ui.libraryDuration
+import com.zaus.nullwave.feature.player.impl.R
+import com.zaus.nullwave.feature.player.presentation.PlayerIntent
+import com.zaus.nullwave.feature.player.presentation.PlayerState
+import com.zaus.nullwave.core.designsystem.R as DesignR
+
+/** Sheet content only: the Activity host owns expansion, collection and the shared Player VM. */
+@Composable
+internal fun PlayerFullPlayer(
+    state: PlayerState,
+    canSubmit: Boolean,
+    onIntent: (PlayerIntent) -> Unit,
+    clock: PlaybackClock,
+    artwork: () -> LibraryArtworkRenderer,
+    lifecycleOwner: LifecycleOwner,
+    onClose: () -> Unit,
+    onOpenLibrary: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val queue = state.displaySnapshot?.queue
+    // The engine emits progress frequently; metadata/order scans only belong to queue changes.
+    val track = remember(queue) { state.currentTrack }
+    val queuePosition = remember(queue) {
+        queue?.current?.let { queue.playOrder.indexOf(it.entryId) + 1 }
+    }
+    val renderer = remember(artwork) { artwork() }
+    val lifecycle by lifecycleOwner.lifecycle.currentStateAsState()
+    val active = lifecycle.isAtLeast(Lifecycle.State.STARTED)
+    val spacing = NullWaveTheme.spacing
+    Column(modifier.fillMaxSize().background(NullWaveTheme.colors.bg).testTag("player_full")) {
+        // Close stays outside the scroll viewport, including when text and notices grow.
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = spacing.xs, vertical = spacing.xxs),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            NullWaveIconButton(
+                icon = NullWaveIcons.Collapse,
+                contentDescription = stringResource(R.string.player_collapse),
+                onClick = onClose,
+                modifier = Modifier.testTag("player_full_close"),
+            )
+            Text(
+                text = if (queuePosition == null || queue == null) stringResource(R.string.player_now_playing)
+                    else stringResource(R.string.player_queue_position, queuePosition, queue.playOrder.size),
+                modifier = Modifier.weight(1f),
+                color = NullWaveTheme.colors.textSecondary,
+                style = NullWaveTheme.typography.mono,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.size(NullWaveTheme.dimens.touchTarget))
+        }
+        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+            val artworkSize = minOf(
+                MaxArtworkSize,
+                (maxWidth - spacing.lg * 2).coerceAtLeast(1.dp),
+                (maxHeight * ArtworkHeightFraction).coerceAtLeast(MinArtworkSize),
+            )
+            val noticeMaxHeight = maxOf(maxHeight / 3, NullWaveTheme.dimens.touchTarget).coerceAtMost(maxHeight)
+            Column(Modifier.fillMaxSize()) {
+                Column(
+                    Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).testTag("player_full_scroll")
+                        .padding(horizontal = spacing.lg, vertical = spacing.xs),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(spacing.lg),
+                ) {
+                    if (track == null) {
+                        Text(
+                            stringResource(R.string.player_no_track),
+                            color = NullWaveTheme.colors.textSecondary,
+                            style = NullWaveTheme.typography.body,
+                        )
+                    } else {
+                        renderer.Artwork(
+                            track.artwork,
+                            track.album ?: track.title,
+                            artworkSize,
+                            Modifier.testTag("player_full_artwork"),
+                        )
+                        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(spacing.xxs)) {
+                            Text(
+                                track.title,
+                                Modifier.testTag("player_full_title"),
+                                color = NullWaveTheme.colors.textPrimary,
+                                style = NullWaveTheme.typography.display,
+                            )
+                            val artist = track.artist ?: stringResource(R.string.player_unknown_artist)
+                            Text(
+                                text = track.album?.let { stringResource(R.string.player_artist_album, artist, it) } ?: artist,
+                                color = NullWaveTheme.colors.textSecondary,
+                                style = NullWaveTheme.typography.body,
+                            )
+                        }
+                        PlayerFullControls(state, canSubmit && active, onIntent, clock)
+                    }
+                }
+                // A late failure is visible without moving the artwork/controls scroll position.
+                PlayerScrollableNotice(
+                    state, canSubmit && active, onIntent, onOpenLibrary,
+                    Modifier.fillMaxWidth().heightIn(max = noticeMaxHeight),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlayerFullControls(
+    state: PlayerState,
+    canSubmit: Boolean,
+    onIntent: (PlayerIntent) -> Unit,
+    clock: PlaybackClock,
+) {
+    val live = state.liveSnapshot
+    val target = live?.queue?.current
+    val anchor = state.progress?.takeIf { live != null && it.matches(live) }
+    val duration = anchor?.durationMs
+    val position = state.positionAt(clock.nowMs())
+    val enabled = live != null && canSubmit
+    val seekEnabled = enabled && duration != null && duration > 0L &&
+        state.supportsItemCommand(PlaybackCapability.SeekTo)
+    val playRequested = state.displaySnapshot?.transport?.playRequested == true
+    val unknownTime = stringResource(DesignR.string.nw_time_unknown)
+
+    // Full token equality includes session and activation: an old gesture cannot seek a new item.
+    // Availability also includes lifecycle/busy/capability, so losing any of them cancels the draft.
+    val source = remember(target, duration, seekEnabled) { MutableInteractionSource() }
+    val dragged by key(source) { source.collectIsDraggedAsState() }
+    var scrubPosition by remember(source) { mutableStateOf<Long?>(null) }
+    val scrubbing = seekEnabled && (dragged || scrubPosition != null)
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.md)) {
+        key(source) {
+            NullWaveSeekBar(
+                mediaKey = "full-player",
+                positionMs = position ?: 0L,
+                durationMs = duration,
+                onSeek = { destination ->
+                    if (seekEnabled && target != null) onIntent(PlayerIntent.SeekTo(target, destination))
+                },
+                // Zero is only the disabled track's drawing origin; an absent engine anchor stays unknown.
+                formatTime = { if (position == null) unknownTime else libraryDuration(it).orEmpty() },
+                modifier = Modifier.fillMaxWidth().testTag("player_full_seek"),
+                enabled = seekEnabled,
+                onScrubPositionChange = { scrubPosition = it },
+                interactionSource = source,
+                glowEnabled = scrubbing,
+            )
+        }
+        // Transport keeps its focus/interaction nodes when only the seek session changes.
+        NullWaveTransportControls(
+            isPlaying = playRequested,
+            onPlayPause = { onIntent(PlayerIntent.SetPlayRequested(!playRequested)) },
+            onPrevious = { onIntent(PlayerIntent.Previous) },
+            onNext = { onIntent(PlayerIntent.Next) },
+            modifier = Modifier.testTag("player_full_transport").padding(vertical = NullWaveTheme.spacing.xs),
+            enabled = enabled,
+            canPlayPause = state.supportsItemCommand(PlaybackCapability.SetPlayRequested),
+            canPrevious = state.supportsItemCommand(PlaybackCapability.Previous),
+            canNext = state.supportsItemCommand(PlaybackCapability.Next),
+            playPauseGlowEnabled = live?.transport?.isPlaying == true && !scrubbing,
+        )
+    }
+}
+
+private val MaxArtworkSize = 364.dp
+private val MinArtworkSize = 96.dp
+private const val ArtworkHeightFraction = 0.45f

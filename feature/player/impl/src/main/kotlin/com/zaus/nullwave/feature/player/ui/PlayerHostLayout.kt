@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
 /**
@@ -16,17 +17,19 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 @Composable
 internal fun PlayerHostLayout(
     modifier: Modifier = Modifier,
+    controlsVisible: Boolean = true,
     notice: @Composable () -> Unit,
     miniPlayer: @Composable () -> Unit,
     content: @Composable () -> Unit,
 ) {
     val minimumNoticeViewport = NullWaveTheme.dimens.touchTarget
+    val controlsSemantics = if (controlsVisible) Modifier else Modifier.clearAndSetSemantics { }
     Layout(
         modifier = modifier,
         content = {
             Box(Modifier.testTag("player_content"), propagateMinConstraints = true) { content() }
-            Box(Modifier.testTag("player_notice_viewport"), propagateMinConstraints = true) { notice() }
-            Box(propagateMinConstraints = true) { miniPlayer() }
+            Box(controlsSemantics.testTag("player_notice_viewport"), propagateMinConstraints = true) { notice() }
+            Box(controlsSemantics, propagateMinConstraints = true) { miniPlayer() }
         },
     ) { measurables, constraints ->
         val loose = constraints.copy(minHeight = 0)
@@ -38,8 +41,11 @@ internal fun PlayerHostLayout(
         val contentPlaceable = measurables[0].measure(loose.copy(minHeight = contentHeight, maxHeight = contentHeight))
         layout(constraints.maxWidth, constraints.maxHeight) {
             contentPlaceable.placeRelative(0, 0)
-            noticePlaceable.placeRelative(0, contentHeight)
-            mini.placeRelative(0, contentHeight + noticePlaceable.height)
+            // A modal player covers these slots; retain their size so the underlying list stays put.
+            if (controlsVisible) {
+                noticePlaceable.placeRelative(0, contentHeight)
+                mini.placeRelative(0, contentHeight + noticePlaceable.height)
+            }
         }
     }
 }

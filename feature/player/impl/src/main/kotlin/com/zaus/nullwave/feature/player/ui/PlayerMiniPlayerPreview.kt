@@ -103,7 +103,7 @@ private fun previewPlayerState(
         sessionId = session,
         revision = 0,
         queue = PlaybackQueue.create(entries = listOf(entry), current = target),
-        transport = PlaybackTransport(PlaybackPhase.Ready, playRequested = playing,
+        transport = PlaybackTransport(if (problem == null) PlaybackPhase.Ready else PlaybackPhase.Idle, playRequested = playing,
             problem = problem?.let { PlaybackProblem(PlaybackProblemId("preview-problem"), it, target) }),
         positionRevision = 0,
         capabilities = if (problem == null) setOf(PlaybackCapability.SetPlayRequested, PlaybackCapability.Next) else emptySet(),

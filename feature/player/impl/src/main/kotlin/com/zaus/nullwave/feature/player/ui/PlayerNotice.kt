@@ -2,7 +2,10 @@ package com.zaus.nullwave.feature.player.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -22,6 +25,22 @@ import com.zaus.nullwave.core.playback.api.model.PlaybackProblemCode
 import com.zaus.nullwave.feature.player.impl.R
 import com.zaus.nullwave.feature.player.presentation.PlayerIntent
 import com.zaus.nullwave.feature.player.presentation.PlayerState
+
+/** Both player surfaces reset long-message scrolling only when the displayed occurrence changes. */
+@Composable
+internal fun PlayerScrollableNotice(
+    state: PlayerState,
+    canSubmit: Boolean,
+    onIntent: (PlayerIntent) -> Unit,
+    onOpenLibrary: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val noticeKey = state.commandNotice?.id ?: (state.connection as? PlaybackConnection.Unavailable)?.reason
+        ?: state.problemKey.takeIf { state.visibleProblem != null }
+    key(noticeKey) {
+        PlayerNotice(state, canSubmit, onIntent, onOpenLibrary, modifier.verticalScroll(rememberScrollState()))
+    }
+}
 
 /** One persistent notice: local command failure, unavailable connection, then engine problem. */
 @Composable
