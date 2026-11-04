@@ -30,6 +30,7 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration.Companion.milliseconds
 
 /** App-scoped facade. Construction is inert; observation, reconnect and commands acquire UI leases. */
 @UnstableApi
@@ -100,7 +101,7 @@ private class ConnectedController(
         }
         // These bounded cleanup jobs survive UI cancellation. They never sample progress or own audio.
         val expiry = cleanupScope.launch {
-            delay(PlaybackSessionProtocol.COMMAND_TIMEOUT_MS)
+            delay(PlaybackSessionProtocol.COMMAND_TIMEOUT_MS.milliseconds)
             tickets.expire(ticket.id)
         }
         future.addListener({
@@ -115,7 +116,7 @@ private class ConnectedController(
         future: ListenableFuture<SessionResult>,
     ): EmptyResult<PlaybackCommandError> {
         val response = try {
-            withTimeout(PlaybackSessionProtocol.COMMAND_TIMEOUT_MS) { future.awaitPlaybackResult() }
+            withTimeout(PlaybackSessionProtocol.COMMAND_TIMEOUT_MS.milliseconds) { future.awaitPlaybackResult() }
         } catch (failure: TimeoutCancellationException) {
             // A service may already own the request: timing out this wait is not rollback.
             return AppResult.Failure(PlaybackCommandError.ConnectionUnavailable, failure)
