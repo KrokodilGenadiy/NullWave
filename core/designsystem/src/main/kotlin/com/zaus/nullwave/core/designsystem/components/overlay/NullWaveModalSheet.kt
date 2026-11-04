@@ -23,6 +23,7 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
  * Remove it in [onDismissRequest]; for an explicit close, await sheetState.hide(), then remove it
  * only if !sheetState.isVisible (a supplied state's confirmValueChange may veto hiding).
  * [properties] controls Back/scrim; [sheetGesturesEnabled] controls dragging, not explicit actions.
+ * [showDragHandle] can omit Material's handle and its reserved height when content owns closing.
  * Material handles IME and [contentWindowInsets]; do not add the host screen's insets a second time.
  * Content owns padding and scrolling: use a bounded verticalScroll Column or LazyColumn as needed.
  */
@@ -36,6 +37,7 @@ fun NullWaveModalSheet(
     properties: ModalBottomSheetProperties = ModalBottomSheetProperties(),
     contentWindowInsets: @Composable () -> WindowInsets = { BottomSheetDefaults.windowInsets },
     borderStyle: NullWaveBorderStyle = NullWaveBorderStyle.Closed,
+    showDragHandle: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = NullWaveTheme.colors
@@ -56,9 +58,9 @@ fun NullWaveModalSheet(
         containerColor = colors.surface,
         contentColor = colors.textPrimary,
         tonalElevation = 0.dp,
-        dragHandle = {
-            BottomSheetDefaults.DragHandle(shape = RectangleShape, color = colors.textSecondary)
-        },
+        dragHandle = if (showDragHandle) {
+            { BottomSheetDefaults.DragHandle(shape = RectangleShape, color = colors.textSecondary) }
+        } else null,
         contentWindowInsets = contentWindowInsets,
         content = content,
     )

@@ -25,8 +25,8 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
  * Timeline with time labels. [mediaKey] identifies the current item and cancels stale scrubbing.
  * Null/zero duration disables seeking; negative duration is invalid (map engine sentinels to null).
  * [formatTime] is a pure, localized formatter of nonnegative milliseconds, owned by the caller.
- * Playback updates cannot overwrite a pending scrub. [onSeek] fires once at completion; the caller
- * should immediately reflect that position in its UI while the engine applies the command.
+ * Playback updates cannot overwrite a pending scrub. [onSeek] fires once at completion, then
+ * the control returns to the supplied [positionMs]; command acknowledgement belongs to the caller.
  * [onScrubPositionChange] receives preview milliseconds, then null at completion/cancellation.
  * [waveform] is an immutable list of normalized peaks, not audio samples. Empty uses a plain track.
  * The same thin playhead marks the exact position at rest and while scrubbing; no visible thumb
