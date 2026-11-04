@@ -98,6 +98,7 @@ internal class PlayerHostActivityFixture(
     val viewport: DpSize? = null,
     val fontScale: Float? = null,
     val locale: Locale? = null,
+    val content: (@Composable () -> Unit)? = null,
 ) {
     val playback = RecordingHostPlaybackController()
     val artwork = RecordingHostArtworkRenderer()
@@ -137,7 +138,10 @@ class PlayerHostTestActivity : ComponentActivity() {
                 NullWaveTheme(effects = NullWaveEffects(reduceMotion = true, glowEnabled = false)) {
                     val viewport = activeFixture.viewport
                     Box(if (viewport == null) Modifier else Modifier.size(viewport.width, viewport.height).testTag("host_test_viewport")) {
-                        if (activeFixture.hostVisible.value) {
+                        val customContent = activeFixture.content
+                        if (customContent != null) {
+                            customContent()
+                        } else if (activeFixture.hostVisible.value) {
                             activeFixture.graph.playerHost.Content(
                                 owner = this@PlayerHostTestActivity,
                                 lifecycleOwner = this@PlayerHostTestActivity,
@@ -217,6 +221,8 @@ internal class RecordingHostPlaybackController : PlaybackController {
     val progressStarts = AtomicInteger()
     val activeStates = AtomicInteger()
     val activeProgress = AtomicInteger()
+    val maxActiveStates = AtomicInteger()
+    val maxActiveProgress = AtomicInteger()
     val commands = mutableListOf<PlaybackCommand>()
     var commandReply: EmptyResult<PlaybackCommandError> = AppResult.Success(Unit)
     var commandGate: CompletableDeferred<Unit>? = null
@@ -224,13 +230,13 @@ internal class RecordingHostPlaybackController : PlaybackController {
 
     override fun observeState(): Flow<PlaybackConnection> = flow {
         stateStarts.incrementAndGet()
-        activeStates.incrementAndGet()
+        maxActiveStates.accumulateAndGet(activeStates.incrementAndGet(), ::maxOf)
         try { emitAll(connection) } finally { activeStates.decrementAndGet() }
     }
 
     override fun observeProgress(): Flow<PlaybackProgress?> = flow {
         progressStarts.incrementAndGet()
-        activeProgress.incrementAndGet()
+        maxActiveProgress.accumulateAndGet(activeProgress.incrementAndGet(), ::maxOf)
         try { emitAll(progress) } finally { activeProgress.decrementAndGet() }
     }
 

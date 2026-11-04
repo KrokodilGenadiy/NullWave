@@ -5,6 +5,7 @@ import android.graphics.Rect
 import android.view.KeyEvent
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.assertIsDisplayed
@@ -44,9 +45,11 @@ import com.zaus.nullwave.core.playback.api.model.PlaybackTransport
 import com.zaus.nullwave.core.playback.api.model.QueueEntry
 import com.zaus.nullwave.core.playback.api.model.QueueEntryId
 import com.zaus.nullwave.feature.player.impl.R
+import com.zaus.nullwave.feature.player.presentation.PlayerViewModel
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -74,7 +77,7 @@ class PlayerMiniPlayerInstrumentedTest {
         val activity = launch()
 
         compose.onNodeWithTag("player_mini").assertIsDisplayed()
-        compose.onNodeWithText(track.title).assertIsDisplayed().assert(!hasClickAction())
+        compose.onNodeWithText(track.title).assertIsDisplayed().assert(hasClickAction())
         compose.onNodeWithText(track.artist!!).assertIsDisplayed()
         awaitStrip(filledAt = 0.20f, emptyAt = 0.80f)
         var artworkCompositions = 0
@@ -110,11 +113,24 @@ class PlayerMiniPlayerInstrumentedTest {
 
     @Test
     fun transportUsesExplicitPlayIntentAndIndependentCapabilitiesWhileBusyBlocksBothActions() {
-        fixture.playback.connection.value = PlaybackConnection.Connected(snapshot(playRequested = true, phase = PlaybackPhase.Buffering))
+        fixture.playback.connection.value = PlaybackConnection.Connected(snapshot(playRequested = true))
         val activity = launch()
         val gate = CompletableDeferred<Unit>()
-        activity.onActivity { fixture.playback.commandGate = gate }
-        action(DesignSystemR.string.nw_player_pause).assertIsEnabled().performClick()
+        lateinit var model: PlayerViewModel
+        activity.onActivity {
+            model = it.playerViewModel()
+            fixture.playback.connection.value = PlaybackConnection.Connected(snapshot(playRequested = true, phase = PlaybackPhase.Buffering))
+            fixture.playback.commandGate = gate
+        }
+        // Do not pass just because the unchanged Pause action is still rendered from Ready.
+        compose.waitUntil(5_000) {
+            model.snapshot.value.state.liveSnapshot?.transport?.phase == PlaybackPhase.Buffering
+        }
+        val pause = action(DesignSystemR.string.nw_player_pause).assertIsEnabled()
+        assertFalse("Engine buffering must not add a UI state announcement",
+            pause.fetchSemanticsNode().config.contains(SemanticsProperties.StateDescription))
+        action(DesignSystemR.string.nw_player_play).assertDoesNotExist()
+        pause.performClick()
         action(DesignSystemR.string.nw_player_pause).assertIsNotEnabled()
         action(DesignSystemR.string.nw_player_next).assertIsNotEnabled()
         activity.onActivity {
