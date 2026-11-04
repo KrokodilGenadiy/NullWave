@@ -14,8 +14,9 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import coil3.compose.AsyncImagePainter
+import coil3.compose.asPainter
 import coil3.compose.rememberAsyncImagePainter
-import com.zaus.nullwave.core.designsystem.components.content.NullWaveArtworkPlaceholder
+import coil3.memory.MemoryCache
 import com.zaus.nullwave.core.designsystem.components.content.NullWaveCoverArt
 import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.core.media.model.ArtworkRef
@@ -51,21 +52,28 @@ internal fun LibraryArtwork(
     }
     // A recycled row must never retain another album's previous painter/state.
     key(request, loader) {
+        // Reuse this exact artwork revision while Coil obtains a larger image for a card/player.
+        // Empty is also covered: AsyncImagePainter may draw a memory hit before state collection.
+        val cachedPainter = remember(request, loader) {
+            request.memoryCacheKey?.let { cacheKey ->
+                loader.imageLoader.memoryCache?.get(MemoryCache.Key(cacheKey))?.image?.asPainter(context)
+            }
+        }
         val painter = rememberAsyncImagePainter(request, loader.imageLoader, contentScale = ContentScale.Crop)
         val state by painter.state.collectAsState()
         // Album thumbnails are optional. Provider/decode failures don't reliably distinguish
-        // missing art from unreadable art; both use a monogram, not a track-error warning.
-        val placeholder = when (state) {
-            is AsyncImagePainter.State.Success,
-            is AsyncImagePainter.State.Error -> NullWaveArtworkPlaceholder.Missing
-            else -> NullWaveArtworkPlaceholder.Loading
+        // missing art from unreadable art. A stable monogram also avoids a loading flash when
+        // another surface retries an absent thumbnail; failures are still retried, not cached.
+        val displayedPainter = when (state) {
+            is AsyncImagePainter.State.Success -> painter
+            is AsyncImagePainter.State.Error -> null
+            else -> cachedPainter
         }
         NullWaveCoverArt(
             modifier = modifier,
             size = size,
-            painter = if (state is AsyncImagePainter.State.Success) painter else null,
+            painter = displayedPainter,
             monogram = monogram,
-            placeholder = placeholder,
         )
     }
 }
