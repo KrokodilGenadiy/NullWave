@@ -10,7 +10,7 @@ import androidx.compose.ui.unit.dp
 
 /** Component-local halo tokens. Static decoration; no elevation, layout or semantics changes. */
 internal enum class PlayerGlow(val radius: Dp, val alpha: Float) {
-    Hero(28.dp, 0.45f),
+    Hero(16.dp, 0.20f),
     Compact(12.dp, 0.35f),
 }
 

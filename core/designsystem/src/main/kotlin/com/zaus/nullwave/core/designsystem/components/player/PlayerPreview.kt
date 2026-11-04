@@ -57,8 +57,7 @@ private fun RtlPlayerPreview() {
 private fun PlayerSheet(variant: NullWaveColorVariant) {
     NullWaveTheme(variant = variant) {
         var playing by remember { mutableStateOf(false) }
-        var loadingPlaying by remember { mutableStateOf(true) }
-        var buffering by remember { mutableStateOf(false) }
+        var unknownDurationPlaying by remember { mutableStateOf(true) }
         var enabled by remember { mutableStateOf(true) }
         var canSkip by remember { mutableStateOf(true) }
         var reduced by remember { mutableStateOf(false) }
@@ -86,7 +85,6 @@ private fun PlayerSheet(variant: NullWaveColorVariant) {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.sm)) {
                 Column(Modifier.padding(horizontal = NullWaveTheme.dimens.gutter), verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.xs)) {
                     Text("Play: $plays · Prev: $previous · Next: $next\nExpand: $expands · Shuffle: $shuffleClicks · Repeat: $repeatClicks", style = NullWaveTheme.typography.mono)
-                    NullWaveButton("Buffering: $buffering", { buffering = !buffering })
                     NullWaveButton("Playback enabled: $enabled", { enabled = !enabled })
                     NullWaveButton("Previous / Next: $canSkip", { canSkip = !canSkip })
                     NullWaveButton("Reduce motion: $reduced", { reduced = !reduced })
@@ -96,33 +94,33 @@ private fun PlayerSheet(variant: NullWaveColorVariant) {
                     NullWaveSectionHeader("PlayPause / Hero, Compact, disabled")
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.md), verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.sm),
                         itemVerticalAlignment = Alignment.CenterVertically) {
-                        NullWavePlayPauseButton(playing, play, focus.modifier, buffering, enabled, reduceMotion = reduced)
-                        NullWavePlayPauseButton(playing, play, buffering = buffering, enabled = enabled, size = NullWavePlayPauseButtonSize.Compact, reduceMotion = reduced)
-                        NullWavePlayPauseButton(true, { plays++ }, buffering = true, enabled = false, reduceMotion = reduced)
+                        NullWavePlayPauseButton(playing, play, focus.modifier, enabled = enabled)
+                        NullWavePlayPauseButton(playing, play, enabled = enabled, size = NullWavePlayPauseButtonSize.Compact)
+                        NullWavePlayPauseButton(true, { plays++ }, enabled = false)
                     }
                     NullWaveSectionHeader("Transport / Shuffle + Repeat")
-                    NullWaveTransportControls(playing, play, { previous++ }, { next++ }, buffering = buffering, enabled = enabled,
+                    NullWaveTransportControls(playing, play, { previous++ }, { next++ }, enabled = enabled,
                         canPrevious = canSkip, canNext = canSkip, shuffle = shuffled,
-                        onShuffleChange = { shuffled = it; shuffleClicks++ }, repeatMode = repeat, onRepeatClick = cycleRepeat, reduceMotion = reduced)
+                        onShuffleChange = { shuffled = it; shuffleClicks++ }, repeatMode = repeat, onRepeatClick = cycleRepeat)
                     Text("Shuffle: $shuffled · Repeat: $repeat", style = NullWaveTheme.typography.mono)
                     NullWaveSectionHeader("Transport / узкий контейнер 240 dp")
                     NullWaveTransportControls(playing, play, { previous++ }, { next++ }, Modifier.width(240.dp),
-                        buffering = buffering, enabled = enabled, canPrevious = canSkip, canNext = canSkip,
+                        enabled = enabled, canPrevious = canSkip, canNext = canSkip,
                         shuffle = shuffled, onShuffleChange = { shuffled = it; shuffleClicks++ },
-                        repeatMode = repeat, onRepeatClick = cycleRepeat, reduceMotion = reduced)
+                        repeatMode = repeat, onRepeatClick = cycleRepeat)
                     NullWaveSectionHeader("Transport / только основные действия")
-                    NullWaveTransportControls(playing, play, { previous++ }, { next++ }, buffering = buffering, enabled = enabled,
-                        canPrevious = canSkip, canNext = canSkip, reduceMotion = reduced)
+                    NullWaveTransportControls(playing, play, { previous++ }, { next++ }, enabled = enabled,
+                        canPrevious = canSkip, canNext = canSkip)
                     NullWaveSectionHeader("MiniPlayer / длинные теги")
                 }
                 NullWaveMiniPlayer(
                     "Очень длинное название трека / A very long night drive across the city", playing, { expands++ }, play, { next++ },
                     subtitle = "Ночной Вектор · исполнитель с длинным именем", artwork = { NullWaveCoverArt(monogram = "НВ") },
-                    progress = progress, buffering = buffering, playbackEnabled = enabled, canNext = canSkip, reduceMotion = reduced,
+                    progress = progress, playbackEnabled = enabled, canNext = canSkip, reduceMotion = reduced,
                 )
-                NullWaveMiniPlayer("Загрузка трека", loadingPlaying, { expands++ }, { loadingPlaying = !loadingPlaying; plays++ }, { next++ }, subtitle = "Static Pilgrim",
+                NullWaveMiniPlayer("Длительность неизвестна", unknownDurationPlaying, { expands++ }, { unknownDurationPlaying = !unknownDurationPlaying; plays++ }, { next++ }, subtitle = "Static Pilgrim",
                     artwork = { NullWaveCoverArt(placeholder = NullWaveArtworkPlaceholder.Loading, reduceMotion = reduced) },
-                    progress = null, buffering = true, canNext = false, reduceMotion = reduced)
+                    progress = null, canNext = false, reduceMotion = reduced)
                 NullWaveMiniPlayer("Playback недоступен / открыть детали можно", false, { expands++ }, { plays++ }, { next++ },
                     progress = 0.25f, playbackEnabled = false, reduceMotion = reduced)
                 Text("У недоступных transport кнопок нажатия не должны увеличивать Expand.",

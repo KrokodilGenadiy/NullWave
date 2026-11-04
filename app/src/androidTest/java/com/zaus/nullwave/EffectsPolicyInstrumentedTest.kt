@@ -5,14 +5,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.MotionDurationScale
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -27,17 +22,14 @@ import com.zaus.nullwave.core.designsystem.components.player.NullWavePlayPauseBu
 import com.zaus.nullwave.core.designsystem.theme.NullWaveEffects
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
 /** Theme wiring and rendered decoration regressions; device execution is a separate manual step. */
 class EffectsPolicyInstrumentedTest {
-    private val motionScale = TestMotionScale()
-
     @get:Rule
-    val compose = createComposeRule(effectContext = motionScale)
+    val compose = createComposeRule()
 
     @Test
     fun nestedThemesFollowLiveParentRestrictionsAndCannotRelaxThem() {
@@ -108,36 +100,15 @@ class EffectsPolicyInstrumentedTest {
         assertTrue("Re-enabling effects must update the existing composition", haloBrightness() > unlit + 0.01f)
     }
 
-    @Test
-    fun liveSystemScaleZeroFreezesBufferingEvenWithPermissiveTheme() {
-        compose.mainClock.autoAdvance = false
-        compose.setContent {
-            NullWaveTheme(effects = NullWaveEffects.Default) {
-                HaloFixture {
-                    NullWavePlayPauseButton(true, {}, buffering = true, glowEnabled = false)
-                }
-            }
-        }
-        compose.mainClock.advanceTimeByFrame()
-        val movingStart = fixtureImage()
-        compose.mainClock.advanceTimeBy(300)
-        assertFalse("The test must first observe a running scanner", samePixels(movingStart, fixtureImage()))
-
-        compose.runOnIdle { motionScale.factor = 0f }
-        compose.mainClock.advanceTimeByFrame()
-        val stopped = fixtureImage()
-        compose.mainClock.advanceTimeBy(300)
-        assertTrue("System scale zero must stop decoration without rebuilding the theme", samePixels(stopped, fixtureImage()))
-    }
-
     private fun fixtureImage() = compose.onNodeWithTag("halo-fixture").captureToImage()
 
     private fun haloBrightness(): Float {
         val pixels = fixtureImage().toPixelMap()
         var sum = 0f
         var count = 0
-        // This band is outside the 76 dp button in the 160 dp fixture: only its halo reaches here.
-        for (y in (pixels.height * 0.17f).toInt()..(pixels.height * 0.22f).toInt()) {
+        // The 76 dp button starts at y=42 dp in this 160 dp fixture. Sample 37–40 dp:
+        // outside its top edge/border, but close enough to measure the restrained hero halo.
+        for (y in (pixels.height * (37f / 160f)).toInt()..(pixels.height * (40f / 160f)).toInt()) {
             for (x in (pixels.width * 0.4f).toInt()..(pixels.width * 0.6f).toInt()) {
                 val color = pixels[x, y]
                 sum += (color.red + color.green + color.blue) / 3f
@@ -158,19 +129,4 @@ private fun EffectsProbe(name: String, observed: MutableMap<String, NullWaveEffe
 private fun HaloFixture(content: @Composable () -> Unit) {
     Box(Modifier.size(160.dp).background(NullWaveTheme.colors.bg).testTag("halo-fixture"),
         contentAlignment = Alignment.Center) { content() }
-}
-
-private class TestMotionScale : MotionDurationScale {
-    var factor by mutableFloatStateOf(1f)
-    override val scaleFactor: Float get() = factor
-}
-
-private fun samePixels(first: ImageBitmap, second: ImageBitmap): Boolean {
-    if (first.width != second.width || first.height != second.height) return false
-    val a = first.toPixelMap()
-    val b = second.toPixelMap()
-    for (y in 0 until a.height) for (x in 0 until a.width) {
-        if (a[x, y] != b[x, y]) return false
-    }
-    return true
 }

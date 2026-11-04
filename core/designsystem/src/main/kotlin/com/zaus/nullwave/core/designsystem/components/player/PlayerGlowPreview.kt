@@ -67,7 +67,6 @@ private fun RtlPlayerGlowPreview() {
 private fun PlayerGlowSheet(variant: NullWaveColorVariant) {
     NullWaveTheme(variant = variant) {
         var playing by remember { mutableStateOf(true) }
-        var buffering by remember { mutableStateOf(false) }
         var enabled by remember { mutableStateOf(true) }
         var effects by remember { mutableStateOf(true) }
         var buttonEffects by remember { mutableStateOf(true) }
@@ -144,7 +143,6 @@ private fun PlayerGlowSheet(variant: NullWaveColorVariant) {
                         onPrevious = changeMedia,
                         onNext = changeMedia,
                         modifier = Modifier.padding(vertical = spacing.md),
-                        buffering = buffering,
                         enabled = enabled,
                         shuffle = shuffled,
                         onShuffleChange = { shuffled = it },
@@ -156,7 +154,6 @@ private fun PlayerGlowSheet(variant: NullWaveColorVariant) {
                                 NullWaveRepeatMode.One -> NullWaveRepeatMode.Off
                             }
                         },
-                        reduceMotion = reduced,
                         playPauseGlowEnabled = playGlow,
                     )
                     Text("Основной акцент: ${when {
@@ -179,7 +176,6 @@ private fun PlayerGlowSheet(variant: NullWaveColorVariant) {
                     subtitle = "Static Pilgrim — Nullwave EP",
                     artwork = { NullWaveCoverArt(monogram = "NW") },
                     progress = progress,
-                    buffering = buffering,
                     playbackEnabled = enabled,
                     reduceMotion = reduced,
                     playPauseGlowEnabled = playGlow,
@@ -203,7 +199,6 @@ private fun PlayerGlowSheet(variant: NullWaveColorVariant) {
                         NullWaveButton("100%", { duration?.let { position = it } }, enabled = durationKnown)
                     }
                     NullWaveButton("Reduce motion: $reduced", { reduced = !reduced })
-                    NullWaveButton("Buffering: $buffering", { buffering = !buffering })
                     NullWaveButton("Playback enabled: $enabled", { enabled = !enabled })
                     NullWaveButton("Duration: ${duration?.let(::glowPreviewTime) ?: "unknown"}", { durationKnown = !durationKnown })
                     Text("После запуска таймера начни drag и удерживай. При смене трека scrub исчезает, " +
@@ -218,20 +213,20 @@ private fun PlayerGlowSheet(variant: NullWaveColorVariant) {
                     ) {
                         NullWavePlayPauseButton(
                             isPlaying = playing, onClick = play, modifier = focus.modifier,
-                            buffering = buffering, enabled = enabled, reduceMotion = reduced, glowEnabled = playGlow,
+                            enabled = enabled, glowEnabled = playGlow,
                         )
                         NullWavePlayPauseButton(
                             isPlaying = playing, onClick = play, size = NullWavePlayPauseButtonSize.Compact,
-                            buffering = buffering, enabled = enabled, reduceMotion = reduced, glowEnabled = false,
+                            enabled = enabled, glowEnabled = false,
                         )
                         NullWavePlayPauseButton(
                             isPlaying = true, onClick = { plays++ }, size = NullWavePlayPauseButtonSize.Compact,
-                            buffering = true, enabled = false, reduceMotion = reduced, glowEnabled = true,
+                            enabled = false, glowEnabled = true,
                         )
                     }
                     NullWaveButton("Фокус на Hero в сравнении", focus::requestFocus)
                     Text(focus.status, style = NullWaveTheme.typography.mono)
-                    Text("Glow статичен: Reduce motion останавливает scanner буферизации, а свечение остаётся. " +
+                    Text("Glow статичен: Reduce motion останавливает бегущую строку, а свечение остаётся. " +
                         "Выключение Glow не убирает focus border и тонкий playhead.",
                         style = NullWaveTheme.typography.caption)
                 }

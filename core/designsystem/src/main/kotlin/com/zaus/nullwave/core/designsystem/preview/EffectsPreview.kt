@@ -114,7 +114,6 @@ private fun EffectsSheet(variant: NullWaveColorVariant) {
                         onNext = { nexts++ },
                         subtitle = "Оригинальный demo-трек",
                         progress = 0.38f,
-                        buffering = true,
                     )
                     Column(Modifier.padding(horizontal = gutter), verticalArrangement = Arrangement.spacedBy(spacing.md)) {
                         NullWaveSectionHeader("Seek и readout")
@@ -137,19 +136,19 @@ private fun EffectsSheet(variant: NullWaveColorVariant) {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm), verticalArrangement = Arrangement.spacedBy(spacing.md)) {
                             Column(Modifier.width(128.dp), verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
                                 Text("Local OFF", style = NullWaveTheme.typography.caption)
-                                NullWavePlayPauseButton(playing, play, buffering = true,
-                                    size = NullWavePlayPauseButtonSize.Compact, reduceMotion = true, glowEnabled = false)
+                                NullWavePlayPauseButton(playing, play,
+                                    size = NullWavePlayPauseButtonSize.Compact, glowEnabled = false)
                             }
                             Column(Modifier.width(128.dp), verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
                                 Text("Child defaults", style = NullWaveTheme.typography.caption)
                                 NullWaveTheme(variant = variant, effects = NullWaveEffects()) {
-                                    NullWavePlayPauseButton(playing, play, buffering = true, size = NullWavePlayPauseButtonSize.Compact)
+                                    NullWavePlayPauseButton(playing, play, size = NullWavePlayPauseButtonSize.Compact)
                                 }
                             }
                             Column(Modifier.width(128.dp), verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
                                 Text("Child OFF", style = NullWaveTheme.typography.caption)
                                 NullWaveTheme(variant = variant, effects = NullWaveEffects(reduceMotion = true, glowEnabled = false)) {
-                                    NullWavePlayPauseButton(playing, play, buffering = true, size = NullWavePlayPauseButtonSize.Compact)
+                                    NullWavePlayPauseButton(playing, play, size = NullWavePlayPauseButtonSize.Compact)
                                 }
                             }
                         }

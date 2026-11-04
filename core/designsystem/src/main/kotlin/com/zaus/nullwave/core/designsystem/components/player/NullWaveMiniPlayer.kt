@@ -67,7 +67,6 @@ fun NullWaveMiniPlayer(
     subtitle: String? = null,
     artwork: @Composable () -> Unit = { NullWaveCoverArt() },
     progress: Float? = null,
-    buffering: Boolean = false,
     playbackEnabled: Boolean = true,
     canNext: Boolean = true,
     reduceMotion: Boolean = false,
@@ -134,8 +133,8 @@ fun NullWaveMiniPlayer(
                     color = colors.textSecondary, style = NullWaveTheme.typography.caption)
             }
         }
-        NullWavePlayPauseButton(isPlaying, onPlayPause, buffering = buffering, enabled = playbackEnabled && canPlayPause,
-            size = NullWavePlayPauseButtonSize.Compact, reduceMotion = reduceMotion, glowEnabled = playPauseGlowEnabled)
+        NullWavePlayPauseButton(isPlaying, onPlayPause, enabled = playbackEnabled && canPlayPause,
+            size = NullWavePlayPauseButtonSize.Compact, glowEnabled = playPauseGlowEnabled)
         NullWaveIconButton(NullWaveIcons.Next, stringResource(R.string.nw_player_next), onNext, enabled = playbackEnabled && canNext)
     }
 }

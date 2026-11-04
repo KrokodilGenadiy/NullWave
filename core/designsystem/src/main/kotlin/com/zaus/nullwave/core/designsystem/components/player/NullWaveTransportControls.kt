@@ -50,7 +50,6 @@ fun NullWaveTransportControls(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     modifier: Modifier = Modifier,
-    buffering: Boolean = false,
     enabled: Boolean = true,
     canPlayPause: Boolean = true,
     canPrevious: Boolean = true,
@@ -59,7 +58,6 @@ fun NullWaveTransportControls(
     onShuffleChange: ((Boolean) -> Unit)? = null,
     repeatMode: NullWaveRepeatMode = NullWaveRepeatMode.Off,
     onRepeatClick: (() -> Unit)? = null,
-    reduceMotion: Boolean = false,
     playPauseGlowEnabled: Boolean = true,
 ) {
     val spacing = NullWaveTheme.spacing
@@ -70,8 +68,8 @@ fun NullWaveTransportControls(
         NullWaveIconButton(NullWaveIcons.Previous, stringResource(R.string.nw_player_previous), onPrevious, enabled = enabled && canPrevious)
     }
     val playPause: @Composable () -> Unit = {
-        NullWavePlayPauseButton(isPlaying, onPlayPause, buffering = buffering, enabled = enabled && canPlayPause,
-            reduceMotion = reduceMotion, glowEnabled = playPauseGlowEnabled)
+        NullWavePlayPauseButton(isPlaying, onPlayPause, enabled = enabled && canPlayPause,
+            glowEnabled = playPauseGlowEnabled)
     }
     val next: @Composable () -> Unit = {
         NullWaveIconButton(NullWaveIcons.Next, stringResource(R.string.nw_player_next), onNext, enabled = enabled && canNext)
