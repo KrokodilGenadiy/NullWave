@@ -38,7 +38,7 @@ enum class NullWaveRepeatMode { Off, All, One }
 
 /**
  * Controlled transport group. [isPlaying] means playback intent, including while buffering.
- * Previous/next availability and repeat/shuffle state come from the caller. No queue policy here.
+ * Each control's availability and repeat/shuffle state come from the caller. No queue policy here.
  * Null optional callbacks omit those controls. At narrow widths shuffle/repeat move below the
  * main controls; targets never shrink. Playback glyphs retain their direction in RTL layouts.
  * [playPauseGlowEnabled] lets the host hand the accent to SeekBar while scrubbing, or disable decor.
@@ -59,11 +59,14 @@ fun NullWaveTransportControls(
     repeatMode: NullWaveRepeatMode = NullWaveRepeatMode.Off,
     onRepeatClick: (() -> Unit)? = null,
     playPauseGlowEnabled: Boolean = true,
+    canShuffle: Boolean = true,
+    canRepeat: Boolean = true,
 ) {
     val spacing = NullWaveTheme.spacing
     val target = NullWaveTheme.dimens.touchTarget
     val hasModes = onShuffleChange != null || onRepeatClick != null
-    val modeTint = if (enabled) NullWaveTheme.colors.primary else NullWaveTheme.colors.textSecondary
+    val shuffleEnabled = enabled && canShuffle
+    val modeTint = if (shuffleEnabled) NullWaveTheme.colors.primary else NullWaveTheme.colors.textSecondary
     val previous: @Composable () -> Unit = {
         NullWaveIconButton(NullWaveIcons.Previous, stringResource(R.string.nw_player_previous), onPrevious, enabled = enabled && canPrevious)
     }
@@ -77,11 +80,11 @@ fun NullWaveTransportControls(
     val shuffleControl: @Composable () -> Unit = {
         if (onShuffleChange != null) NullWaveIconToggleButton(
             NullWaveIcons.Shuffle, stringResource(R.string.nw_player_shuffle), shuffle, onShuffleChange,
-            Modifier.modeMarker(shuffle, modeTint), enabled = enabled,
+            Modifier.modeMarker(shuffle, modeTint), enabled = shuffleEnabled,
         ) else Spacer(Modifier.size(target))
     }
     val repeatControl: @Composable () -> Unit = {
-        if (onRepeatClick != null) RepeatButton(repeatMode, onRepeatClick, enabled) else Spacer(Modifier.size(target))
+        if (onRepeatClick != null) RepeatButton(repeatMode, onRepeatClick, enabled && canRepeat) else Spacer(Modifier.size(target))
     }
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val wide = hasModes && maxWidth >= HeroPlayPauseSize + target * 4 + spacing.xxs * 4

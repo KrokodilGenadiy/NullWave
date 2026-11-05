@@ -32,12 +32,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
 import com.zaus.nullwave.core.designsystem.components.control.iconButton.NullWaveIconButton
+import com.zaus.nullwave.core.designsystem.components.player.NullWaveRepeatMode
 import com.zaus.nullwave.core.designsystem.components.player.NullWaveSeekBar
 import com.zaus.nullwave.core.designsystem.components.player.NullWaveTransportControls
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.playback.api.PlaybackClock
 import com.zaus.nullwave.core.playback.api.command.PlaybackCapability
+import com.zaus.nullwave.core.playback.api.model.RepeatMode
 import com.zaus.nullwave.feature.library.api.ui.LibraryArtworkRenderer
 import com.zaus.nullwave.feature.library.api.ui.libraryDuration
 import com.zaus.nullwave.feature.player.impl.R
@@ -160,6 +162,8 @@ private fun PlayerFullControls(
     val seekEnabled = enabled && duration != null && duration > 0L &&
         state.supportsItemCommand(PlaybackCapability.SeekTo)
     val playRequested = state.displaySnapshot?.transport?.playRequested == true
+    val displayQueue = state.displaySnapshot?.queue
+    val repeatMode = displayQueue?.repeatMode ?: RepeatMode.Off
     val unknownTime = stringResource(DesignR.string.nw_time_unknown)
 
     // Full token equality includes session and activation: an old gesture cannot seek a new item.
@@ -197,6 +201,23 @@ private fun PlayerFullControls(
             canPlayPause = state.supportsItemCommand(PlaybackCapability.SetPlayRequested),
             canPrevious = state.supportsItemCommand(PlaybackCapability.Previous),
             canNext = state.supportsItemCommand(PlaybackCapability.Next),
+            shuffle = displayQueue?.shuffleEnabled == true,
+            onShuffleChange = { onIntent(PlayerIntent.SetShuffle(it)) },
+            canShuffle = PlaybackCapability.SetShuffle in live?.capabilities.orEmpty(),
+            repeatMode = when (repeatMode) {
+                RepeatMode.Off -> NullWaveRepeatMode.Off
+                RepeatMode.All -> NullWaveRepeatMode.All
+                RepeatMode.One -> NullWaveRepeatMode.One
+            },
+            onRepeatClick = {
+                // UI chooses the cycle; only an engine observation changes the displayed mode.
+                onIntent(PlayerIntent.SetRepeat(when (repeatMode) {
+                    RepeatMode.Off -> RepeatMode.All
+                    RepeatMode.All -> RepeatMode.One
+                    RepeatMode.One -> RepeatMode.Off
+                }))
+            },
+            canRepeat = PlaybackCapability.SetRepeat in live?.capabilities.orEmpty(),
             playPauseGlowEnabled = live?.transport?.isPlaying == true && !scrubbing,
         )
     }

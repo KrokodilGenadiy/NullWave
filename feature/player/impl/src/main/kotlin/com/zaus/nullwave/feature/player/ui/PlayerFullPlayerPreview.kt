@@ -26,6 +26,7 @@ import com.zaus.nullwave.core.playback.api.model.PlaybackSnapshot
 import com.zaus.nullwave.core.playback.api.model.PlaybackTransport
 import com.zaus.nullwave.core.playback.api.model.QueueEntry
 import com.zaus.nullwave.core.playback.api.model.QueueEntryId
+import com.zaus.nullwave.core.playback.api.model.RepeatMode
 import com.zaus.nullwave.feature.library.api.ui.LibraryArtworkRenderer
 import com.zaus.nullwave.feature.library.api.ui.libraryMonogram
 import com.zaus.nullwave.feature.player.presentation.PlayerState
@@ -89,7 +90,7 @@ private fun fullPreviewState(russian: Boolean = false, denied: Boolean = false):
     val snapshot = PlaybackSnapshot.create(
         sessionId = session,
         revision = 0,
-        queue = PlaybackQueue.create(entries = entries, current = target),
+        queue = PlaybackQueue.create(entries = entries, current = target, shuffleEnabled = true, repeatMode = RepeatMode.All),
         transport = PlaybackTransport(
             if (denied) PlaybackPhase.Idle else PlaybackPhase.Ready,
             playRequested = !denied,
@@ -101,6 +102,8 @@ private fun fullPreviewState(russian: Boolean = false, denied: Boolean = false):
             PlaybackCapability.Previous,
             PlaybackCapability.Next,
             PlaybackCapability.SeekTo,
+            PlaybackCapability.SetShuffle,
+            PlaybackCapability.SetRepeat,
         ),
     )
     return PlayerState(
