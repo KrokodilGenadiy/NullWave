@@ -56,6 +56,17 @@ internal class PlayerViewModel(private val playbackController: PlaybackControlle
             // Use engine duration, not catalog metadata; the service checks the captured token again.
             submit(request, PlayerRequest.Transport(PlaybackCommand.SeekTo(intent.target, intent.positionMs.coerceAtMost(duration))))
         }
+        // Session modes can be available before a queue exists; they do not require a current item.
+        on<PlayerIntent.SetShuffle> { intent ->
+            if (PlaybackCapability.SetShuffle in state.liveSnapshot?.capabilities.orEmpty()) {
+                submit(request, PlayerRequest.Transport(PlaybackCommand.SetShuffle(intent.enabled)))
+            }
+        }
+        on<PlayerIntent.SetRepeat> { intent ->
+            if (PlaybackCapability.SetRepeat in state.liveSnapshot?.capabilities.orEmpty()) {
+                submit(request, PlayerRequest.Transport(PlaybackCommand.SetRepeat(intent.mode)))
+            }
+        }
         on<PlayerIntent.Reconnect> { submit(request, PlayerRequest.Reconnect) }
         on<PlayerIntent.RetryProblem> { intent ->
             val snapshot = state.liveSnapshot ?: return@on
