@@ -313,7 +313,10 @@ class PlayerFullPlayerInstrumentedTest {
         assertEquals(240f, (viewport.bottom - viewport.top).value, 0.5f)
         compose.onNodeWithTag("player_full_close").assertIsDisplayed()
             .assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
-        listOf(DesignSystemR.string.nw_player_previous, DesignSystemR.string.nw_player_play, DesignSystemR.string.nw_player_next)
+        listOf(
+            DesignSystemR.string.nw_player_previous, DesignSystemR.string.nw_player_play, DesignSystemR.string.nw_player_next,
+            DesignSystemR.string.nw_player_shuffle, DesignSystemR.string.nw_player_repeat,
+        )
             .forEach { id ->
                 val button = control(id).performScrollTo()
                 button.assertIsDisplayed().assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
