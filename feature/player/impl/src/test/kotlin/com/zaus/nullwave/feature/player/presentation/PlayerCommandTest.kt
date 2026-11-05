@@ -12,6 +12,7 @@ import com.zaus.nullwave.core.playback.api.model.PlaybackSessionId
 import com.zaus.nullwave.core.playback.api.model.PlaybackSnapshot
 import com.zaus.nullwave.core.playback.api.model.PlaybackTransport
 import com.zaus.nullwave.core.playback.api.model.QueueEntryId
+import com.zaus.nullwave.core.playback.api.model.RepeatMode
 import com.zaus.nullwave.core.playback.api.source.PlaybackSourceError
 import com.zaus.nullwave.core.result.AppResult
 import kotlinx.coroutines.CancellationException
@@ -106,6 +107,8 @@ class PlayerCommandTest {
             repeat(3) { send(vm, PlayerIntent.Next) }
             send(vm, PlayerIntent.Previous)
             send(vm, PlayerIntent.SetPlayRequested(false))
+            send(vm, PlayerIntent.SetShuffle(true))
+            send(vm, PlayerIntent.SetRepeat(RepeatMode.All))
             send(vm, PlayerIntent.Reconnect)
 
             assertEquals(1, playback.calls.size)
@@ -137,6 +140,8 @@ class PlayerCommandTest {
             send(vm, PlayerIntent.Next)
             send(vm, PlayerIntent.Previous)
             send(vm, PlayerIntent.SetPlayRequested(true))
+            send(vm, PlayerIntent.SetShuffle(true))
+            send(vm, PlayerIntent.SetRepeat(RepeatMode.One))
             assertTrue(playback.calls.isEmpty())
             assertTrue(vm.snapshot.value.operations[PlayerViewModel.RequestKey].isBusy)
 
