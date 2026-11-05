@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -24,9 +25,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -37,6 +40,7 @@ import com.zaus.nullwave.core.designsystem.components.player.NullWaveSeekBar
 import com.zaus.nullwave.core.designsystem.components.player.NullWaveTransportControls
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
+import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.core.playback.api.PlaybackClock
 import com.zaus.nullwave.core.playback.api.command.PlaybackCapability
 import com.zaus.nullwave.core.playback.api.model.RepeatMode
@@ -104,7 +108,6 @@ internal fun PlayerFullPlayer(
                     Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).testTag("player_full_scroll")
                         .padding(horizontal = spacing.lg, vertical = spacing.xs),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(spacing.lg),
                 ) {
                     if (track == null) {
                         Text(
@@ -119,20 +122,8 @@ internal fun PlayerFullPlayer(
                             artworkSize,
                             Modifier.testTag("player_full_artwork"),
                         )
-                        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(spacing.xxs)) {
-                            Text(
-                                track.title,
-                                Modifier.testTag("player_full_title"),
-                                color = NullWaveTheme.colors.textPrimary,
-                                style = NullWaveTheme.typography.display,
-                            )
-                            val artist = track.artist ?: stringResource(R.string.player_unknown_artist)
-                            Text(
-                                text = track.album?.let { stringResource(R.string.player_artist_album, artist, it) } ?: artist,
-                                color = NullWaveTheme.colors.textSecondary,
-                                style = NullWaveTheme.typography.body,
-                            )
-                        }
+                        Spacer(Modifier.height(spacing.lg))
+                        PlayerFullMetadata(track)
                         PlayerFullControls(state, canSubmit && active, onIntent, clock)
                     }
                 }
@@ -143,6 +134,41 @@ internal fun PlayerFullPlayer(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun PlayerFullMetadata(track: MediaTrack) {
+    val typography = NullWaveTheme.typography
+    val spacing = NullWaveTheme.spacing
+    // Keep the space before the timeline inside the block. Taller fallback glyphs can use it.
+    val reservedHeight = with(LocalDensity.current) {
+        val titleLine = typography.display.lineHeight.toDp()
+        val creditLine = typography.body.lineHeight.toDp()
+        (titleLine + creditLine) * MetadataMaxLines + spacing.xxs + maxOf(spacing.lg, titleLine)
+    }
+    Column(
+        Modifier.fillMaxWidth().heightIn(min = reservedHeight).testTag("player_full_metadata")
+            .padding(bottom = spacing.xxs),
+        verticalArrangement = Arrangement.spacedBy(spacing.xxs),
+    ) {
+        Text(
+            text = track.title,
+            modifier = Modifier.fillMaxWidth().testTag("player_full_title"),
+            color = NullWaveTheme.colors.textPrimary,
+            style = typography.display,
+            maxLines = MetadataMaxLines,
+            overflow = TextOverflow.Ellipsis,
+        )
+        val artist = track.artist ?: stringResource(R.string.player_unknown_artist)
+        Text(
+            text = track.album?.let { stringResource(R.string.player_artist_album, artist, it) } ?: artist,
+            modifier = Modifier.fillMaxWidth().testTag("player_full_subtitle"),
+            color = NullWaveTheme.colors.textSecondary,
+            style = typography.body,
+            maxLines = MetadataMaxLines,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -226,3 +252,4 @@ private fun PlayerFullControls(
 private val MaxArtworkSize = 364.dp
 private val MinArtworkSize = 96.dp
 private const val ArtworkHeightFraction = 0.45f
+private const val MetadataMaxLines = 2
