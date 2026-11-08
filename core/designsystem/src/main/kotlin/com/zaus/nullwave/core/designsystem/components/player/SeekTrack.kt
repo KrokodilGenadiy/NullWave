@@ -10,12 +10,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
+import kotlin.math.abs
 
 /** All geometry is measured along the full timeline. Recompute it only when data or size changes. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,11 +30,13 @@ internal fun SeekTrack(
     waveform: List<Float>?,
     scrubbing: Boolean,
     glowEnabled: Boolean,
+    motion: WaveformMotion? = null,
 ) {
     val colors = NullWaveTheme.colors
     Spacer(Modifier.fillMaxWidth().height(SeekTrackHeight).drawWithCache {
         val rtl = layoutDirection == LayoutDirection.Rtl
         val stroke = PlayheadWidth.toPx()
+        val ticks = (size.width / RulerPitch.toPx()).toInt().coerceAtLeast(1)
         fun Path.mark(start: Float, end: Float, height: Float) {
             if (end <= start) return
             val left = if (rtl) size.width - end else start
@@ -38,7 +44,6 @@ internal fun SeekTrack(
         }
         val timeline = Path().apply {
             if (waveform == null) {
-                val ticks = (size.width / RulerPitch.toPx()).toInt().coerceAtLeast(1)
                 val pitch = size.width / ticks
                 val width = minOf(RulerTickWidth.toPx(), pitch)
                 for (index in 0 until ticks) {
@@ -68,12 +73,9 @@ internal fun SeekTrack(
         val scrubGlow = PlayerLineGlow(colors.primary, ScrubGlowRadius.toPx(), ScrubGlowAlpha)
         val playedTimeline = Path()
         val playedBounds = Path()
-        onDrawBehind {
-            val fraction = state.coercedValueAsFraction
-            val boundary = size.width * if (rtl) 1f - fraction else fraction
-            val active = if (enabled) colors.secondary else colors.textSecondary
+        fun DrawScope.drawTimeline(boundary: Float, active: Color) {
             drawPath(timeline, colors.outline)
-            if (enabled && glowEnabled && fraction > 0f) {
+            if (enabled && glowEnabled && state.coercedValueAsFraction > 0f) {
                 // Cut the source geometry, then draw its halo freely past the progress boundary.
                 // Clipping an already drawn halo produces a flat edge and includes unplayed bars.
                 playedTimeline.reset()
@@ -85,6 +87,18 @@ internal fun SeekTrack(
                 }
             }
             clipRect(left = if (rtl) boundary else 0f, right = if (rtl) size.width else boundary) { drawPath(timeline, active) }
+        }
+        onDrawBehind {
+            val fraction = state.coercedValueAsFraction
+            val boundary = size.width * if (rtl) 1f - fraction else fraction
+            val active = if (enabled) colors.secondary else colors.textSecondary
+            val heightScale = if (waveform.isNullOrEmpty()) 1f else motion?.barHeightScale?.value ?: 1f
+            if (heightScale < 1f) {
+                scale(scaleX = 1f, scaleY = heightScale) { drawTimeline(boundary, active) }
+            } else {
+                drawTimeline(boundary, active)
+            }
+            motion?.scanPhase?.let { drawRulerScan(ticks, it.value, active) }
             // Identical centre/width in both states. Drag changes emphasis, never precision.
             val halfStroke = minOf(stroke, size.width) / 2f
             val x = boundary.coerceIn(halfStroke, size.width - halfStroke)
@@ -97,6 +111,24 @@ internal fun SeekTrack(
             drawLine(playheadColor, start, end, stroke)
         }
     })
+}
+
+/** A small bank of illuminated slashes above the ruler. The playhead stays visible in front. */
+private fun DrawScope.drawRulerScan(ticks: Int, phase: Float, color: Color) {
+    val direction = if (layoutDirection == LayoutDirection.Rtl) -1f else 1f
+    val center = (ticks - 1) * phase
+    val pitch = size.width / ticks
+    val halfWidth = minOf(1.5.dp.toPx(), pitch / 4)
+    val top = size.height / 2f - 11.dp.toPx()
+    val bottom = top + 4.dp.toPx()
+    val radius = 4
+    for (index in maxOf(0, center.toInt() - radius)..minOf(ticks - 1, center.toInt() + radius)) {
+        val strength = (1f - abs(index - center) / radius).coerceAtLeast(0f)
+        val fromStart = (index + 0.5f) * pitch
+        val x = if (layoutDirection == LayoutDirection.Rtl) size.width - fromStart else fromStart
+        drawLine(color, Offset(x - direction * halfWidth, bottom), Offset(x + direction * halfWidth, top),
+            strokeWidth = RulerTickWidth.toPx(), alpha = strength * 0.9f)
+    }
 }
 
 private val SeekTrackHeight = 32.dp

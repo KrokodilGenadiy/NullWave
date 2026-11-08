@@ -29,14 +29,17 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
  * the control returns to the supplied [positionMs]; command acknowledgement belongs to the caller.
  * [onScrubPositionChange] receives preview milliseconds, then null at completion/cancellation.
  * [waveform] contains normalized peaks for the whole track. Null shows time marks while
- * loading. An empty list uses a plain rail when the waveform is unavailable.
+ * loading, with an indeterminate scan for reads that take longer than a cache hit. When the
+ * scan is visible, completed bars grow together from the center if decorative motion is enabled.
+ * An empty list uses a plain rail when the waveform is unavailable.
  * The same thin playhead marks the exact position at rest and while scrubbing; no visible thumb
  * obscures it. [glowEnabled] adds a subtle halo to the played timeline and strengthens the playhead
  * during scrub. This accent takes over from Play/Pause; disabled timelines never glow.
  * [glowEnabled] can disable glow locally but cannot re-enable it when [NullWaveTheme.effects] forbids it.
  * For one accent across a player, the host observes drag on [interactionSource] and non-null
  * [onScrubPositionChange] (also keyboard input), suppressing its Play/Pause halo while either is active.
- * Key the host's drag observer to its source, and reset that source on media/duration/enabled changes.
+ * Replacing [interactionSource] cancels the active gesture, including when a new queue entry plays
+ * the same recording. Waveform motion follows [mediaKey] across gesture changes.
  * Give each simultaneously displayed seek control its own interaction source.
  * Observing drag is visual only; cancellation/commit still use the synchronous session below.
  */
@@ -65,8 +68,9 @@ fun NullWaveSeekBar(
     }
     val interactive = enabled && durationMs != null && durationMs > 0L
     val effects = NullWaveTheme.effects.withRestrictions(glowEnabled = glowEnabled)
+    val motion = key(mediaKey) { rememberWaveformMotion(peaks) }
     // Recreate the actual Material gesture node too, so a gesture cannot transfer to another item.
-    key(mediaKey, durationMs, enabled) {
+    key(mediaKey, durationMs, enabled, interactionSource) {
         val session = remember { SeekSession() }
         val currentOnScrub by rememberUpdatedState(onScrubPositionChange)
         val source = interactionSource ?: remember { MutableInteractionSource() }
@@ -95,7 +99,9 @@ fun NullWaveSeekBar(
                 label = label,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = interactive,
-                valueDescription = description,
+                valueDescription = if (motion.scanPhase != null) {
+                    stringResource(R.string.nw_seek_preparing_waveform, description)
+                } else description,
                 interactionSource = seekSource,
                 onValueChangeFinished = {
                     session.finish()?.let { target ->
@@ -108,7 +114,7 @@ fun NullWaveSeekBar(
                     // SeekTrack draws a precise playhead in both states instead of a wide thumb.
                     Box(Modifier.size(SliderNodeSize))
                 },
-                track = { SeekTrack(it, interactive, peaks, scrubbing, effects.glowEnabled) },
+                track = { SeekTrack(it, interactive, peaks, scrubbing, effects.glowEnabled, motion) },
             )
             NullWaveTimeLabels(positionText, durationText,
                 endDescription = if (durationMs == null) stringResource(R.string.nw_time_duration_unknown)
