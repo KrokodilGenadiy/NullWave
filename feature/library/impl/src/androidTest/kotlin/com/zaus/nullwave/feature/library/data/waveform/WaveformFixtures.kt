@@ -3,6 +3,12 @@ package com.zaus.nullwave.feature.library.data.waveform
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
+internal fun clearFlacSampleCount(flac: ByteArray) {
+    // FLAC STREAMINFO reserves a zero 36-bit total-samples field for unknown length.
+    flac[21] = (flac[21].toInt() and 0xf0).toByte()
+    flac.fill(0, fromIndex = 22, toIndex = 26)
+}
+
 /** A mono RIFF/WAVE fixture with signed 16-bit little-endian samples. */
 internal fun pcmWave(samples: ShortArray, sampleRate: Int = 8_000): ByteArray {
     val pcmBytes = samples.size * Short.SIZE_BYTES

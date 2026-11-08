@@ -123,12 +123,6 @@ class AndroidWaveformDecoderInstrumentedTest {
     private fun assetBytes(name: String): ByteArray =
         instrumentation.context.assets.open("waveform/$name").use { it.readBytes() }
 
-    private fun clearFlacSampleCount(flac: ByteArray) {
-        // FLAC STREAMINFO reserves a zero 36-bit total-samples field for unknown length.
-        flac[21] = (flac[21].toInt() and 0xf0).toByte()
-        flac.fill(0, fromIndex = 22, toIndex = 26)
-    }
-
     @Test
     fun resumingCompressedFilesAfterANonzeroSeekPreservesTheOriginalTimeline() = runBlocking {
         for (asset in listOf("resume-levels.flac", "quarter-tones.mp3")) {
