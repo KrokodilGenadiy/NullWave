@@ -5,6 +5,8 @@ import android.content.res.Configuration
 import android.view.KeyEvent
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -14,6 +16,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
@@ -31,13 +34,17 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import com.zaus.nullwave.core.designsystem.R as DesignSystemR
+import com.zaus.nullwave.core.designsystem.theme.NullWaveColors
 import com.zaus.nullwave.core.media.model.ArtworkRef
 import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.core.media.model.track.TrackId
+import com.zaus.nullwave.core.media.waveform.Waveform
+import com.zaus.nullwave.core.media.waveform.WaveformSource
 import com.zaus.nullwave.core.playback.api.PlaybackClock
 import com.zaus.nullwave.core.playback.api.command.PlaybackCapability
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommand
@@ -57,6 +64,13 @@ import com.zaus.nullwave.feature.player.presentation.PlayerIntent
 import com.zaus.nullwave.feature.player.presentation.PlayerState
 import com.zaus.nullwave.feature.player.presentation.PlayerViewModel
 import java.util.Locale
+import java.util.concurrent.CopyOnWriteArrayList
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.job
+import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -162,6 +176,157 @@ class PlayerFullPlayerInstrumentedTest {
         }
         assertEquals("Completed seek draft must return to the published position",
             0.25f, seek().fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo].current, 0.001f)
+    }
+
+    @Test
+    fun fullSheetDrawsOnlySelectedTrackPeaksAndSeekWorksDuringLoading() {
+        val secondTrack = track.copy(id = TrackId("second"), title = "Second")
+        val thirdTrack = track.copy(id = TrackId("third"), title = "Third")
+        val requests = CopyOnWriteArrayList<PeakRequest>()
+        fixture = PlayerHostActivityFixture(waveformSource = recordingSource(requests, lateReplyForRequest = 2))
+        val first = snapshot()
+        connect(first)
+        launch()
+        openFull()
+        compose.waitUntil(5_000) { requests.size == 1 }
+        seek().performScrollTo().assertIsEnabled()
+        assertUnplayedRail(segmentTicks = true)
+        seek().performSemanticsAction(SemanticsActions.SetProgress) { it(0.5f) }
+        awaitCommandCount(1)
+        assertEquals(PlaybackCommand.SeekTo(first.queue.current!!, 60_000), fixture.playback.commands.single())
+        assertTallWaveformBar(false)
+
+        val rising = Waveform.of(listOf(0f, 1f, 1f, 1f))
+        requests.first().reply.complete(rising)
+        assertTallWaveformBar(true, startPercent = 33, endPercent = 42)
+        assertTallWaveformBar(true)
+        compose.runOnIdle { connect(snapshot(activation = 1, item = secondTrack)) }
+        compose.waitUntil(5_000) { requests.size == 2 }
+        val second = requests.last()
+        try {
+            assertTallWaveformBar(false)
+            compose.runOnIdle { connect(snapshot(activation = 2, item = thirdTrack)) }
+            compose.waitUntil(5_000) { requests.size == 3 }
+            assertEquals(listOf(track.id, secondTrack.id, thirdTrack.id), requests.map { it.id })
+            assertTrue(second.job.isCancelled)
+            // Simulate a late decoder reply for the superseded track and an unavailable current file.
+            second.reply.complete(rising)
+            requests.last().reply.complete(null)
+            compose.waitUntil(5_000) { second.job.isCompleted && requests.last().job.isCompleted }
+            assertUnplayedRail(segmentTicks = false)
+            assertTallWaveformBar(false)
+            seek().assertIsEnabled()
+        } finally {
+            second.reply.complete(null)
+        }
+    }
+
+    @Test
+    fun rapidAToBToAUsesTheSecondAWhenTheFirstARepliesLast() {
+        val other = track.copy(id = TrackId("other"), title = "Other")
+        val requests = CopyOnWriteArrayList<PeakRequest>()
+        fixture = PlayerHostActivityFixture(waveformSource = recordingSource(requests, lateReplyForRequest = 1))
+        connect(snapshot())
+        launch()
+        openFull()
+        compose.waitUntil(5_000) { requests.size == 1 }
+        val original = requests.single()
+        try {
+            compose.runOnIdle { connect(snapshot(activation = 1, item = other)) }
+            compose.waitUntil(5_000) { requests.size == 2 }
+            compose.runOnIdle { connect(snapshot(activation = 2, item = track)) }
+            compose.waitUntil(5_000) { requests.size == 3 }
+            assertEquals(listOf(track.id, other.id, track.id), requests.map { it.id })
+            assertTrue(original.job.isCancelled)
+            assertTrue(requests[1].job.isCancelled)
+            assertFalse(original.job.isCompleted)
+            seek().performScrollTo()
+            assertUnplayedRail(segmentTicks = true)
+
+            requests.last().reply.complete(Waveform.of(listOf(0f, 1f)))
+            assertTallWaveformBar(true)
+            original.reply.complete(Waveform.of(listOf(1f, 0f)))
+            compose.waitUntil(5_000) { original.job.isCompleted }
+            assertTallWaveformBar(true)
+        } finally {
+            original.reply.complete(null)
+        }
+    }
+
+    @Test
+    fun waveformReadBelongsToTheExpandedStartedSheet() {
+        val requests = CopyOnWriteArrayList<PeakRequest>()
+        fixture = PlayerHostActivityFixture(waveformSource = recordingSource(requests, lateReplyForRequest = 2))
+        connect(snapshot())
+        val activity = launch()
+        compose.runOnIdle { assertTrue(requests.isEmpty()) }
+        openFull()
+        compose.waitUntil(5_000) { requests.size == 1 }
+        val first = requests.single()
+        first.reply.complete(Waveform.of(listOf(0f, 1f)))
+        seek().performScrollTo()
+        assertTallWaveformBar(true)
+        activity.moveToState(Lifecycle.State.CREATED)
+        activity.moveToState(Lifecycle.State.RESUMED)
+        compose.waitUntil(5_000) { requests.size > 1 && requests.last().job.isActive }
+        assertTallWaveformBar(false)
+        val pending = requests.last()
+        try {
+            activity.moveToState(Lifecycle.State.CREATED)
+            compose.waitUntil(5_000) { pending.job.isCancelled }
+            activity.moveToState(Lifecycle.State.RESUMED)
+            compose.waitUntil(5_000) { requests.last() !== pending && requests.last().job.isActive }
+            pending.reply.complete(Waveform.of(listOf(1f, 1f)))
+            compose.waitUntil(5_000) { pending.job.isCompleted }
+            assertUnplayedRail(segmentTicks = true)
+        } finally {
+            pending.reply.complete(null)
+        }
+        val resumed = requests.last()
+        compose.onNodeWithTag("player_full_close").performClick()
+        awaitClosed()
+        compose.waitUntil(5_000) { resumed.job.isCancelled }
+        compose.runOnIdle {
+            assertTrue(requests.none { it.job.isActive })
+            assertTrue(fixture.playback.commands.isEmpty())
+        }
+    }
+
+    private class PeakRequest(val id: TrackId, val job: Job) {
+        val reply = CompletableDeferred<Waveform?>()
+    }
+
+    private fun recordingSource(
+        requests: MutableList<PeakRequest>,
+        lateReplyForRequest: Int? = null,
+    ) = WaveformSource { trackId ->
+        val request = PeakRequest(trackId, currentCoroutineContext().job)
+        requests += request
+        if (requests.size == lateReplyForRequest) withContext(NonCancellable) { request.reply.await() }
+        else request.reply.await()
+    }
+
+    private fun assertUnplayedRail(segmentTicks: Boolean) {
+        val outline = NullWaveColors.Cyberpunk.outline.toArgb()
+        compose.waitUntil(5_000) {
+            val pixels = seek().captureToImage().toPixelMap()
+            val region = (pixels.width * 60 / 100) until (pixels.width * 85 / 100)
+            val filled = region.count { x -> pixels[x, pixels.height / 2].toArgb() == outline }
+            if (segmentTicks) filled in 1 until region.count() / 2 else filled == region.count()
+        }
+    }
+
+    private fun assertTallWaveformBar(expected: Boolean, startPercent: Int = 66, endPercent: Int = 80) {
+        // Check the unplayed region above the midline so the playhead and time ticks are excluded.
+        val outline = NullWaveColors.Cyberpunk.outline.toArgb()
+        compose.waitUntil(5_000) {
+            val image = seek().captureToImage()
+            val pixels = image.toPixelMap()
+            val y = image.height / 3
+            val region = (image.width * startPercent / 100) until (image.width * endPercent / 100)
+            val tallBar = region.count { x -> pixels[x, y].toArgb() == outline } > region.count() / 2
+            tallBar == expected
+        }
     }
 
     @Test
@@ -394,9 +559,10 @@ class PlayerFullPlayerInstrumentedTest {
         activation: Long = 0,
         playRequested: Boolean = false,
         phase: PlaybackPhase = PlaybackPhase.Ready,
+        item: MediaTrack = track,
     ): PlaybackSnapshot {
         val session = PlaybackSessionId("full-session")
-        val entry = QueueEntry(QueueEntryId("full-entry"), track)
+        val entry = QueueEntry(QueueEntryId("full-entry"), item)
         return PlaybackSnapshot.create(
             sessionId = session,
             queue = PlaybackQueue.create(entries = listOf(entry), current = PlaybackItemToken(session, entry.entryId, activation)),
