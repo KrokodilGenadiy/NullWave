@@ -90,9 +90,10 @@ internal fun PlayerFullSheet(
 
 @Composable
 private fun rememberPlayerWaveform(trackId: TrackId, source: WaveformSource, lifecycleOwner: LifecycleOwner): PlayerWaveform {
-    var waveform by remember(trackId, source, lifecycleOwner) { mutableStateOf<PlayerWaveform>(PlayerWaveform.Loading) }
+    var waveform by remember(trackId, source, lifecycleOwner) { mutableStateOf<PlayerWaveform>(PlayerWaveform.Unavailable) }
     val scope = rememberCoroutineScope()
     LifecycleStartEffect(trackId, source, lifecycleOwner = lifecycleOwner) {
+        waveform = PlayerWaveform.Loading
         val observation = scope.launch {
             val result = source.load(trackId)
             // A stopped reader may finish after the same track has been opened again.
@@ -101,7 +102,7 @@ private fun rememberPlayerWaveform(trackId: TrackId, source: WaveformSource, lif
         }
         onStopOrDispose {
             observation.cancel()
-            waveform = PlayerWaveform.Loading
+            waveform = PlayerWaveform.Unavailable
         }
     }
     return waveform

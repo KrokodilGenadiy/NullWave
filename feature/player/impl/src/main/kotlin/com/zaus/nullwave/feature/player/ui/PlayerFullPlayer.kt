@@ -128,7 +128,7 @@ internal fun PlayerFullPlayer(
                         Spacer(Modifier.height(spacing.lg))
                         PlayerFullMetadata(track)
                         val timeline = if (state.liveSnapshot != null) waveform(track.id) else PlayerWaveform.Unavailable
-                        PlayerFullControls(state, canSubmit && active, onIntent, clock, timeline)
+                        PlayerFullControls(state, canSubmit && active, onIntent, clock, track.id, timeline)
                     }
                 }
                 // A late failure is visible without moving the artwork/controls scroll position.
@@ -182,6 +182,7 @@ private fun PlayerFullControls(
     canSubmit: Boolean,
     onIntent: (PlayerIntent) -> Unit,
     clock: PlaybackClock,
+    trackId: TrackId,
     waveform: PlayerWaveform,
 ) {
     val live = state.liveSnapshot
@@ -204,24 +205,22 @@ private fun PlayerFullControls(
     var scrubPosition by remember(source) { mutableStateOf<Long?>(null) }
     val scrubbing = seekEnabled && (dragged || scrubPosition != null)
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.md)) {
-        key(source) {
-            NullWaveSeekBar(
-                mediaKey = "full-player",
-                positionMs = position ?: 0L,
-                durationMs = duration,
-                onSeek = { destination ->
-                    if (seekEnabled && target != null) onIntent(PlayerIntent.SeekTo(target, destination))
-                },
-                // Zero is only the disabled track's drawing origin; an absent engine anchor stays unknown.
-                formatTime = { if (position == null) unknownTime else libraryDuration(it).orEmpty() },
-                modifier = Modifier.fillMaxWidth().testTag("player_full_seek"),
-                enabled = seekEnabled,
-                waveform = waveform.peaks,
-                onScrubPositionChange = { scrubPosition = it },
-                interactionSource = source,
-                glowEnabled = scrubbing,
-            )
-        }
+        NullWaveSeekBar(
+            mediaKey = trackId.value,
+            positionMs = position ?: 0L,
+            durationMs = duration,
+            onSeek = { destination ->
+                if (seekEnabled && target != null) onIntent(PlayerIntent.SeekTo(target, destination))
+            },
+            // Zero is only the disabled track's drawing origin; an absent engine anchor stays unknown.
+            formatTime = { if (position == null) unknownTime else libraryDuration(it).orEmpty() },
+            modifier = Modifier.fillMaxWidth().testTag("player_full_seek"),
+            enabled = seekEnabled,
+            waveform = waveform.peaks,
+            onScrubPositionChange = { scrubPosition = it },
+            interactionSource = source,
+            glowEnabled = scrubbing,
+        )
         // Transport keeps its focus/interaction nodes when only the seek session changes.
         NullWaveTransportControls(
             isPlaying = playRequested,
