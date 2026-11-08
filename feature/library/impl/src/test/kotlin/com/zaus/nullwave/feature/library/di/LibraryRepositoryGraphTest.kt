@@ -10,6 +10,7 @@ import com.zaus.nullwave.feature.library.api.repository.LibrarySearchRepository
 import com.zaus.nullwave.feature.library.data.source.audioRow
 import com.zaus.nullwave.feature.library.data.source.FakeMediaStoreAudioSource
 import com.zaus.nullwave.feature.library.data.source.MediaStoreAudioSource
+import com.zaus.nullwave.feature.library.data.waveform.work.WaveformCatalogSync
 import com.zaus.nullwave.feature.library.presentation.LibraryViewModel
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.createGraphFactory
@@ -56,6 +57,9 @@ class LibraryRepositoryGraphTest {
     ],
 )
 internal interface LibraryRepositoryTestGraph {
+    @Provides
+    fun waveformSync(): WaveformCatalogSync = WaveformCatalogSync {}
+
     val catalog: LibraryCatalogRepository
     val tracks: LibraryRepository
     val search: LibrarySearchRepository

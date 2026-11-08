@@ -6,6 +6,7 @@ import com.zaus.nullwave.feature.library.api.repository.LibraryRepository
 import com.zaus.nullwave.feature.library.api.repository.LibrarySearchRepository
 import com.zaus.nullwave.feature.library.data.repository.MediaStoreLibraryRepository
 import com.zaus.nullwave.feature.library.data.source.MediaStoreAudioSource
+import com.zaus.nullwave.feature.library.data.waveform.work.WaveformCatalogSync
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
@@ -22,7 +23,8 @@ object LibraryRepositoryBindings {
     private fun mediaStoreRepository(
         source: MediaStoreAudioSource,
         @IoDispatcher io: CoroutineDispatcher,
-    ): MediaStoreLibraryRepository = MediaStoreLibraryRepository(source, io)
+        waveformSync: WaveformCatalogSync,
+    ): MediaStoreLibraryRepository = MediaStoreLibraryRepository(source, io, waveformSync)
 
     @Provides
     private fun catalog(repository: MediaStoreLibraryRepository): LibraryCatalogRepository = repository

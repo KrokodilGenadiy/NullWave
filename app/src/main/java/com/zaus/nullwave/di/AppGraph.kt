@@ -5,6 +5,7 @@ import android.content.Context
 import com.zaus.nullwave.core.navigation.EntryProviderInstaller
 import com.zaus.nullwave.core.playback.api.PlaybackController
 import com.zaus.nullwave.core.playback.media3.service.PlaybackServiceComponent
+import com.zaus.nullwave.feature.library.data.waveform.work.WaveformWorkerComponent
 import com.zaus.nullwave.feature.player.api.ui.PlayerHost
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Binds
@@ -20,6 +21,8 @@ interface AppGraph : ViewModelGraph, PlaybackServiceComponent {
     val application: Application
 
     val playbackController: PlaybackController
+
+    val waveformWorkerComponent: WaveformWorkerComponent
 
     val playerHost: PlayerHost
 

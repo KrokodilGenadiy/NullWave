@@ -20,5 +20,6 @@ class AppGraphInstrumentedTest {
         assertSame(graph.metroViewModelFactory, graph.metroViewModelFactory)
         assertSame(graph.playbackController, graph.playbackController)
         assertSame(graph.playbackController, graph.playbackServiceDependencies.controller())
+        assertSame(graph.waveformWorkerComponent, application.waveformWorkerComponent)
     }
 }
