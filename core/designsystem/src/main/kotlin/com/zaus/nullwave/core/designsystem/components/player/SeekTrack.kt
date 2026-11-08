@@ -17,32 +17,48 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
-/** Real peaks only. Aggregate to visible bars by peak, once per data/size change, not each frame. */
+/** All geometry is measured along the full timeline. Recompute it only when data or size changes. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun SeekTrack(state: SliderState, enabled: Boolean, waveform: List<Float>, scrubbing: Boolean, glowEnabled: Boolean) {
+internal fun SeekTrack(
+    state: SliderState,
+    enabled: Boolean,
+    waveform: List<Float>?,
+    scrubbing: Boolean,
+    glowEnabled: Boolean,
+) {
     val colors = NullWaveTheme.colors
     Spacer(Modifier.fillMaxWidth().height(SeekTrackHeight).drawWithCache {
-        val bars = minOf(waveform.size, (size.width / BarPitch.toPx()).toInt().coerceAtLeast(1))
-        val peaks = FloatArray(bars) { bar ->
-            val start = (bar.toLong() * waveform.size / bars).toInt()
-            val end = ((bar + 1L) * waveform.size / bars).toInt()
-            var peak = 0f
-            for (index in start until end) peak = maxOf(peak, waveform[index])
-            peak
-        }
         val rtl = layoutDirection == LayoutDirection.Rtl
         val stroke = PlayheadWidth.toPx()
+        fun Path.mark(start: Float, end: Float, height: Float) {
+            if (end <= start) return
+            val left = if (rtl) size.width - end else start
+            addRect(Rect(left, (size.height - height) / 2f, left + (end - start), (size.height + height) / 2f))
+        }
         val timeline = Path().apply {
-            if (peaks.isEmpty()) {
-                addRect(Rect(0f, size.height / 2f - stroke, size.width, size.height / 2f + stroke))
+            if (waveform == null) {
+                val ticks = (size.width / RulerPitch.toPx()).toInt().coerceAtLeast(1)
+                val pitch = size.width / ticks
+                val width = minOf(RulerTickWidth.toPx(), pitch)
+                for (index in 0 until ticks) {
+                    val x = (index + 0.5f) * pitch - width / 2f
+                    val height = if (index % 4 == 0) RulerMajorHeight else RulerMinorHeight
+                    mark(x, x + width, height.toPx())
+                }
+            } else if (waveform.isEmpty()) {
+                mark(0f, size.width, stroke * 2f)
             } else {
-                val pitch = size.width / peaks.size
+                val bars = minOf(waveform.size, (size.width / BarPitch.toPx()).toInt().coerceAtLeast(1))
+                val pitch = size.width / bars
                 val width = (pitch - BarGap.toPx()).coerceAtLeast(1f).coerceAtMost(pitch)
-                peaks.forEachIndexed { index, peak ->
-                    val height = maxOf(stroke, size.height * peak)
-                    val x = (if (rtl) size.width - (index + 1) * pitch else index * pitch) + (pitch - width) / 2f
-                    addRect(Rect(x, (size.height - height) / 2f, x + width, (size.height + height) / 2f))
+                for (bar in 0 until bars) {
+                    val startBin = (bar.toLong() * waveform.size / bars).toInt()
+                    val endBin = ((bar + 1L) * waveform.size / bars).toInt()
+                    var peak = 0f
+                    for (index in startBin until endBin) peak = maxOf(peak, waveform[index])
+                    val x = bar * pitch + (pitch - width) / 2f
+                    mark(x, x + width, maxOf(stroke, size.height * peak))
                 }
             }
         }
@@ -70,7 +86,8 @@ internal fun SeekTrack(state: SliderState, enabled: Boolean, waveform: List<Floa
             }
             clipRect(left = if (rtl) boundary else 0f, right = if (rtl) size.width else boundary) { drawPath(timeline, active) }
             // Identical centre/width in both states. Drag changes emphasis, never precision.
-            val x = boundary.coerceIn(stroke / 2f, maxOf(stroke / 2f, size.width - stroke / 2f))
+            val halfStroke = minOf(stroke, size.width) / 2f
+            val x = boundary.coerceIn(halfStroke, size.width - halfStroke)
             val start = Offset(x, 0f)
             val end = Offset(x, size.height)
             if (enabled && glowEnabled) {
@@ -86,6 +103,10 @@ private val SeekTrackHeight = 32.dp
 private val PlayheadWidth = 2.dp
 private val BarPitch = 4.dp
 private val BarGap = 2.dp
+private val RulerPitch = 8.dp
+private val RulerTickWidth = 1.5.dp
+private val RulerMinorHeight = 4.dp
+private val RulerMajorHeight = 8.dp
 private val WaveGlowRadius = 4.dp
 private const val WaveGlowAlpha = 0.28f
 private val PlayheadGlowRadius = 6.dp

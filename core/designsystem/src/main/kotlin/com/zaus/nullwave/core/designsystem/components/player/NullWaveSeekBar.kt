@@ -28,7 +28,8 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
  * Playback updates cannot overwrite a pending scrub. [onSeek] fires once at completion, then
  * the control returns to the supplied [positionMs]; command acknowledgement belongs to the caller.
  * [onScrubPositionChange] receives preview milliseconds, then null at completion/cancellation.
- * [waveform] is an immutable list of normalized peaks, not audio samples. Empty uses a plain track.
+ * [waveform] contains normalized peaks for the whole track. Null shows time marks while
+ * loading. An empty list uses a plain rail when the waveform is unavailable.
  * The same thin playhead marks the exact position at rest and while scrubbing; no visible thumb
  * obscures it. [glowEnabled] adds a subtle halo to the played timeline and strengthens the playhead
  * during scrub. This accent takes over from Play/Pause; disabled timelines never glow.
@@ -50,7 +51,7 @@ fun NullWaveSeekBar(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     label: String = stringResource(R.string.nw_seek_label),
-    waveform: List<Float> = emptyList(),
+    waveform: List<Float>? = emptyList(),
     onScrubPositionChange: (Long?) -> Unit = {},
     interactionSource: MutableInteractionSource? = null,
     glowEnabled: Boolean = true,
@@ -58,7 +59,7 @@ fun NullWaveSeekBar(
     require(mediaKey.isNotBlank()) { "SeekBar needs a stable media key" }
     require(durationMs == null || durationMs >= 0L) { "Unknown duration must be null, not negative" }
     val peaks = remember(waveform) {
-        waveform.toList().also { values ->
+        waveform?.toList()?.also { values ->
             require(values.all { it.isFinite() && it in 0f..1f }) { "Waveform peaks must be finite and normalized" }
         }
     }
