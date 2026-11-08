@@ -22,6 +22,7 @@ import com.zaus.nullwave.feature.library.data.mapping.toTracks
 import com.zaus.nullwave.feature.library.data.search.toSearchResults
 import com.zaus.nullwave.feature.library.data.source.MediaStoreAudioRow
 import com.zaus.nullwave.feature.library.data.source.MediaStoreAudioSource
+import com.zaus.nullwave.feature.library.data.waveform.work.WaveformCatalogSync
 import java.io.IOException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.CoroutineDispatcher
@@ -35,6 +36,7 @@ import kotlinx.coroutines.flow.flowOn
 internal class MediaStoreLibraryRepository(
     private val source: MediaStoreAudioSource,
     private val io: CoroutineDispatcher,
+    private val waveformSync: WaveformCatalogSync = WaveformCatalogSync {},
 ) : LibraryCatalogRepository, LibrarySearchRepository {
     override fun observeTracks(query: LibraryTrackQuery): Flow<AppResult<List<MediaTrack>, DataError>> =
         observe { it.toTracks(query) }
@@ -46,9 +48,10 @@ internal class MediaStoreLibraryRepository(
         observe { it.toArtists(query) }
 
     override fun observeSearch(query: LibrarySearchQuery): Flow<AppResult<LibrarySearchResults, DataError>> =
-        observe { it.toSearchResults(query) }
+        observe(prepareWaveforms = false) { it.toSearchResults(query) }
 
     private fun <T> observe(
+        prepareWaveforms: Boolean = true,
         transform: suspend (List<MediaStoreAudioRow>) -> T,
     ): Flow<AppResult<T, DataError>> = flow {
         val changes = Channel<Unit>(Channel.CONFLATED)
@@ -59,11 +62,16 @@ internal class MediaStoreLibraryRepository(
                 is AppResult.Success -> observation.value.use {
                     changes.trySend(Unit)
                     for (ignored in changes) {
-                        val result = readResult { transform(source.readRows()) }
+                        var catalogRows: List<MediaStoreAudioRow>? = null
+                        val result = readResult {
+                            val rows = source.readRows()
+                            transform(rows).also { if (prepareWaveforms) catalogRows = rows }
+                        }
                         // Access may have been revoked while the provider was reading or sorting.
                         val checked = if (result is AppResult.Success && !source.hasReadAccess()) {
                             AppResult.Failure(DataError.AccessDenied)
                         } else result
+                        if (checked is AppResult.Success) catalogRows?.let(waveformSync::submit)
                         emit(checked)
                         if (checked is AppResult.Failure && checked.error == DataError.AccessDenied) break
                     }

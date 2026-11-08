@@ -37,7 +37,8 @@ import org.junit.Test
 class MediaStoreLibraryRepositoryTest(private val kind: String) {
     private val dispatcher = StandardTestDispatcher()
     private val source = FakeMediaStoreAudioSource()
-    private val repository = MediaStoreLibraryRepository(source, dispatcher)
+    private var waveformSubmissions = 0
+    private val repository = MediaStoreLibraryRepository(source, dispatcher) { waveformSubmissions++ }
     private fun observe(localeTag: String = "en"): Flow<AppResult<Any, DataError>> = when (kind) {
         "tracks" -> repository.observeTracks(LibraryTrackQuery(localeTag))
         "albums" -> repository.observeAlbums(LibraryAlbumQuery(localeTag))
@@ -65,6 +66,7 @@ class MediaStoreLibraryRepositoryTest(private val kind: String) {
         assertEquals(listOf(AppResult.Failure(DataError.AccessDenied)), results)
         assertEquals(0, source.registrations)
         assertEquals(0, source.reads)
+        assertEquals(0, waveformSubmissions)
     }
 
     @Test
@@ -106,6 +108,7 @@ class MediaStoreLibraryRepositoryTest(private val kind: String) {
         assertEquals(2, source.reads)
         assertEquals(2, results.size)
         assertEquals(1, source.activeObservers)
+        assertEquals(if (kind == "search") 0 else 2, waveformSubmissions)
     }
 
     @Test
