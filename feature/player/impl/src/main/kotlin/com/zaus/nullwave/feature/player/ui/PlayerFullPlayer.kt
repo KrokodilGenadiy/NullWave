@@ -41,6 +41,8 @@ import com.zaus.nullwave.core.designsystem.components.player.NullWaveTransportCo
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.media.model.track.MediaTrack
+import com.zaus.nullwave.core.media.model.track.TrackId
+import com.zaus.nullwave.feature.player.presentation.PlayerWaveform
 import com.zaus.nullwave.core.playback.api.PlaybackClock
 import com.zaus.nullwave.core.playback.api.command.PlaybackCapability
 import com.zaus.nullwave.core.playback.api.model.RepeatMode
@@ -63,6 +65,7 @@ internal fun PlayerFullPlayer(
     onClose: () -> Unit,
     onOpenLibrary: () -> Unit,
     modifier: Modifier = Modifier,
+    waveform: @Composable (TrackId) -> PlayerWaveform = { PlayerWaveform.Unavailable },
 ) {
     val queue = state.displaySnapshot?.queue
     // The engine emits progress frequently; metadata/order scans only belong to queue changes.
@@ -124,7 +127,8 @@ internal fun PlayerFullPlayer(
                         )
                         Spacer(Modifier.height(spacing.lg))
                         PlayerFullMetadata(track)
-                        PlayerFullControls(state, canSubmit && active, onIntent, clock)
+                        val timeline = if (state.liveSnapshot != null) waveform(track.id) else PlayerWaveform.Unavailable
+                        PlayerFullControls(state, canSubmit && active, onIntent, clock, timeline)
                     }
                 }
                 // A late failure is visible without moving the artwork/controls scroll position.
@@ -178,6 +182,7 @@ private fun PlayerFullControls(
     canSubmit: Boolean,
     onIntent: (PlayerIntent) -> Unit,
     clock: PlaybackClock,
+    waveform: PlayerWaveform,
 ) {
     val live = state.liveSnapshot
     val target = live?.queue?.current
@@ -211,6 +216,7 @@ private fun PlayerFullControls(
                 formatTime = { if (position == null) unknownTime else libraryDuration(it).orEmpty() },
                 modifier = Modifier.fillMaxWidth().testTag("player_full_seek"),
                 enabled = seekEnabled,
+                waveform = waveform.peaks,
                 onScrubPositionChange = { scrubPosition = it },
                 interactionSource = source,
                 glowEnabled = scrubbing,

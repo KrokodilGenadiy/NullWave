@@ -14,6 +14,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.compose.LifecycleStartEffect
+import com.zaus.nullwave.core.media.model.track.TrackId
+import com.zaus.nullwave.core.media.waveform.WaveformSource
 import com.zaus.nullwave.core.designsystem.components.overlay.NullWaveModalSheet
 import com.zaus.nullwave.core.mvi.ui.MviUiState
 import com.zaus.nullwave.core.playback.api.PlaybackClock
@@ -21,6 +24,8 @@ import com.zaus.nullwave.feature.library.api.ui.LibraryArtworkRenderer
 import com.zaus.nullwave.feature.player.presentation.PlayerIntent
 import com.zaus.nullwave.feature.player.presentation.PlayerState
 import com.zaus.nullwave.feature.player.presentation.PlayerViewModel
+import com.zaus.nullwave.feature.player.presentation.PlayerWaveform
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 
 /** Modal presentation only: closing never sends a playback command or changes the host's binding. */
@@ -31,6 +36,7 @@ internal fun PlayerFullSheet(
     lifecycleOwner: LifecycleOwner,
     clock: PlaybackClock,
     artwork: () -> LibraryArtworkRenderer,
+    waveformSource: WaveformSource,
     onClose: () -> Unit,
     onOpenLibrary: () -> Unit,
 ) {
@@ -77,6 +83,26 @@ internal fun PlayerFullSheet(
                 }
             },
             modifier = Modifier.fillMaxSize(),
+            waveform = { id -> rememberPlayerWaveform(id, waveformSource, lifecycleOwner) },
         )
     }
+}
+
+@Composable
+private fun rememberPlayerWaveform(trackId: TrackId, source: WaveformSource, lifecycleOwner: LifecycleOwner): PlayerWaveform {
+    var waveform by remember(trackId, source, lifecycleOwner) { mutableStateOf<PlayerWaveform>(PlayerWaveform.Loading) }
+    val scope = rememberCoroutineScope()
+    LifecycleStartEffect(trackId, source, lifecycleOwner = lifecycleOwner) {
+        val observation = scope.launch {
+            val result = source.load(trackId)
+            // A stopped reader may finish after the same track has been opened again.
+            ensureActive()
+            waveform = result?.let(PlayerWaveform::Ready) ?: PlayerWaveform.Unavailable
+        }
+        onStopOrDispose {
+            observation.cancel()
+            waveform = PlayerWaveform.Loading
+        }
+    }
+    return waveform
 }

@@ -42,6 +42,7 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveEffects
 import com.zaus.nullwave.core.media.model.ArtworkRef
 import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.core.media.model.track.TrackId
+import com.zaus.nullwave.core.media.waveform.WaveformSource
 import com.zaus.nullwave.core.playback.api.PlaybackController
 import com.zaus.nullwave.core.playback.api.PlaybackClock
 import com.zaus.nullwave.core.playback.api.command.PlaybackCapability
@@ -90,6 +91,7 @@ internal interface PlayerHostTestGraph : ViewModelGraph {
             @Provides playback: PlaybackController,
             @Provides clock: PlaybackClock,
             @Provides artwork: LibraryArtworkRenderer,
+            @Provides waveformSource: WaveformSource,
         ): PlayerHostTestGraph
     }
 }
@@ -98,11 +100,12 @@ internal class PlayerHostActivityFixture(
     val viewport: DpSize? = null,
     val fontScale: Float? = null,
     val locale: Locale? = null,
+    waveformSource: WaveformSource = WaveformSource { null },
     val content: (@Composable () -> Unit)? = null,
 ) {
     val playback = RecordingHostPlaybackController()
     val artwork = RecordingHostArtworkRenderer()
-    val graph = createGraphFactory<PlayerHostTestGraph.Factory>().create(playback, PlaybackClock { 10_000 }, artwork)
+    val graph = createGraphFactory<PlayerHostTestGraph.Factory>().create(playback, PlaybackClock { 10_000 }, artwork, waveformSource)
     val hostVisible = mutableStateOf(true)
     val entryOwners = mutableMapOf<HostDestination, ViewModelStoreOwner>()
     var libraryRequests = 0

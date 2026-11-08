@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelStoreOwner
+import com.zaus.nullwave.core.media.waveform.WaveformSource
 import com.zaus.nullwave.core.mvi.ui.MviUiState
 import com.zaus.nullwave.core.mvi.ui.collectMviUiWithLifecycle
 import com.zaus.nullwave.core.playback.api.PlaybackClock
@@ -34,6 +35,7 @@ internal fun PlayerRoot(
     onOpenLibrary: () -> Unit,
     clock: PlaybackClock,
     artwork: () -> LibraryArtworkRenderer,
+    waveformSource: WaveformSource,
     content: @Composable () -> Unit,
 ) {
     val viewModel = metroViewModel<PlayerViewModel>(viewModelStoreOwner = owner, key = PlayerViewModelKey)
@@ -47,7 +49,7 @@ internal fun PlayerRoot(
         miniPlayer = { if (showControls) PlayerHostMini(ui, lifecycleOwner, clock, artwork, { expanded = true }, !expanded) },
         content = content,
     )
-    if (expanded) PlayerFullSheet(ui, lifecycleOwner, clock, artwork, { expanded = false }, onOpenLibrary)
+    if (expanded) PlayerFullSheet(ui, lifecycleOwner, clock, artwork, waveformSource, { expanded = false }, onOpenLibrary)
 }
 
 /** Snapshot reads stay below navigation, so progress samples don't invalidate the navigation host. */

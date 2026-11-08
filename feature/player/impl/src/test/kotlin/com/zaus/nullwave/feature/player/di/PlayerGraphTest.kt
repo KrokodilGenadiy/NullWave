@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import com.zaus.nullwave.core.media.model.ArtworkRef
+import com.zaus.nullwave.core.media.waveform.WaveformSource
 import com.zaus.nullwave.core.playback.api.PlaybackClock
 import com.zaus.nullwave.core.playback.api.PlaybackController
 import com.zaus.nullwave.feature.library.api.ui.LibraryArtworkRenderer
@@ -36,7 +37,8 @@ class PlayerGraphTest {
     @Test
     fun `production contribution reaches Metro factory and creates unscoped Player instances`() = with(fixture) {
         runTest(dispatcher) {
-            val graph = createGraphFactory<PlayerTestGraph.Factory>().create(playback, PlaybackClock { 0L }, NoArtwork)
+            val graph = createGraphFactory<PlayerTestGraph.Factory>().create(playback, PlaybackClock { 0L }, NoArtwork,
+                WaveformSource { error("Creating a host must not read audio") })
             val first = graph.metroViewModelFactory.create(PlayerViewModel::class, CreationExtras.Empty)
                 .also { store.put("first", it) }
             val second = graph.metroViewModelFactory.create(PlayerViewModel::class, CreationExtras.Empty)
@@ -65,6 +67,7 @@ internal interface PlayerTestGraph : ViewModelGraph {
             @Provides controller: PlaybackController,
             @Provides clock: PlaybackClock,
             @Provides artwork: LibraryArtworkRenderer,
+            @Provides waveformSource: WaveformSource,
         ): PlayerTestGraph
     }
 }
