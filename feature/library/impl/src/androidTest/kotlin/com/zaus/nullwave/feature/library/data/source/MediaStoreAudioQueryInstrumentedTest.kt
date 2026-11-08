@@ -3,7 +3,9 @@ package com.zaus.nullwave.feature.library.data.source
 import android.database.MatrixCursor
 import android.database.sqlite.SQLiteDiskIOException
 import android.os.OperationCanceledException
+import android.provider.MediaStore
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.filters.SdkSuppress
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.DataError
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
@@ -41,10 +43,23 @@ class MediaStoreAudioQueryInstrumentedTest {
         assertEquals(6_000_000_001L, rows.first().sizeBytes)
         assertEquals(2_000_000_001L, rows.first().dateModifiedSeconds)
         assertEquals(7_000_000_001L, rows.first().artistId)
+        assertEquals(null, rows.first().generationModified)
         assertEquals(null, rows.last().albumId)
         assertEquals(null, rows.last().sizeBytes)
         assertEquals(null, rows.last().dateModifiedSeconds)
         assertEquals(null, rows.last().artistId)
+        assertTrue(cursor.isClosed)
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 30)
+    fun readsMediaStoreGenerationWhenTheCatalogRequestsIt() = runBlocking {
+        val cursor = MatrixCursor(audioProjection + MediaStore.MediaColumns.GENERATION_MODIFIED).apply {
+            newRow().add(MediaStore.MediaColumns._ID, 23L)
+                .add(MediaStore.MediaColumns.GENERATION_MODIFIED, 5_000_000_007L)
+        }
+        val row = queryAudioRows(Dispatchers.IO) { cursor }.single()
+        assertEquals(5_000_000_007L, row.generationModified)
         assertTrue(cursor.isClosed)
     }
 

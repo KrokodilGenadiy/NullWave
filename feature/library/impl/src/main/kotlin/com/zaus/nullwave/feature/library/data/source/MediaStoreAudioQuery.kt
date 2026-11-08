@@ -29,13 +29,21 @@ internal fun audioSelection(sdk: Int): String = if (sdk >= 30) {
 internal suspend fun queryAudioRows(
     io: CoroutineDispatcher,
     query: (CancellationSignal) -> Cursor?,
-): List<MediaStoreAudioRow> = coroutineScope {
+): List<MediaStoreAudioRow> = withMediaStoreCancellation(io) { signal ->
+    val cursor = query(signal) ?: throw IOException("MediaStore audio query returned no cursor")
+    cursor.use { it.readRows(signal) }
+}
+
+/** Keep cursor/descriptor ownership inside [block], including when returning across dispatchers. */
+internal suspend fun <T> withMediaStoreCancellation(
+    io: CoroutineDispatcher,
+    block: suspend (CancellationSignal) -> T,
+): T = coroutineScope {
     val cancellation = CancellationSignal()
     val worker = async(io) {
         try {
             cancellation.throwIfCanceled()
-            val cursor = query(cancellation) ?: throw IOException("MediaStore audio query returned no cursor")
-            cursor.use { it.readRows(cancellation) }
+            block(cancellation)
         } catch (failure: OperationCanceledException) {
             currentCoroutineContext().ensureActive()
             throw failure
@@ -61,6 +69,7 @@ private fun Cursor.readRows(cancellation: CancellationSignal): List<MediaStoreAu
     val size = getColumnIndexOrThrow(Media.SIZE)
     val modified = getColumnIndexOrThrow(Media.DATE_MODIFIED)
     val artistId = getColumnIndexOrThrow(Media.ARTIST_ID)
+    val generation = getColumnIndex(Media.GENERATION_MODIFIED)
     return buildList {
         while (true) {
             cancellation.throwIfCanceled()
@@ -79,6 +88,7 @@ private fun Cursor.readRows(cancellation: CancellationSignal): List<MediaStoreAu
                 sizeBytes = if (isNull(size)) null else getLong(size),
                 dateModifiedSeconds = if (isNull(modified)) null else getLong(modified),
                 artistId = if (isNull(artistId)) null else getLong(artistId),
+                generationModified = if (generation >= 0 && !isNull(generation)) getLong(generation) else null,
             ))
         }
     }

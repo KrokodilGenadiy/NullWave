@@ -25,7 +25,7 @@ internal class AndroidMediaStoreAudioSource(
     override suspend fun readRows(): List<MediaStoreAudioRow> = queryAudioRows(io) { cancellation ->
         context.contentResolver.query(
             MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL),
-            audioProjection,
+            if (Build.VERSION.SDK_INT >= 30) audioProjection + MediaStore.MediaColumns.GENERATION_MODIFIED else audioProjection,
             audioSelection(Build.VERSION.SDK_INT),
             null,
             null,
