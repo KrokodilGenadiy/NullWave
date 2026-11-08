@@ -4,6 +4,7 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.view.KeyEvent
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
@@ -63,6 +64,7 @@ import com.zaus.nullwave.feature.player.impl.R
 import com.zaus.nullwave.feature.player.presentation.PlayerIntent
 import com.zaus.nullwave.feature.player.presentation.PlayerState
 import com.zaus.nullwave.feature.player.presentation.PlayerViewModel
+import com.zaus.nullwave.feature.player.presentation.PlayerWaveform
 import java.util.Locale
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CompletableDeferred
@@ -81,7 +83,9 @@ import org.junit.Test
 
 /** Real Activity/host ownership; direct content is used only for controlled viewport and gestures. */
 class PlayerFullPlayerInstrumentedTest {
-    @get:Rule val compose = createEmptyComposeRule()
+    @get:Rule val compose = createEmptyComposeRule(effectContext = object : MotionDurationScale {
+        override val scaleFactor = 1f
+    })
     private var fixture = PlayerHostActivityFixture()
     private var scenario: ActivityScenario<PlayerHostTestActivity>? = null
     private val track = MediaTrack(
@@ -179,6 +183,83 @@ class PlayerFullPlayerInstrumentedTest {
     }
 
     @Test
+    fun pendingPlayCommandKeepsTheSameWaveformReadAndPreparationCue() {
+        val requests = CopyOnWriteArrayList<PeakRequest>()
+        val gate = CompletableDeferred<Unit>()
+        fixture = PlayerHostActivityFixture(waveformSource = recordingSource(requests))
+        fixture.playback.commandGate = gate
+        connect(snapshot())
+        launch()
+        openFull()
+        val play = control(DesignSystemR.string.nw_player_play).performScrollTo()
+        awaitWaveformPreparing()
+        compose.mainClock.autoAdvance = false
+        try {
+            fun awaitSeekEnabledWhilePreparing(enabled: Boolean) {
+                compose.waitUntil(5_000) {
+                    compose.mainClock.advanceTimeByFrame()
+                    assertSeekDescription(preparing = true)
+                    val isEnabled = !seek().fetchSemanticsNode().config.contains(SemanticsProperties.Disabled)
+                    isEnabled == enabled
+                }
+            }
+            play.performClick()
+            awaitSeekEnabledWhilePreparing(false)
+            awaitCommandCount(1)
+            assertEquals(listOf(PlaybackCommand.SetPlayRequested(true)), fixture.playback.commands)
+            compose.runOnIdle { gate.complete(Unit) }
+            awaitSeekEnabledWhilePreparing(true)
+            assertTrue(requests.single().job.isActive)
+        } finally {
+            gate.complete(Unit)
+            compose.mainClock.autoAdvance = true
+        }
+    }
+
+    @Test
+    fun barsKeepGrowingWhenSeekBecomesBusyAndDurationChanges() {
+        val initial = snapshot()
+        val state = mutableStateOf(displayState(initial))
+        val canSubmit = mutableStateOf(true)
+        val waveform = mutableStateOf<PlayerWaveform>(PlayerWaveform.Loading)
+        fixture = PlayerHostActivityFixture(reduceMotion = false, content = {
+            PlayerFullPlayer(
+                state = state.value, canSubmit = canSubmit.value, onIntent = {},
+                clock = PlaybackClock { 10_000 }, artwork = { fixture.artwork },
+                lifecycleOwner = LocalLifecycleOwner.current, onClose = {}, onOpenLibrary = {},
+                waveform = { waveform.value },
+            )
+        })
+        launch()
+        seek().performScrollTo()
+        awaitWaveformPreparing()
+        compose.mainClock.autoAdvance = false
+        try {
+            fun unplayedBarHeight(): Int {
+                val pixels = seek().captureToImage().toPixelMap()
+                val x = pixels.width * 3 / 4
+                val outline = NullWaveColors.Cyberpunk.outline.toArgb()
+                return (0 until pixels.height).count { y -> pixels[x, y].toArgb() == outline }
+            }
+            compose.runOnUiThread { waveform.value = PlayerWaveform.Ready(Waveform.of(listOf(1f, 1f))) }
+            compose.mainClock.advanceTimeBy(80)
+            val initialHeight = unplayedBarHeight()
+            compose.runOnUiThread { canSubmit.value = false }
+            compose.mainClock.advanceTimeBy(32)
+            val busyHeight = unplayedBarHeight()
+            compose.runOnUiThread { state.value = displayState(initial, durationMs = 180_000) }
+            compose.mainClock.advanceTimeBy(32)
+            val correctedHeight = unplayedBarHeight()
+            compose.mainClock.advanceTimeBy(400)
+            val fullHeight = unplayedBarHeight()
+            assertTrue("Expected increasing bar heights, got $initialHeight, $busyHeight, $correctedHeight, $fullHeight",
+                initialHeight > 0 && initialHeight < busyHeight && busyHeight < correctedHeight && correctedHeight < fullHeight)
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+    }
+
+    @Test
     fun fullSheetDrawsOnlySelectedTrackPeaksAndSeekWorksDuringLoading() {
         val secondTrack = track.copy(id = TrackId("second"), title = "Second")
         val thirdTrack = track.copy(id = TrackId("third"), title = "Third")
@@ -190,7 +271,7 @@ class PlayerFullPlayerInstrumentedTest {
         openFull()
         compose.waitUntil(5_000) { requests.size == 1 }
         seek().performScrollTo().assertIsEnabled()
-        assertUnplayedRail(segmentTicks = true)
+        awaitWaveformPreparing()
         seek().performSemanticsAction(SemanticsActions.SetProgress) { it(0.5f) }
         awaitCommandCount(1)
         assertEquals(PlaybackCommand.SeekTo(first.queue.current!!, 60_000), fixture.playback.commands.single())
@@ -200,6 +281,7 @@ class PlayerFullPlayerInstrumentedTest {
         requests.first().reply.complete(rising)
         assertTallWaveformBar(true, startPercent = 33, endPercent = 42)
         assertTallWaveformBar(true)
+        assertSeekDescription(preparing = false)
         compose.runOnIdle { connect(snapshot(activation = 1, item = secondTrack)) }
         compose.waitUntil(5_000) { requests.size == 2 }
         val second = requests.last()
@@ -209,16 +291,50 @@ class PlayerFullPlayerInstrumentedTest {
             compose.waitUntil(5_000) { requests.size == 3 }
             assertEquals(listOf(track.id, secondTrack.id, thirdTrack.id), requests.map { it.id })
             assertTrue(second.job.isCancelled)
-            // Simulate a late decoder reply for the superseded track and an unavailable current file.
+            // The old decoder completes while the selected track is still loading.
             second.reply.complete(rising)
+            compose.waitUntil(5_000) { second.job.isCompleted }
+            awaitWaveformPreparing()
             requests.last().reply.complete(null)
-            compose.waitUntil(5_000) { second.job.isCompleted && requests.last().job.isCompleted }
-            assertUnplayedRail(segmentTicks = false)
+            compose.waitUntil(5_000) { requests.last().job.isCompleted }
+            assertPlainUnplayedRail()
+            assertSeekDescription(preparing = false)
             assertTallWaveformBar(false)
             seek().assertIsEnabled()
         } finally {
             second.reply.complete(null)
         }
+    }
+
+    @Test
+    fun switchingToCachedPeaksKeepsTheSeekPositionDescriptionAcrossFrames() {
+        val cachedTrack = track.copy(id = TrackId("cached"), title = "Cached")
+        val waveform = Waveform.of(listOf(0f, 1f))
+        fixture = PlayerHostActivityFixture(waveformSource = WaveformSource { id ->
+            if (id == cachedTrack.id) waveform else null
+        })
+        connect(snapshot())
+        launch()
+        openFull()
+        seek().performScrollTo()
+        assertPlainUnplayedRail()
+
+        val preparation = text(DesignSystemR.string.nw_seek_preparing_waveform, "").trim()
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.runOnIdle { connect(snapshot(activation = 1, item = cachedTrack)) }
+            // Inspect each rendered frame through the loading grace period.
+            repeat(20) {
+                compose.mainClock.advanceTimeByFrame()
+                val description = seek().fetchSemanticsNode().config[SemanticsProperties.StateDescription]
+                assertFalse("Cached track announced preparation: $description", description.contains(preparation))
+            }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.onNodeWithText(cachedTrack.title).assertExists()
+        assertTallWaveformBar(true)
+        assertSeekDescription(preparing = false)
     }
 
     @Test
@@ -241,7 +357,7 @@ class PlayerFullPlayerInstrumentedTest {
             assertTrue(requests[1].job.isCancelled)
             assertFalse(original.job.isCompleted)
             seek().performScrollTo()
-            assertUnplayedRail(segmentTicks = true)
+            awaitWaveformPreparing()
 
             requests.last().reply.complete(Waveform.of(listOf(0f, 1f)))
             assertTallWaveformBar(true)
@@ -278,7 +394,7 @@ class PlayerFullPlayerInstrumentedTest {
             compose.waitUntil(5_000) { requests.last() !== pending && requests.last().job.isActive }
             pending.reply.complete(Waveform.of(listOf(1f, 1f)))
             compose.waitUntil(5_000) { pending.job.isCompleted }
-            assertUnplayedRail(segmentTicks = true)
+            awaitWaveformPreparing()
         } finally {
             pending.reply.complete(null)
         }
@@ -306,13 +422,23 @@ class PlayerFullPlayerInstrumentedTest {
         else request.reply.await()
     }
 
-    private fun assertUnplayedRail(segmentTicks: Boolean) {
+    private fun awaitWaveformPreparing() {
+        compose.mainClock.advanceTimeBy(250)
+        assertSeekDescription(preparing = true)
+    }
+
+    private fun assertSeekDescription(preparing: Boolean) {
+        val position = text(DesignSystemR.string.nw_seek_position, "0:30", "2:00")
+        val expected = if (preparing) text(DesignSystemR.string.nw_seek_preparing_waveform, position) else position
+        assertEquals(expected, seek().fetchSemanticsNode().config[SemanticsProperties.StateDescription])
+    }
+
+    private fun assertPlainUnplayedRail() {
         val outline = NullWaveColors.Cyberpunk.outline.toArgb()
         compose.waitUntil(5_000) {
             val pixels = seek().captureToImage().toPixelMap()
             val region = (pixels.width * 60 / 100) until (pixels.width * 85 / 100)
-            val filled = region.count { x -> pixels[x, pixels.height / 2].toArgb() == outline }
-            if (segmentTicks) filled in 1 until region.count() / 2 else filled == region.count()
+            region.all { x -> pixels[x, pixels.height / 2].toArgb() == outline }
         }
     }
 
@@ -543,12 +669,12 @@ class PlayerFullPlayerInstrumentedTest {
         SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress) and hasAnyAncestor(hasTestTag("player_full_seek")),
     )
 
-    private fun text(id: Int): String {
+    private fun text(id: Int, vararg args: Any): String {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val locale = fixture.locale ?: return context.getString(id)
+        val locale = fixture.locale ?: return context.getString(id, *args)
         val configuration = Configuration(context.resources.configuration)
         configuration.setLocale(locale)
-        return context.createConfigurationContext(configuration).getString(id)
+        return context.createConfigurationContext(configuration).getString(id, *args)
     }
 
     private fun displayState(snapshot: PlaybackSnapshot, durationMs: Long = 120_000) = PlayerState(

@@ -100,6 +100,7 @@ internal class PlayerHostActivityFixture(
     val viewport: DpSize? = null,
     val fontScale: Float? = null,
     val locale: Locale? = null,
+    val reduceMotion: Boolean = true,
     waveformSource: WaveformSource = WaveformSource { null },
     val content: (@Composable () -> Unit)? = null,
 ) {
@@ -138,7 +139,7 @@ class PlayerHostTestActivity : ComponentActivity() {
                 LocalDensity provides (activeFixture.fontScale?.let { Density(density.density, it) } ?: density),
                 LocalMetroViewModelFactory provides activeFixture.graph.metroViewModelFactory,
             ) {
-                NullWaveTheme(effects = NullWaveEffects(reduceMotion = true, glowEnabled = false)) {
+                NullWaveTheme(effects = NullWaveEffects(reduceMotion = activeFixture.reduceMotion, glowEnabled = false)) {
                     val viewport = activeFixture.viewport
                     Box(if (viewport == null) Modifier else Modifier.size(viewport.width, viewport.height).testTag("host_test_viewport")) {
                         val customContent = activeFixture.content
