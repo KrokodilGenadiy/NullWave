@@ -60,6 +60,7 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
  * Full text remains available to accessibility. Height grows from 72 dp with font scale, not tag length.
  * [durationLabel] is preformatted, never computed from media.
  * With a null [onClick], the row is informational: normal colours, no button role or click action.
+ * [playingStateDescription] can describe the highlighted entry as the current track even when paused.
  * Selection and long click require an interactive row; a separate more action remains optional.
  * On narrow windows/large text, metadata moves below the title to preserve readable space.
  */
@@ -81,6 +82,7 @@ fun NullWaveTrackRow(
     longClickLabel: String? = null,
     interactionSource: MutableInteractionSource? = null,
     reduceMotion: Boolean = false,
+    playingStateDescription: String? = null,
 ) {
     require(title.isNotBlank()) { "Track title must not be blank" }
     require(onMoreClick == null || moreDescription.isNotBlank()) { "More action needs a description" }
@@ -95,13 +97,12 @@ fun NullWaveTrackRow(
     val focused by source.collectIsFocusedAsState()
     val pressed by source.collectIsPressedAsState()
     val choosing = selectionMode || selected
-    val playingDescription = if (playing) stringResource(
-        when {
-            !choosing -> R.string.nw_track_playing
-            selected -> R.string.nw_track_selected_playing
-            else -> R.string.nw_track_unselected_playing
-        },
-    ) else null
+    val playingDescription = when {
+        !playing -> null
+        !choosing -> playingStateDescription ?: stringResource(R.string.nw_track_playing)
+        selected -> stringResource(R.string.nw_track_selected_playing)
+        else -> stringResource(R.string.nw_track_unselected_playing)
+    }
     val spine = when {
         !enabled -> colors.textSecondary
         selected -> colors.secondary
@@ -199,7 +200,7 @@ private fun TrackMetadata(durationLabel: String?, playing: Boolean, enabled: Boo
     if (durationLabel.isNullOrBlank() && !playing && !unavailable) return
     Row(horizontalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.xs), verticalAlignment = Alignment.CenterVertically) {
         if (playing) NullWaveIcon(
-            NullWaveIcons.Waveform, null, Modifier.size(PlaybackMarkSize),
+            R.drawable.nw_track_playing_bars, null, Modifier.size(PlaybackMarkSize),
             tint = if (enabled) NullWaveTheme.colors.primary else NullWaveTheme.colors.textSecondary,
         )
         Column {
@@ -209,7 +210,8 @@ private fun TrackMetadata(durationLabel: String?, playing: Boolean, enabled: Boo
     }
 }
 
-internal fun trackMetadataBelow(width: Dp, fontScale: Float): Boolean =
+/** Place metadata below the track text when a trailing label would crowd the title. */
+fun trackMetadataBelow(width: Dp, fontScale: Float): Boolean =
     width < InlineMetadataMinWidth || fontScale > InlineMetadataMaxFontScale
 
 internal val TrackRowMinHeight = 72.dp

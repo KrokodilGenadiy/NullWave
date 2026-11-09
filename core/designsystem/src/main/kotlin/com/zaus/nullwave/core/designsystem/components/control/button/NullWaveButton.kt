@@ -195,8 +195,6 @@ private fun ButtonContent(
             }
             Text(
                 text = label,
-                // Wrap within the space left by the icon without stretching short labels.
-                modifier = Modifier.weight(1f, fill = false),
                 style = style,
             )
         }
