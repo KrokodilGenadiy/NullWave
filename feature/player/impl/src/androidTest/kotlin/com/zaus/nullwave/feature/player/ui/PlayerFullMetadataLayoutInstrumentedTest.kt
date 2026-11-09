@@ -2,6 +2,7 @@ package com.zaus.nullwave.feature.player.ui
 
 import android.content.Intent
 import android.content.res.Configuration
+import android.content.res.Resources
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -10,6 +11,7 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.DpRect
@@ -111,8 +113,17 @@ class PlayerFullMetadataLayoutInstrumentedTest(
         compose.waitForIdle()
 
         assertTrackChangesPreserveGeometry()
+        val close = compose.onNodeWithTag("player_full_close")
+        val headerBounds = close.getUnclippedBoundsInRoot()
+        val fullBounds = compose.onNodeWithTag("player_full").getUnclippedBoundsInRoot()
         val scroll = compose.onNodeWithTag("player_full_scroll")
         val maximum = scroll.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].maxValue()
+        if (fontScale == 1f) {
+            assertEquals("All playback controls must fit the initial portrait viewport", 0f, maximum, 0f)
+            val cover = compose.onNodeWithTag("player_full_artwork").getUnclippedBoundsInRoot()
+            assertTrue("Artwork must fit below the header", cover.top >= headerBounds.bottom)
+            assertEquals("Artwork stays square", (cover.right - cover.left).value, (cover.bottom - cover.top).value, 0.5f)
+        }
         if (fontScale == 2f) assertTrue("The compact large-text case must exercise scrolling", maximum > 0f)
         if (maximum > 0f) {
             scroll.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, maximum) }
@@ -121,6 +132,15 @@ class PlayerFullMetadataLayoutInstrumentedTest(
                 scroll.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value(), 0.5f)
             assertTrackChangesPreserveGeometry()
         }
+        val strings = localizedResources()
+        for (label in listOf(R.string.player_queue, R.string.player_action_info)) {
+            val action = compose.onNodeWithText(strings.getString(label)).getUnclippedBoundsInRoot()
+            assertTrue("The entire action must be reachable in the viewport: $action",
+                action.top >= headerBounds.bottom && action.bottom <= fullBounds.bottom + 0.5.dp)
+            assertTrue("Keep a full touch target: $action",
+                action.bottom - action.top >= 47.5.dp && action.right - action.left >= 47.5.dp)
+        }
+        assertEquals("The collapse action stays pinned while scrolling", headerBounds, close.getUnclippedBoundsInRoot())
     }
 
     private fun assertTrackChangesPreserveGeometry() {
@@ -200,11 +220,15 @@ class PlayerFullMetadataLayoutInstrumentedTest(
         return Geometry(bounds, scroll.value(), scroll.maxValue())
     }
 
-    private fun subtitle(track: MediaTrack): String {
+    private fun localizedResources(): Resources {
         val base = InstrumentationRegistry.getInstrumentation().targetContext
-        val resources = base.createConfigurationContext(Configuration(base.resources.configuration).also {
+        return base.createConfigurationContext(Configuration(base.resources.configuration).also {
             it.setLocale(locale)
-        })
+        }).resources
+    }
+
+    private fun subtitle(track: MediaTrack): String {
+        val resources = localizedResources()
         val artist = track.artist ?: resources.getString(R.string.player_unknown_artist)
         return track.album?.let { resources.getString(R.string.player_artist_album, artist, it) } ?: artist
     }
@@ -251,6 +275,7 @@ class PlayerFullMetadataLayoutInstrumentedTest(
         @JvmStatic
         @Parameterized.Parameters(name = "{0}x{1}dp,font={2},locale={3}")
         fun windows(): List<Array<Any>> = listOf(
+            arrayOf(360, 600, 1f, "en", "風の谷のナウシカ交響組曲"),
             arrayOf(360, 720, 1f, "en", "風の谷のナウシカ交響組曲"),
             arrayOf(412, 820, 1.5f, "ja", "風の谷のナウシカ交響組曲"),
             arrayOf(320, 240, 2f, "ru", "風の谷のナウシカ"),
