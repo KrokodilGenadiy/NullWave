@@ -3,6 +3,24 @@
     <string name="player_collapse">Collapse player</string>
     <string name="player_now_playing">NOW PLAYING</string>
     <string name="player_queue_position">NOW PLAYING · QUEUE %1$d/%2$d</string>
+    <string name="player_queue">QUEUE</string>
+    <string name="player_action_fav">FAV</string>
+    <string name="player_action_lyrics">LYRICS</string>
+    <string name="player_action_info">INFO</string>
+    <string name="player_queue_options">Queue options</string>
+    <string name="player_queue_clear">CLEAR</string>
+    <string name="player_queue_save">SAVE AS PLAYLIST</string>
+    <string name="player_queue_shuffle_rest">SHUFFLE REST</string>
+    <string name="player_queue_next">NEXT UP</string>
+    <plurals name="player_queue_tracks">
+        <item quantity="one">QUEUE · %1$d TRACK</item>
+        <item quantity="other">QUEUE · %1$d TRACKS</item>
+    </plurals>
+    <string name="player_queue_minutes">%1$s · %2$d MIN</string>
+    <string name="player_queue_credit">%1$s · %2$s</string>
+    <string name="player_back_to_player">Back to player</string>
+    <string name="player_queue_current">Current track</string>
+    <string name="player_queue_unavailable">Queue details are unavailable.</string>
     <string name="player_artist_album">%1$s — %2$s</string>
     <string name="player_no_track">Choose a track in your library to start playback.</string>
     <string name="player_reconnect">Reconnect</string>

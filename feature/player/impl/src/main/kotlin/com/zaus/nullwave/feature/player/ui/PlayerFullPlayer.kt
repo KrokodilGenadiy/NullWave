@@ -1,5 +1,7 @@
 package com.zaus.nullwave.feature.player.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
@@ -10,7 +12,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -22,14 +23,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -45,6 +50,7 @@ import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.feature.player.presentation.PlayerWaveform
 import com.zaus.nullwave.core.playback.api.PlaybackClock
 import com.zaus.nullwave.core.playback.api.command.PlaybackCapability
+import com.zaus.nullwave.core.playback.api.model.PlaybackQueue
 import com.zaus.nullwave.core.playback.api.model.RepeatMode
 import com.zaus.nullwave.feature.library.api.ui.LibraryArtworkRenderer
 import com.zaus.nullwave.feature.library.api.ui.libraryDuration
@@ -70,72 +76,138 @@ internal fun PlayerFullPlayer(
     val queue = state.displaySnapshot?.queue
     // The engine emits progress frequently; metadata/order scans only belong to queue changes.
     val track = remember(queue) { state.currentTrack }
-    val queuePosition = remember(queue) {
-        queue?.current?.let { queue.playOrder.indexOf(it.entryId) + 1 }
+    val currentIndex = remember(queue) {
+        queue?.current?.let { queue.playOrder.indexOf(it.entryId) }
     }
     val renderer = remember(artwork) { artwork() }
+    var queueOpen by rememberSaveable { mutableStateOf(false) }
+    val playerScroll = rememberScrollState()
+    if (queueOpen) BackHandler { queueOpen = false }
     val lifecycle by lifecycleOwner.lifecycle.currentStateAsState()
     val active = lifecycle.isAtLeast(Lifecycle.State.STARTED)
     val spacing = NullWaveTheme.spacing
     Column(modifier.fillMaxSize().background(NullWaveTheme.colors.bg).testTag("player_full")) {
-        // Close stays outside the scroll viewport, including when text and notices grow.
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = spacing.xs, vertical = spacing.xxs),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            NullWaveIconButton(
-                icon = NullWaveIcons.Collapse,
-                contentDescription = stringResource(R.string.player_collapse),
-                onClick = onClose,
-                modifier = Modifier.testTag("player_full_close"),
-            )
-            Text(
-                text = if (queuePosition == null || queue == null) stringResource(R.string.player_now_playing)
-                    else stringResource(R.string.player_queue_position, queuePosition, queue.playOrder.size),
-                modifier = Modifier.weight(1f),
-                color = NullWaveTheme.colors.textSecondary,
-                style = NullWaveTheme.typography.mono,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.size(NullWaveTheme.dimens.touchTarget))
+        val header: @Composable () -> Unit = {
+            PlayerHeader(queueOpen, queue, currentIndex) { if (queueOpen) queueOpen = false else onClose() }
         }
+        if (!queueOpen) header()
+        // The pinned MiniPlayer gets its natural height before the notice and scroll viewport.
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
-            val artworkSize = minOf(
-                MaxArtworkSize,
-                (maxWidth - spacing.lg * 2).coerceAtLeast(1.dp),
-                (maxHeight * ArtworkHeightFraction).coerceAtLeast(MinArtworkSize),
-            )
             val noticeMaxHeight = maxOf(maxHeight / 3, NullWaveTheme.dimens.touchTarget).coerceAtMost(maxHeight)
             Column(Modifier.fillMaxSize()) {
-                Column(
-                    Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).testTag("player_full_scroll")
-                        .padding(horizontal = spacing.lg, vertical = spacing.xs),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    if (track == null) {
+                if (queueOpen) {
+                    if (queue != null && currentIndex != null) {
+                        PlayerQueue(queue, currentIndex, renderer, Modifier.weight(1f), header)
+                    } else {
+                        header()
                         Text(
-                            stringResource(R.string.player_no_track),
+                            stringResource(R.string.player_queue_unavailable),
+                            modifier = Modifier.weight(1f).padding(spacing.lg),
                             color = NullWaveTheme.colors.textSecondary,
                             style = NullWaveTheme.typography.body,
                         )
-                    } else {
-                        renderer.Artwork(
-                            track.artwork,
-                            track.album ?: track.title,
-                            artworkSize,
-                            Modifier.testTag("player_full_artwork"),
-                        )
-                        Spacer(Modifier.height(spacing.lg))
+                    }
+                } else if (track != null) {
+                    PlayerBodyLayout(
+                        modifier = Modifier.weight(1f),
+                        scroll = playerScroll,
+                        artwork = { size ->
+                            renderer.Artwork(
+                                track.artwork,
+                                track.album ?: track.title,
+                                size,
+                                Modifier.testTag("player_full_artwork"),
+                            )
+                        },
+                    ) {
                         PlayerFullMetadata(track)
                         val timeline = if (state.liveSnapshot != null) waveform(track.id) else PlayerWaveform.Unavailable
                         PlayerFullControls(state, canSubmit && active, onIntent, clock, track.id, timeline)
+                        PlayerSecondaryActions { queueOpen = true }
                     }
+                } else {
+                    Text(
+                        stringResource(R.string.player_no_track),
+                        modifier = Modifier.fillMaxWidth().weight(1f).padding(spacing.xs),
+                        textAlign = TextAlign.Center,
+                        color = NullWaveTheme.colors.textSecondary,
+                        style = NullWaveTheme.typography.body,
+                    )
                 }
                 // A late failure is visible without moving the artwork/controls scroll position.
                 PlayerScrollableNotice(
                     state, canSubmit && active, onIntent, onOpenLibrary,
                     Modifier.fillMaxWidth().heightIn(max = noticeMaxHeight),
                 )
+            }
+        }
+        if (queueOpen) {
+            PlayerMiniPlayer(state, canSubmit, onIntent, clock, artwork, lifecycleOwner, onExpand = { queueOpen = false })
+        }
+    }
+}
+
+@Composable
+private fun PlayerHeader(queueOpen: Boolean, queue: PlaybackQueue?, currentIndex: Int?, onBack: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = NullWaveTheme.spacing.xs, vertical = NullWaveTheme.spacing.xxs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        NullWaveIconButton(
+            icon = NullWaveIcons.Collapse,
+            contentDescription = stringResource(if (queueOpen) R.string.player_back_to_player else R.string.player_collapse),
+            onClick = onBack,
+            modifier = Modifier.testTag(if (queueOpen) "player_queue_back" else "player_full_close"),
+        )
+        Text(
+            text = when {
+                queueOpen && queue != null -> queueSummary(queue.entries)
+                queueOpen -> stringResource(R.string.player_queue)
+                currentIndex != null && queue != null -> stringResource(R.string.player_queue_position, currentIndex + 1, queue.playOrder.size)
+                else -> stringResource(R.string.player_now_playing)
+            },
+            modifier = Modifier.weight(1f),
+            color = NullWaveTheme.colors.textSecondary,
+            style = NullWaveTheme.typography.mono,
+            textAlign = TextAlign.Center,
+        )
+        if (queueOpen) {
+            NullWaveIconButton(NullWaveIcons.More, stringResource(R.string.player_queue_options), {}, enabled = false)
+        } else Spacer(Modifier.size(NullWaveTheme.dimens.touchTarget))
+    }
+}
+
+@Composable
+private fun PlayerBodyLayout(
+    modifier: Modifier,
+    scroll: ScrollState,
+    artwork: @Composable (Dp) -> Unit,
+    controls: @Composable () -> Unit,
+) {
+    val spacing = NullWaveTheme.spacing
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val viewportHeight = constraints.maxHeight
+        Layout(
+            modifier = Modifier.fillMaxSize().verticalScroll(scroll).testTag("player_full_scroll")
+                .padding(horizontal = spacing.lg),
+            content = {
+                BoxWithConstraints { artwork(maxWidth) }
+                Column { controls() }
+            },
+        ) { (cover, details), constraints ->
+            // Text and controls take their natural height, including any wrapped rows.
+            val width = constraints.maxWidth
+            val panel = details.measure(Constraints.fixedWidth(width))
+            val inset = spacing.xs.roundToPx()
+            val gap = spacing.md.roundToPx()
+            val maxSide = minOf(width, MaxArtworkSize.roundToPx())
+            val remaining = viewportHeight - panel.height - 2 * inset - gap
+            val side = remaining.coerceIn(minOf(MinArtworkSize.roundToPx(), maxSide), maxSide)
+            val image = cover.measure(Constraints.fixed(side, side))
+            val panelTop = inset + side + gap
+            layout(width, maxOf(constraints.minHeight, panelTop + panel.height + inset)) {
+                image.placeRelative((width - side) / 2, inset)
+                panel.placeRelative(0, panelTop)
             }
         }
     }
@@ -204,7 +276,7 @@ private fun PlayerFullControls(
     val dragged by key(source) { source.collectIsDraggedAsState() }
     var scrubPosition by remember(source) { mutableStateOf<Long?>(null) }
     val scrubbing = seekEnabled && (dragged || scrubPosition != null)
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.md)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.xs)) {
         NullWaveSeekBar(
             mediaKey = trackId.value,
             positionMs = position ?: 0L,
@@ -227,7 +299,7 @@ private fun PlayerFullControls(
             onPlayPause = { onIntent(PlayerIntent.SetPlayRequested(!playRequested)) },
             onPrevious = { onIntent(PlayerIntent.Previous) },
             onNext = { onIntent(PlayerIntent.Next) },
-            modifier = Modifier.testTag("player_full_transport").padding(vertical = NullWaveTheme.spacing.xs),
+            modifier = Modifier.testTag("player_full_transport"),
             enabled = enabled,
             canPlayPause = state.supportsItemCommand(PlaybackCapability.SetPlayRequested),
             canPrevious = state.supportsItemCommand(PlaybackCapability.Previous),
@@ -254,7 +326,6 @@ private fun PlayerFullControls(
     }
 }
 
-private val MaxArtworkSize = 364.dp
+private val MaxArtworkSize = 320.dp
 private val MinArtworkSize = 96.dp
-private const val ArtworkHeightFraction = 0.45f
 private const val MetadataMaxLines = 2

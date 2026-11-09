@@ -3,6 +3,26 @@
     <string name="player_collapse">Свернуть плеер</string>
     <string name="player_now_playing">ВОСПРОИЗВЕДЕНИЕ</string>
     <string name="player_queue_position">ВОСПРОИЗВЕДЕНИЕ · ОЧЕРЕДЬ %1$d/%2$d</string>
+    <string name="player_queue">ОЧЕРЕДЬ</string>
+    <string name="player_action_fav">ИЗБР.</string>
+    <string name="player_action_lyrics">ТЕКСТ</string>
+    <string name="player_action_info">ИНФО</string>
+    <string name="player_queue_options">Действия с очередью</string>
+    <string name="player_queue_clear">ОЧИСТИТЬ</string>
+    <string name="player_queue_save">В ПЛЕЙЛИСТ</string>
+    <string name="player_queue_shuffle_rest">ПЕРЕМЕШАТЬ ОСТАТОК</string>
+    <string name="player_queue_next">ДАЛЕЕ</string>
+    <plurals name="player_queue_tracks">
+        <item quantity="one">ОЧЕРЕДЬ · %1$d ТРЕК</item>
+        <item quantity="few">ОЧЕРЕДЬ · %1$d ТРЕКА</item>
+        <item quantity="many">ОЧЕРЕДЬ · %1$d ТРЕКОВ</item>
+        <item quantity="other">ОЧЕРЕДЬ · %1$d ТРЕКОВ</item>
+    </plurals>
+    <string name="player_queue_minutes">%1$s · %2$d МИН</string>
+    <string name="player_queue_credit">%1$s · %2$s</string>
+    <string name="player_back_to_player">Вернуться в плеер</string>
+    <string name="player_queue_current">Текущая композиция</string>
+    <string name="player_queue_unavailable">Данные очереди пока недоступны.</string>
     <string name="player_artist_album">%1$s — %2$s</string>
     <string name="player_no_track">Выберите трек в медиатеке, чтобы начать воспроизведение.</string>
     <string name="player_reconnect">Подключиться снова</string>

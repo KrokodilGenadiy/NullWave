@@ -43,6 +43,23 @@ private fun FullPlayerRussianPreview() = FullPreview(fullPreviewState(russian = 
 @Composable
 private fun FullPlayerCompactPreview() = FullPreview(fullPreviewState(russian = true, denied = true))
 
+@Preview(name = "Queue with repeated track", widthDp = 360, heightDp = 260)
+@Composable
+private fun PlayerQueuePreview() {
+    val first = QueueEntry(QueueEntryId("first"),
+        MediaTrack(TrackId("chorus"), "Deadzone Chorus", "Static Pilgrim", "Nullwave EP", 221_000))
+    val next = QueueEntry(QueueEntryId("next"),
+        MediaTrack(TrackId("transit"), "Hollow Transit", "Kova", null, 267_000))
+    val repeat = first.copy(entryId = QueueEntryId("repeat"))
+    val queue = PlaybackQueue.create(
+        entries = listOf(first, next, repeat),
+        playOrder = listOf(next.entryId, repeat.entryId, first.entryId),
+        current = PlaybackItemToken(PlaybackSessionId("preview"), repeat.entryId, 0),
+        shuffleEnabled = true,
+    )
+    NullWaveTheme { PlayerQueue(queue, 1, FullPreviewArtwork) }
+}
+
 @Preview(name = "Full player disconnected", widthDp = 360, heightDp = 720)
 @Composable
 private fun FullPlayerDisconnectedPreview() {
