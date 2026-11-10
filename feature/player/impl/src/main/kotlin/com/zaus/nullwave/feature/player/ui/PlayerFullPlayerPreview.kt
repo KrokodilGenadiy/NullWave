@@ -118,6 +118,7 @@ private fun fullPreviewState(russian: Boolean = false, denied: Boolean = false):
             PlaybackCapability.SetPlayRequested,
             PlaybackCapability.Previous,
             PlaybackCapability.Next,
+            PlaybackCapability.SelectQueueEntry,
             PlaybackCapability.SeekTo,
             PlaybackCapability.SetShuffle,
             PlaybackCapability.SetRepeat,

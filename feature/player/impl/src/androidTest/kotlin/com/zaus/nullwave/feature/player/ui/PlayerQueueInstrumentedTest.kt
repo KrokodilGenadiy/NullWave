@@ -3,12 +3,16 @@ package com.zaus.nullwave.feature.player.ui
 import android.content.Intent
 import android.view.KeyEvent
 import androidx.activity.findViewTreeOnBackPressedDispatcherOwner
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
@@ -26,8 +30,11 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
+import com.zaus.nullwave.core.designsystem.R as DesignSystemR
 import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.core.media.model.track.TrackId
+import com.zaus.nullwave.core.playback.api.command.PlaybackCapability
+import com.zaus.nullwave.core.playback.api.command.PlaybackCommand
 import com.zaus.nullwave.core.playback.api.model.PlaybackConnection
 import com.zaus.nullwave.core.playback.api.model.PlaybackConnectionError
 import com.zaus.nullwave.core.playback.api.model.PlaybackItemToken
@@ -37,6 +44,7 @@ import com.zaus.nullwave.core.playback.api.model.PlaybackSnapshot
 import com.zaus.nullwave.core.playback.api.model.QueueEntry
 import com.zaus.nullwave.core.playback.api.model.QueueEntryId
 import com.zaus.nullwave.feature.player.impl.R
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -44,7 +52,9 @@ import org.junit.Rule
 import org.junit.Test
 
 class PlayerQueueInstrumentedTest {
-    @get:Rule val compose = createEmptyComposeRule()
+    @get:Rule val compose = createEmptyComposeRule(effectContext = object : MotionDurationScale {
+        override val scaleFactor = 1f
+    })
     private var fixture = PlayerHostActivityFixture()
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val session = PlaybackSessionId("queue-session")
@@ -127,6 +137,88 @@ class PlayerQueueInstrumentedTest {
     }
 
     @Test
+    fun tappingADuplicateInShuffledOrderSelectsThatOccurrenceAndWaitsForTheServiceMarker() {
+        val first = entry(0)
+        val duplicate = first.copy(entryId = QueueEntryId("duplicate"))
+        val middle = entry(1)
+        val entries = listOf(first, middle, duplicate)
+        val order = listOf(first, duplicate, middle)
+        publish(entries, first, order)
+        launchQueue(first.track.title)
+        val gate = CompletableDeferred<Unit>()
+        fixture.playback.commandGate = gate
+        val expected = PlaybackCommand.SelectQueueEntry(session, duplicate.entryId)
+
+        try {
+            row(duplicate).assertIsEnabled().performClick()
+            row(middle).assertIsEnabled().assertHasNoClickAction().performTouchInput { click() }
+            val marker = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,
+                instrumentation.targetContext.getString(R.string.player_queue_current))
+            compose.onNode(marker).assertIsEnabled().assertHasNoClickAction()
+            compose.onNodeWithText(instrumentation.targetContext.getString(DesignSystemR.string.nw_track_unavailable),
+                useUnmergedTree = true).assertDoesNotExist()
+            assertOrderAndCurrent(order, first)
+            compose.runOnIdle { assertEquals(listOf(expected), fixture.playback.commands) }
+        } finally {
+            gate.complete(Unit)
+        }
+        compose.runOnIdle { publish(entries, duplicate, order) }
+        assertOrderAndCurrent(listOf(duplicate, middle), duplicate)
+        row(first).assertDoesNotExist()
+        row(duplicate).performTouchInput { click() }
+        compose.runOnIdle { assertEquals(listOf(expected, expected), fixture.playback.commands) }
+    }
+
+    @Test
+    fun onlyAPressStartedOnTheRevealedQueueRowSelectsIt() {
+        fixture = PlayerHostActivityFixture(reduceMotion = false)
+        val entries = List(2, ::entry)
+        val next = entries.last()
+        publish(entries, entries.first())
+        launchQueue(entries.first().track.title)
+        val sheet = compose.onNodeWithTag("player_full")
+        val point = row(next).assertIsDisplayed().fetchSemanticsNode().boundsInRoot.center -
+            sheet.fetchSemanticsNode().positionInRoot
+        compose.onNodeWithTag("player_queue_back").performClick()
+        val action = compose.onNodeWithText(instrumentation.targetContext.getString(R.string.player_queue)).performScrollTo()
+        compose.mainClock.autoAdvance = false
+        action.performClick()
+        compose.mainClock.advanceTimeBy(48)
+        sheet.performTouchInput { down(point) }
+        compose.mainClock.advanceTimeBy(256)
+        sheet.performTouchInput { up() }
+        compose.runOnIdle { assertTrue(fixture.playback.commands.isEmpty()) }
+        sheet.performTouchInput { click(point) }
+        val expected = listOf(PlaybackCommand.SelectQueueEntry(session, next.entryId))
+        compose.runOnIdle { assertEquals(expected, fixture.playback.commands) }
+
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+        compose.mainClock.advanceTimeBy(48)
+        compose.onNodeWithTag("player_queue").assertDoesNotExist()
+        sheet.performTouchInput { click(point) }
+        compose.runOnIdle {
+            assertEquals("A departing queue row must not receive another tap", expected, fixture.playback.commands)
+        }
+    }
+
+    @Test
+    fun replacingTheSessionWhilePressedCannotSelectAReusedEntryId() {
+        val entries = List(2, ::entry)
+        val next = entries.last()
+        publish(entries, entries.first())
+        launchQueue(entries.first().track.title)
+        row(next).performTouchInput { down(center) }
+        val newSession = PlaybackSessionId("new-queue")
+        compose.runOnIdle { publish(entries, entries.first(), sessionId = newSession) }
+        row(next).performTouchInput { up() }
+        compose.runOnIdle { assertTrue(fixture.playback.commands.isEmpty()) }
+        row(next).performTouchInput { click() }
+        compose.runOnIdle {
+            assertEquals(listOf(PlaybackCommand.SelectQueueEntry(newSession, next.entryId)), fixture.playback.commands)
+        }
+    }
+
+    @Test
     fun confirmingADeepQueueSelectionKeepsTheSelectedOccurrenceInView() {
         val entries = List(120, ::entry)
         val selected = entries[42]
@@ -205,13 +297,19 @@ class PlayerQueueInstrumentedTest {
     @Test
     fun disconnectKeepsTheLastQueueAndNoticeUntilTheServiceConfirmsAnEmptyQueue() {
         val entry = entry(0)
-        publish(listOf(entry), entry)
+        val next = entry(1)
+        val entries = listOf(entry, next)
+        publish(entries, entry, capabilities = emptySet())
         launchQueue(entry.track.title)
+        row(next).assertHasNoClickAction().performTouchInput { click() }
+        compose.runOnIdle { publish(entries, entry) }
+        row(next).assertHasClickAction()
         compose.runOnIdle {
             fixture.playback.connection.value = PlaybackConnection.Unavailable(PlaybackConnectionError.ServiceDisconnected)
         }
         awaitVisible("player_notice")
         row(entry).assertIsDisplayed()
+        row(next).assertHasNoClickAction().performTouchInput { click() }
         compose.runOnIdle { fixture.playback.connection.value = PlaybackConnection.Connected(PlaybackSnapshot.create(session)) }
         compose.waitUntil(5_000) { !compose.onNodeWithTag("player_full").isDisplayed() }
         compose.onNodeWithTag("player_queue").assertDoesNotExist()
@@ -223,10 +321,17 @@ class PlayerQueueInstrumentedTest {
         QueueEntryId("entry-$index"), MediaTrack(TrackId("track-$index"), "Track $index", "Artist", null, 120_000),
     )
 
-    private fun publish(entries: List<QueueEntry>, current: QueueEntry, order: List<QueueEntry> = entries) {
+    private fun publish(
+        entries: List<QueueEntry>,
+        current: QueueEntry,
+        order: List<QueueEntry> = entries,
+        sessionId: PlaybackSessionId = session,
+        capabilities: Set<PlaybackCapability> = setOf(PlaybackCapability.SelectQueueEntry),
+    ) {
         fixture.playback.connection.value = PlaybackConnection.Connected(PlaybackSnapshot.create(
-            session, queue = PlaybackQueue.create(entries, order.map { it.entryId },
-                PlaybackItemToken(session, current.entryId, 0), shuffleEnabled = order != entries),
+            sessionId, queue = PlaybackQueue.create(entries, order.map { it.entryId },
+                PlaybackItemToken(sessionId, current.entryId, 0), shuffleEnabled = order != entries),
+            capabilities = capabilities,
         ))
     }
 

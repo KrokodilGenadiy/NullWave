@@ -71,7 +71,8 @@ internal fun PlayerFullPlayer(
     modifier: Modifier = Modifier,
     waveform: @Composable (TrackId) -> PlayerWaveform = { PlayerWaveform.Unavailable },
 ) {
-    val queue = state.displaySnapshot?.queue
+    val snapshot = state.displaySnapshot
+    val queue = snapshot?.queue
     // The engine emits progress frequently; metadata/order scans only belong to queue changes.
     val track = remember(queue) { state.currentTrack }
     val currentIndex = remember(queue) {
@@ -96,8 +97,21 @@ internal fun PlayerFullPlayer(
             val noticeMaxHeight = maxOf(maxHeight / 3, NullWaveTheme.dimens.touchTarget).coerceAtMost(maxHeight)
             Column(Modifier.fillMaxSize()) {
                 if (showQueue) {
-                    if (queue != null && currentIndex != null) {
-                        PlayerQueue(queue, currentIndex, renderer, Modifier.weight(1f), header = header)
+                    if (snapshot != null && currentIndex != null) {
+                        val sessionId = snapshot.sessionId
+                        // Replacing a session cancels a press even when the new queue reuses a row ID.
+                        key(sessionId) {
+                            PlayerQueue(
+                                queue = snapshot.queue,
+                                currentIndex = currentIndex,
+                                artwork = renderer,
+                                onSelectEntry = if (navigation.queueOpen && active && canSubmit &&
+                                    state.supportsItemCommand(PlaybackCapability.SelectQueueEntry)
+                                ) { id -> onIntent(PlayerIntent.SelectQueueEntry(sessionId, id)) } else null,
+                                modifier = Modifier.weight(1f),
+                                header = header,
+                            )
+                        }
                     } else {
                         header()
                         Text(
