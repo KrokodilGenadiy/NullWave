@@ -16,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -116,7 +117,7 @@ private val CompactQueueHeight = 240.dp
 @Composable
 private fun rememberQueueScrollState(queue: PlaybackQueue, currentIndex: Int): LazyListState {
     val session = checkNotNull(queue.current).sessionId.value
-    return rememberSaveable(session, saver = listSaver<LazyListState, Any>(
+    val list = rememberSaveable(session, saver = listSaver<LazyListState, Any>(
         save = { list ->
             val index = list.firstVisibleItemIndex
             val measuredKey = list.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.key
@@ -128,13 +129,26 @@ private fun rememberQueueScrollState(queue: PlaybackQueue, currentIndex: Int): L
                 saved.size != 3 || saved[0] != session -> null
                 saved[1] == QueueIntroKey -> LazyListState(0, saved[2] as Int)
                 else -> {
-                    val position = queue.playOrder.indexOf(QueueEntryId(saved[1] as String))
-                    if (position < currentIndex) LazyListState(1)
-                    else LazyListState(1 + position - currentIndex, saved[2] as Int)
+                    val index = queue.rowIndex(saved[1] as String, currentIndex)
+                    if (index == null) LazyListState(1) else LazyListState(index, saved[2] as Int)
                 }
             }
         },
     )) { LazyListState() }
+    SideEffect(list, queue.playOrder, currentIndex) {
+        // The last layout still identifies the occurrence the user was reading before remeasurement.
+        val index = list.firstVisibleItemIndex
+        val key = list.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.key as? String ?: return@SideEffect
+        val newIndex = queue.rowIndex(key, currentIndex)
+        if (newIndex == null) list.requestScrollToItem(1)
+        else if (newIndex != index) list.requestScrollToItem(newIndex, list.firstVisibleItemScrollOffset)
+    }
+    return list
+}
+
+private fun PlaybackQueue.rowIndex(key: String, currentIndex: Int): Int? {
+    val position = playOrder.indexOf(QueueEntryId(key))
+    return if (position < currentIndex) null else 1 + position - currentIndex
 }
 
 @Composable

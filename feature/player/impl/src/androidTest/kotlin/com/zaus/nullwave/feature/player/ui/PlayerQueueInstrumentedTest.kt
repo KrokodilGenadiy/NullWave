@@ -10,6 +10,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -21,6 +22,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
@@ -122,6 +124,26 @@ class PlayerQueueInstrumentedTest {
         assertOrderAndCurrent(entries, first)
         compose.onNodeWithText(resources.getString(R.string.player_queue_clear)).assertIsNotEnabled()
         compose.runOnIdle { assertTrue(fixture.playback.commands.isEmpty()) }
+    }
+
+    @Test
+    fun confirmingADeepQueueSelectionKeepsTheSelectedOccurrenceInView() {
+        val entries = List(120, ::entry)
+        val selected = entries[42]
+        publish(entries, entries.first())
+        launchQueue(entries.first().track.title)
+        val list = compose.onNodeWithTag("player_queue")
+        list.performSemanticsAction(SemanticsActions.ScrollToIndex) { it(41) }
+        list.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, 20f) }
+        val anchor = row(entries[40]).assertIsDisplayed()
+        val before = anchor.fetchSemanticsNode().positionInRoot.y
+        compose.runOnIdle { publish(entries, entries[24]) }
+        assertEquals(before, anchor.fetchSemanticsNode().positionInRoot.y, 0.5f)
+
+        row(selected).assertIsDisplayed().performTouchInput { click() }
+        compose.runOnIdle { publish(entries, selected) }
+        assertOrderAndCurrent(listOf(selected, entries[43]), selected)
+        assertEquals(list.fetchSemanticsNode().boundsInRoot.top, row(selected).fetchSemanticsNode().positionInRoot.y, 0.5f)
     }
 
     @Test
