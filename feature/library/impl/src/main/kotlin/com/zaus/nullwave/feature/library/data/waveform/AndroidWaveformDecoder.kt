@@ -200,17 +200,17 @@ internal object AndroidWaveformDecoder {
                 context.ensureActive()
                 val input = if (inputFinished) -1 else codec.dequeueInputBuffer(0)
                 if (input >= 0) {
-                    val size = extractor.sampleSize
+                    val buffer = codec.getInputBuffer(input) ?: return false
+                    val size = extractor.readSampleData(buffer, 0)
                     if (size < 0) {
                         codec.queueInputBuffer(input, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
                         inputFinished = true
                     } else {
-                        val buffer = codec.getInputBuffer(input) ?: return false
-                        if (size > buffer.remaining() || extractor.isEncrypted()) return false
-                        if (extractor.readSampleData(buffer, 0).toLong() != size) return false
-                        val partial = extractor.sampleFlags and MediaExtractor.SAMPLE_FLAG_PARTIAL_FRAME != 0
+                        val sampleFlags = extractor.sampleFlags
+                        if (sampleFlags and MediaExtractor.SAMPLE_FLAG_ENCRYPTED != 0) return false
+                        val partial = sampleFlags and MediaExtractor.SAMPLE_FLAG_PARTIAL_FRAME != 0
                         val flags = if (partial) MediaCodec.BUFFER_FLAG_PARTIAL_FRAME else 0
-                        codec.queueInputBuffer(input, 0, size.toInt(), extractor.sampleTime, flags)
+                        codec.queueInputBuffer(input, 0, size, extractor.sampleTime, flags)
                         extractor.advance()
                     }
                 }

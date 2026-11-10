@@ -7,6 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.math.abs
 
 class PcmPeaksTest {
     @Test
@@ -17,6 +18,43 @@ class PcmPeaksTest {
         assertTrue(peaks.add(pcm16(0, 0, 0, 8192, -16384, 0), 0, stereo))
         assertTrue(peaks.add(pcm16(0, 8192, 0, 0, 0, 0, 0, -32768, 0, 0), 375_000, stereo))
         assertEquals(listOf(0.25f, 0.5f, 0f, 1f), peaks.waveform()?.peaks)
+    }
+
+    @Test
+    fun `bulk PCM16 matches a sample by sample scan across unaligned packet and interval boundaries`() {
+        val format = PcmFormat(PcmEncoding.Signed16, channels = 3, sampleRate = 44_100)
+        val bins = 7
+        val durationUs = 800_000L
+        val packetStartUs = 37_000L
+        val expected = FloatArray(bins)
+        val frames = 36_000
+        // Mimic a codec buffer whose valid bytes start at a nonzero offset and end before capacity.
+        val data = ByteBuffer.allocateDirect(4 + frames * format.channels * Short.SIZE_BYTES).order(ByteOrder.LITTLE_ENDIAN)
+        data.putShort(Short.MIN_VALUE)
+        for (frame in 0 until frames) {
+            val time = packetStartUs * format.sampleRate + frame * 1_000_000L
+            val bin = (time * bins / (durationUs * format.sampleRate)).toInt().coerceAtMost(bins - 1)
+            for (channel in 0 until format.channels) {
+                val level = (bin + 1) * 2048 + (frame + channel) % 101
+                val sample = when {
+                    frame == frames - 1 && channel == 1 -> Short.MIN_VALUE.toInt()
+                    bin % 2 == 0 -> level
+                    else -> -level
+                }
+                data.putShort(sample.toShort())
+                expected[bin] = maxOf(expected[bin], abs(sample) / 32768f)
+            }
+        }
+        val end = data.position()
+        data.putShort(Short.MAX_VALUE)
+        val packet = data.asReadOnlyBuffer().apply {
+            position(Short.SIZE_BYTES)
+            limit(end)
+        }
+        val peaks = PcmPeaks(durationUs, bins)
+        assertTrue(peaks.add(packet, packetStartUs, format))
+        assertEquals(end, packet.position())
+        assertEquals(expected.toList(), peaks.waveform()?.peaks)
     }
 
     @Test
