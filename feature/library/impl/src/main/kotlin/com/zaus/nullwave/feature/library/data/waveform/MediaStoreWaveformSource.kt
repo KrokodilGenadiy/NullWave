@@ -88,7 +88,7 @@ internal class MediaStoreWaveformSource(
                     val currentHintUs by lazy(LazyThreadSafetyMode.NONE) {
                         if (catalogRow == null) durationHintUs(uri, signal) else catalogRow.durationMs.toDurationUs()
                     }
-                    val revision = file.revision(trackId)
+                    val revision = file.revision(trackId, readFirstByte = true)
                     if (revision != null) {
                         val inMemory = memory.get(trackId)?.takeIf { it.revision == revision }
                         val cached = inMemory?.peaks ?: disk.read(revision)
@@ -130,7 +130,9 @@ internal class MediaStoreWaveformSource(
                     }
                     if (revision != null) {
                         // A long scan may outlive the row/file it opened, including an atomic replacement.
-                        val freshRevision = resolver.openAssetFileDescriptor(uri, "r", signal)?.use { it.revision(trackId) }
+                        val freshRevision = resolver.openAssetFileDescriptor(uri, "r", signal)?.use {
+                            it.revision(trackId, readFirstByte = true)
+                        }
                         if (revision != freshRevision || !hasAudioAccess()) return@use null
                         if (catalogRevision != null) {
                             if (readCatalogRow()?.request != catalogRevision) return@use null
@@ -192,13 +194,23 @@ internal class MediaStoreWaveformSource(
 private fun Long?.toDurationUs(): Long? = this?.takeIf { it in 1L..Long.MAX_VALUE / 1_000 }?.times(1_000)
 
 /** Some providers return pipes. Only identifiable, regular files qualify for reuse. */
-private fun AssetFileDescriptor.revision(trackId: TrackId): WaveformFileRevision? {
-    val stat = try {
+private fun AssetFileDescriptor.revision(trackId: TrackId, readFirstByte: Boolean = false): WaveformFileRevision? {
+    var stat = try {
         Os.fstat(fileDescriptor)
     } catch (_: ErrnoException) {
         return null
     }
     if (!OsConstants.S_ISREG(stat.st_mode) || stat.st_ino == 0L) return null
+    if (declaredLength == 0L || startOffset >= stat.st_size) return null
+    if (readFirstByte) {
+        try {
+            // Some MediaStore descriptors report the published file's final ctime only after data access.
+            if (Os.pread(fileDescriptor, ByteArray(1), 0, 1, startOffset) != 1) throw IOException("Empty audio slice")
+            stat = Os.fstat(fileDescriptor)
+        } catch (failure: ErrnoException) {
+            throw IOException("Cannot verify the opened audio file", failure)
+        }
+    }
     val fingerprint = listOf(stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtim.tv_sec, stat.st_mtim.tv_nsec,
         stat.st_ctim.tv_sec, stat.st_ctim.tv_nsec, startOffset, declaredLength).joinToString(":")
     return WaveformFileRevision(trackId, fingerprint)
