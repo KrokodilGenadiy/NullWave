@@ -41,14 +41,40 @@ import org.junit.Test
 
 class PlayerQueueInstrumentedTest {
     @get:Rule val compose = createEmptyComposeRule()
-    private val fixture = PlayerHostActivityFixture()
+    private var fixture = PlayerHostActivityFixture()
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val session = PlaybackSessionId("queue-session")
     private var scenario: ActivityScenario<PlayerHostTestActivity>? = null
 
     @After
     fun close() {
+        compose.mainClock.autoAdvance = true
         try { scenario?.close() } finally { PlayerHostTestActivity.fixture = null }
+    }
+
+    @Test
+    fun backDuringOpeningKeepsTheSheetAndRecreationRestoresTheRequestedQueue() {
+        fixture = PlayerHostActivityFixture(reduceMotion = false)
+        val entries = List(3, ::entry)
+        publish(entries, entries.first())
+        val activity = launchFullPlayer(entries.first().track.title)
+        val queueAction = compose.onNodeWithText(instrumentation.targetContext.getString(R.string.player_queue))
+        queueAction.performScrollTo()
+        compose.mainClock.autoAdvance = false
+        queueAction.performClick()
+        compose.mainClock.advanceTimeBy(64)
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+        compose.mainClock.advanceTimeBy(400)
+        compose.onNodeWithTag("player_full_close").assertIsDisplayed()
+        compose.onNodeWithTag("player_queue").assertDoesNotExist()
+
+        queueAction.performClick()
+        compose.mainClock.advanceTimeBy(64)
+        activity.recreate()
+        compose.mainClock.autoAdvance = true
+        awaitVisible("player_queue")
+        row(entries.first()).assertIsDisplayed()
+        compose.runOnIdle { assertTrue(fixture.playback.commands.isEmpty()) }
     }
 
     @Test
@@ -157,13 +183,18 @@ class PlayerQueueInstrumentedTest {
     }
 
     private fun launchQueue(title: String): ActivityScenario<PlayerHostTestActivity> {
+        val activity = launchFullPlayer(title)
+        openQueue()
+        return activity
+    }
+
+    private fun launchFullPlayer(title: String): ActivityScenario<PlayerHostTestActivity> {
         PlayerHostTestActivity.fixture = fixture
         val activity = ActivityScenario.launch<PlayerHostTestActivity>(Intent(instrumentation.targetContext, PlayerHostTestActivity::class.java))
         scenario = activity
         awaitVisible("player_mini")
         compose.onNodeWithText(title).performClick()
         awaitVisible("player_full_close")
-        openQueue()
         return activity
     }
 

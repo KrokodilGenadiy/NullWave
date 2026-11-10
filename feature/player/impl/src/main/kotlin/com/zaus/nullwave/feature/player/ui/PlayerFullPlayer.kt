@@ -86,16 +86,19 @@ internal fun PlayerFullPlayer(
     val lifecycle by lifecycleOwner.lifecycle.currentStateAsState()
     val active = lifecycle.isAtLeast(Lifecycle.State.STARTED)
     val spacing = NullWaveTheme.spacing
-    Column(modifier.fillMaxSize().background(NullWaveTheme.colors.bg).testTag("player_full")) {
+    PlayerQueueTransition(
+        queueOpen, active,
+        modifier = modifier.fillMaxSize().background(NullWaveTheme.colors.bg).testTag("player_full"),
+    ) { showQueue ->
         val header: @Composable () -> Unit = {
-            PlayerHeader(queueOpen, queue, currentIndex) { if (queueOpen) queueOpen = false else onClose() }
+            PlayerHeader(showQueue, queue, currentIndex) { if (showQueue) queueOpen = false else onClose() }
         }
-        if (!queueOpen) header()
+        if (!showQueue) header()
         // The pinned MiniPlayer gets its natural height before the notice and scroll viewport.
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
             val noticeMaxHeight = maxOf(maxHeight / 3, NullWaveTheme.dimens.touchTarget).coerceAtMost(maxHeight)
             Column(Modifier.fillMaxSize()) {
-                if (queueOpen) {
+                if (showQueue) {
                     if (queue != null && currentIndex != null) {
                         PlayerQueue(queue, currentIndex, renderer, Modifier.weight(1f), header)
                     } else {
@@ -141,8 +144,9 @@ internal fun PlayerFullPlayer(
                 )
             }
         }
-        if (queueOpen) {
-            PlayerMiniPlayer(state, canSubmit, onIntent, clock, artwork, lifecycleOwner, onExpand = { queueOpen = false })
+        if (showQueue) {
+            PlayerMiniPlayer(state, canSubmit, onIntent, clock, artwork, lifecycleOwner,
+                onExpand = { queueOpen = false })
         }
     }
 }
