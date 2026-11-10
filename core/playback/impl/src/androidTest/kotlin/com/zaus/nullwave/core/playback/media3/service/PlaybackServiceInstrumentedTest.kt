@@ -63,6 +63,50 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class PlaybackServiceInstrumentedTest {
     @Test
+    fun selectingAnotherOccurrenceResumesFromEndedInForegroundAndPreservesALaterPause(): Unit = runBlocking {
+        val app = application()
+        val activity = ActivityScenario.launch(PlaybackTestActivity::class.java)
+        val sourceFile = installSilentTrack(app)
+        val controller = app.dependencies.controller()
+        val states = MutableStateFlow<PlaybackConnection>(PlaybackConnection.Disconnected)
+        val observer = launch { controller.observeState().collect { states.value = it } }
+        withPlaybackTestCleanup(
+            cleanup = listOf(
+                { observer.cancelAndJoin() },
+                { stopServiceAndAwaitDetach(app) },
+                { activity.close() },
+                { sourceFile.delete() },
+                { app.tracks.clear() },
+            ),
+        ) {
+            withTimeout(20_000.milliseconds) {
+                states.connected { true }
+                val request = PlaybackQueueRequest.create(listOf(ID, ID), 1)
+                assertEquals(AppResult.Success(Unit), controller.execute(PlaybackCommand.ReplaceQueue(request)))
+                val playing = states.connected { it.transport.isPlaying }
+                val last = requireNotNull(playing.queue.current)
+                val first = playing.queue.entries.first().entryId
+                val duration = controller.observeProgress().filterNotNull().first { it.durationMs != null }.durationMs!!
+                assertEquals(AppResult.Success(Unit), controller.execute(PlaybackCommand.SeekTo(last, duration)))
+                states.connected { it.transport.phase == PlaybackPhase.Ended }
+                activity.moveToState(Lifecycle.State.CREATED)
+
+                val select = PlaybackCommand.SelectQueueEntry(playing.sessionId, first)
+                assertEquals(AppResult.Success(Unit), controller.execute(select))
+                states.connected { it.queue.current?.entryId == first && it.transport.isPlaying }
+                while (!isPlaybackServiceForeground(app)) delay(50)
+                assertEquals(AppResult.Success(Unit), controller.execute(PlaybackCommand.SetPlayRequested(false)))
+                assertEquals(AppResult.Success(Unit), controller.execute(select.copy(entryId = last.entryId)))
+                val paused = states.connected { it.queue.current?.entryId == last.entryId && it.transport.phase == PlaybackPhase.Ready }
+                assertFalse(paused.transport.playRequested)
+                val anchor = controller.observeProgress().filterNotNull().first { it.matches(paused) }
+                assertEquals(0L, anchor.positionMs)
+                assertEquals(AppResult.Success(Unit), controller.execute(PlaybackCommand.StopAndClear))
+            }
+        }
+    }
+
+    @Test
     fun portableSeekOutOfEndedReplaysInForegroundAfterTheActivityStops(): Unit = runBlocking {
         val app = application()
         val activity = ActivityScenario.launch(PlaybackTestActivity::class.java)

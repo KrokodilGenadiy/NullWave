@@ -7,6 +7,9 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
+import androidx.media3.test.utils.FakeMediaSourceFactory
 import androidx.media3.test.utils.FakePlayer
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -64,6 +67,105 @@ class Media3QueueCommitTargetInstrumentedTest {
             assertEquals("Artist", fixture.player.currentMediaItem!!.mediaMetadata.artist.toString())
             assertEquals(777L, fixture.player.currentPosition)
             assertFalse(snapshot.transport.playRequested)
+        }
+    }
+
+    @Test
+    fun pausedSelectionFindsTheSecondCopyAndReselectingItPreservesProgress() = onMain {
+        val player = ExoPlayer.Builder(InstrumentationRegistry.getInstrumentation().targetContext)
+            .setMediaSourceFactory(FakeMediaSourceFactory()).build()
+        val registry = PlaybackServiceRegistry()
+        val ids = PlaybackIdentities()
+        val target = Media3QueueCommitTarget(player, ids, registry, PlaybackClock { 0L }) { error("Paused selection requested foreground") }
+        try {
+            val track = MediaTrack(TrackId("a"), "Track A", null, null, 10_000)
+            val resource = ResolvedPlaybackTrack(track, "content://com.zaus.nullwave.test/a")
+            val request = PlaybackQueueRequest.create(listOf(track.id, track.id), 0, startPositionMs = 700, playRequested = false)
+            val commit = QueueCommit.create(PreparedQueue.create(request, listOf(resource, resource)), ids)
+            success(target.install(commit))
+            player.setShuffleOrder(DefaultShuffleOrder(intArrayOf(1, 0), 0L))
+            success(target.execute(PlaybackCommand.SetShuffle(true)))
+            player.stop() // A native stop retains the queue and leaves ExoPlayer in Idle.
+            target.publish()
+            val before = registry.snapshot.value!!
+            assertTrue(PlaybackCapability.SelectQueueEntry in before.capabilities)
+            val secondCopy = commit.entries.last().entryId
+            assertEquals(secondCopy, before.queue.playOrder.first())
+            val command = PlaybackCommand.SelectQueueEntry(before.sessionId, secondCopy)
+            success(target.execute(command))
+
+            val selected = registry.snapshot.value!!
+            assertEquals(secondCopy, selected.queue.current!!.entryId)
+            assertEquals(1, player.currentMediaItemIndex)
+            assertEquals(before.queue.playOrder, selected.queue.playOrder)
+            assertFalse(selected.transport.playRequested)
+            assertNotEquals(PlaybackPhase.Idle, selected.transport.phase)
+            assertEquals(0L, player.currentPosition)
+            assertTrue(target.sampleProgress()!!.matches(selected))
+
+            player.seekTo(1, 1_200L)
+            target.publish()
+            val atPosition = registry.snapshot.value!!
+            success(target.execute(command))
+            assertSame(atPosition, registry.snapshot.value)
+            assertEquals(1_200L, player.currentPosition)
+        } finally {
+            target.close()
+            player.release()
+        }
+    }
+
+    @Test
+    fun staleAndUnsupportedSelectionsPreserveTheInstalledQueueWithoutAcquiringForeground() = onMain {
+        Fixture().use { fixture ->
+            val old = fixture.commit(listOf("a", "a"))
+            success(fixture.target.install(old))
+            val replacement = fixture.commit(listOf("a", "a"), position = 350)
+            success(fixture.target.install(replacement))
+            val installed = fixture.snapshot()
+            val select = PlaybackCommand.SelectQueueEntry(installed.sessionId, replacement.entries.last().entryId)
+            fixture.player.removeCommands(Player.COMMAND_SEEK_TO_MEDIA_ITEM)
+            fixture.target.publish()
+            assertFalse(PlaybackCapability.SelectQueueEntry in fixture.snapshot().capabilities)
+            failure(fixture.target.execute(select), PlaybackCommandError.CommandUnavailable)
+            failure(fixture.target.execute(select.copy(entryId = old.entries.last().entryId)), PlaybackCommandError.StaleTarget)
+            failure(fixture.target.execute(select.copy(sessionId = PlaybackSessionId("other"))), PlaybackCommandError.StaleTarget)
+            assertSame(installed.queue, fixture.snapshot().queue)
+            assertEquals(installed.positionRevision, fixture.snapshot().positionRevision)
+        }
+    }
+
+    @Test
+    fun idleSelectionNeedsPrepareAndAnAllowedStartBeforeChangingThePlayingEntry() = onMain {
+        var allowed = false
+        val leases = mutableListOf<String>()
+        Fixture(acquireForeground = {
+            leases += "acquire"
+            if (allowed) AppResult.Success(AutoCloseable { leases += "release" })
+            else AppResult.Failure(PlaybackCommandError.StartNotAllowed)
+        }).use { fixture ->
+            val commit = fixture.commit(listOf("a", "b"))
+            success(fixture.target.install(commit))
+            fixture.player.stop()
+            val select = PlaybackCommand.SelectQueueEntry(commit.current.sessionId, commit.entries.last().entryId)
+            fixture.player.removeCommands(Player.COMMAND_PREPARE)
+            fixture.target.publish()
+            assertFalse(PlaybackCapability.SelectQueueEntry in fixture.snapshot().capabilities)
+            failure(fixture.target.execute(select), PlaybackCommandError.CommandUnavailable)
+            fixture.player.addCommands(Player.COMMAND_PREPARE)
+            fixture.target.publish()
+            assertTrue(PlaybackCapability.SelectQueueEntry in fixture.snapshot().capabilities)
+            success(fixture.target.execute(select.copy(entryId = commit.current.entryId)))
+            assertTrue(leases.isEmpty())
+            failure(fixture.target.execute(select), PlaybackCommandError.StartNotAllowed)
+            assertEquals(commit.current, fixture.snapshot().queue.current)
+
+            allowed = true
+            success(fixture.target.execute(select))
+            assertEquals(listOf("acquire", "acquire", "release"), leases)
+            assertEquals(select.entryId, fixture.snapshot().queue.current!!.entryId)
+            assertTrue(fixture.snapshot().transport.playRequested)
+            assertEquals(PlaybackPhase.Ready, fixture.snapshot().transport.phase)
         }
     }
 
@@ -316,6 +418,7 @@ class Media3QueueCommitTargetInstrumentedTest {
             assertFalse(snapshot.transport.playRequested)
             assertNull(snapshot.transport.problem)
             assertFalse(PlaybackCapability.SetPlayRequested in snapshot.capabilities)
+            assertFalse(PlaybackCapability.SelectQueueEntry in snapshot.capabilities)
             assertNull(fixture.target.sampleProgress())
             assertNull(fixture.registry.anchor.value)
         }
