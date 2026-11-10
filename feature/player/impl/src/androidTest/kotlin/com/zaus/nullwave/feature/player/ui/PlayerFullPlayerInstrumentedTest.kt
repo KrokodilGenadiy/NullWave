@@ -370,7 +370,91 @@ class PlayerFullPlayerInstrumentedTest {
     }
 
     @Test
-    fun waveformReadBelongsToTheExpandedStartedSheet() {
+    fun expandingKeepsThePlayingTrackWarmupAndSwitchingInTheSheetStartsOnlyItsOwnRead() {
+        val requests = CopyOnWriteArrayList<PeakRequest>()
+        fixture = PlayerHostActivityFixture(waveformSource = recordingSource(requests))
+        connect(snapshot(playRequested = true))
+        launch()
+        compose.waitUntil(5_000) { requests.size == 1 }
+        val warmup = requests.single()
+        openFull()
+        compose.waitUntil(5_000) { requests.size == 2 }
+        val sheetRead = requests.last()
+        assertTrue("Opening the sheet must keep the in-flight warmup", warmup.job.isActive)
+        assertTrue(sheetRead.job.isActive)
+        assertEquals(listOf(track.id, track.id), requests.map { it.id })
+
+        val other = track.copy(id = TrackId("other"), title = "Other")
+        compose.runOnIdle { connect(snapshot(activation = 1, playRequested = true, item = other)) }
+        compose.waitUntil(5_000) { requests.any { it.id == other.id } }
+        compose.waitForIdle()
+        assertTrue(warmup.job.isCancelled)
+        assertTrue(sheetRead.job.isCancelled)
+        assertEquals(listOf(track.id, track.id, other.id), requests.map { it.id })
+        requests.last().reply.complete(Waveform.of(listOf(0f, 1f)))
+        seek().performScrollTo()
+        assertTallWaveformBar(true)
+    }
+
+    @Test
+    fun collapsingWhileTheNewPlayingTrackIsLoadingStartsItsWarmup() {
+        val requests = CopyOnWriteArrayList<PeakRequest>()
+        fixture = PlayerHostActivityFixture(waveformSource = recordingSource(requests))
+        connect(snapshot())
+        launch()
+        openFull()
+        compose.waitUntil(5_000) { requests.size == 1 }
+
+        val other = track.copy(id = TrackId("other"), title = "Other")
+        compose.runOnIdle { connect(snapshot(activation = 1, playRequested = true, item = other)) }
+        compose.waitUntil(5_000) { requests.size == 2 }
+        val sheetRead = requests.last()
+        assertEquals(other.id, sheetRead.id)
+        compose.onNodeWithTag("player_full_close").performClick()
+        awaitClosed()
+
+        compose.waitUntil(5_000) { sheetRead.job.isCancelled && requests.size == 3 }
+        assertEquals(listOf(track.id, other.id, other.id), requests.map { it.id })
+        assertTrue(requests.last().job.isActive)
+    }
+
+    @Test
+    fun collapsedWarmupRequiresStartedActivityAndLivePlayRequest() {
+        val requests = CopyOnWriteArrayList<PeakRequest>()
+        fixture = PlayerHostActivityFixture(waveformSource = recordingSource(requests))
+        val playing = snapshot(playRequested = true)
+        connect(snapshot())
+        val activity = launch()
+        compose.runOnIdle {
+            assertTrue(requests.isEmpty())
+            connect(playing)
+        }
+        compose.waitUntil(5_000) { requests.size == 1 }
+        compose.runOnIdle { connect(snapshot()) }
+        compose.waitUntil(5_000) { requests.first().job.isCancelled }
+
+        compose.runOnIdle { connect(playing) }
+        compose.waitUntil(5_000) { requests.size == 2 }
+        val beforeDisconnect = requests.last()
+        compose.runOnIdle { fixture.playback.connection.value = PlaybackConnection.Disconnected }
+        compose.waitUntil(5_000) { beforeDisconnect.job.isCancelled }
+        compose.onNodeWithText(track.title).assertIsDisplayed()
+        compose.runOnIdle { assertEquals("Cached metadata must not start a warmup", 2, requests.size) }
+
+        activity.moveToState(Lifecycle.State.CREATED)
+        activity.onActivity { connect(playing) }
+        assertEquals(2, requests.size)
+        activity.moveToState(Lifecycle.State.RESUMED)
+        compose.waitUntil(5_000) { requests.size == 3 }
+        val resumed = requests.last()
+        assertEquals(track.id, resumed.id)
+        activity.moveToState(Lifecycle.State.CREATED)
+        compose.waitUntil(5_000) { resumed.job.isCancelled }
+        assertTrue(fixture.playback.commands.isEmpty())
+    }
+
+    @Test
+    fun pausedTrackReadsWaveformOnlyInTheExpandedStartedSheet() {
         val requests = CopyOnWriteArrayList<PeakRequest>()
         fixture = PlayerHostActivityFixture(waveformSource = recordingSource(requests, lateReplyForRequest = 2))
         connect(snapshot())
