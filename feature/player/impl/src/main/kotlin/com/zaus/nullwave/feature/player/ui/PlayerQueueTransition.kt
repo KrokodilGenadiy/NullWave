@@ -17,13 +17,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.zaus.nullwave.core.designsystem.motion.decorativeMotionEnabled
@@ -62,37 +67,54 @@ internal fun PlayerQueueTransition(
     }
 }
 
-// Both pages keep their final layout. Only the part of the destination behind the scan is drawn.
-private fun Modifier.queueScan(queue: Boolean, colors: NullWaveColors, progress: () -> Float) = drawWithCache {
-    val cut = minOf(26.dp.toPx(), size.width / 4f, size.height / 4f)
-    val joint = size.width * 0.58f
-    val margin = 6.dp.toPx()
-    val mask = Path()
-    val edge = Path()
-    val separator = Stroke(5.dp.toPx())
-    val rail = Stroke(2.dp.toPx())
-    onDrawWithContent {
-        val y = size.height + cut + margin - (size.height + cut + 2 * margin) * progress()
-        edge.reset()
-        edge.moveTo(0f, y)
-        edge.lineTo(joint, y)
-        edge.lineTo(joint + cut, y - cut)
-        edge.lineTo(size.width, y - cut)
+private class ScanEdge(private val size: Size, density: Density) {
+    private val cut = minOf(with(density) { 26.dp.toPx() }, size.width / 4f, size.height / 4f)
+    private val margin = with(density) { 6.dp.toPx() }
+    private val joint = size.width * 0.58f
+    val traceStartX = joint + cut
 
-        val end = if (queue) size.height else 0f
-        mask.reset()
-        mask.addPath(edge)
-        mask.lineTo(size.width, end)
-        mask.lineTo(0f, end)
-        mask.close()
-        clipPath(mask) { this@onDrawWithContent.drawContent() }
-
-        drawPath(edge, colors.bg, style = separator)
-        drawPath(edge, colors.primary, style = rail)
-        val traceY = y - cut + 4.dp.toPx()
-        drawLine(colors.secondary, Offset(joint + cut, traceY), Offset(size.width, traceY), rail.width)
+    fun trace(path: Path, progress: Float): Float {
+        val y = size.height + cut + margin - (size.height + cut + 2 * margin) * progress
+        val rightY = y - cut
+        path.rewind()
+        path.moveTo(0f, y)
+        path.lineTo(joint, y)
+        path.lineTo(traceStartX, rightY)
+        path.lineTo(size.width, rightY)
+        return rightY
     }
 }
+
+private class RevealedPage(private val queue: Boolean, private val progress: Float) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val path = Path()
+        ScanEdge(size, density).trace(path, progress)
+        val end = if (queue) size.height else 0f
+        path.lineTo(size.width, end)
+        path.lineTo(0f, end)
+        path.close()
+        return Outline.Generic(path)
+    }
+}
+
+private fun Modifier.queueScan(queue: Boolean, colors: NullWaveColors, progress: () -> Float) =
+    drawWithCache {
+        val scan = ScanEdge(size, this)
+        val path = Path()
+        val separator = Stroke(5.dp.toPx())
+        val rail = Stroke(2.dp.toPx())
+        onDrawWithContent {
+            drawContent()
+            val traceY = scan.trace(path, progress()) + 4.dp.toPx()
+            drawPath(path, colors.bg, style = separator)
+            drawPath(path, colors.primary, style = rail)
+            drawLine(colors.secondary, Offset(scan.traceStartX, traceY), Offset(size.width, traceY), rail.width)
+        }
+    }.graphicsLayer {
+        // Compose uses the layer outline for both drawing and the initial pointer hit test.
+        shape = RevealedPage(queue, progress())
+        clip = true
+    }
 
 private fun Modifier.blockPageInput() = clearAndSetSemantics {}
     .onPreviewKeyEvent { true }

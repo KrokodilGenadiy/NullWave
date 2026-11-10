@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.MotionDurationScale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.toPixelMap
@@ -63,7 +64,7 @@ class PlayerQueueTransitionInstrumentedTest {
         showSheet()
         navigate(true, 160)
         compose.onNodeWithTag("player").assertDoesNotExist()
-        sheet.performTouchInput { click() }
+        sheet.performTouchInput { click(bottomCenter - Offset(0f, 4f)) }
         val before = frame()
         val x = before.width / 4
         val beforeY = before.scanY(x)
@@ -75,10 +76,52 @@ class PlayerQueueTransitionInstrumentedTest {
         val afterY = frame().scanY(x)
         assertTrue("Back should move toward the footer: $turnY -> $afterY", afterY > turnY)
         compose.onNodeWithTag("queue").assertDoesNotExist()
-        sheet.performTouchInput { click() }
+        sheet.performTouchInput { click(topCenter + Offset(0f, 4f)) }
         assertEquals(listOf(true, false), tappedPages)
         advance(480)
         assertRestingPage(false)
+    }
+
+    @Test
+    fun onlyTheRevealedSideOfTheChamferAcceptsNewTapsInEitherDirection() {
+        showSheet()
+        for (queue in listOf(true, false)) {
+            navigate(queue, 144)
+            val pixels = frame()
+            val left = 2
+            val right = pixels.width * 9 / 10
+            val y = (pixels.scanY(left) + pixels.scanY(right)) / 2
+            // Same height, opposite sides of the cut. The right pixel belongs to the queue.
+            assertEquals(Color.White, pixels[left, y])
+            assertEquals(Color.Blue, pixels[right, y])
+            val hidden = Offset((if (queue) left else right).toFloat(), y.toFloat())
+            val visible = Offset((if (queue) right else left).toFloat(), y.toFloat())
+            sheet.performTouchInput { click(hidden) }
+            compose.runOnIdle { assertTrue(tappedPages.isEmpty()) }
+            sheet.performTouchInput { click(visible) }
+            compose.runOnIdle {
+                assertEquals(listOf(queue), tappedPages)
+                tappedPages.clear()
+            }
+            advance(480)
+        }
+    }
+
+    @Test
+    fun liftingAHiddenPressAfterTheQueueIsRevealedDoesNotClickThrough() {
+        showSheet()
+        navigate(true, 64)
+        val point = Offset(10f, 10f)
+        assertEquals(Color.White, frame()[10, 10])
+        sheet.performTouchInput { down(point) }
+        // The destination becomes fully interactive while the finger is still down.
+        compose.runOnUiThread { reduceMotion = true }
+        advance(16)
+        assertEquals(Color.Blue, frame()[10, 10])
+        sheet.performTouchInput { up() }
+        compose.runOnIdle { assertTrue(tappedPages.isEmpty()) }
+        sheet.performTouchInput { click(point) }
+        compose.runOnIdle { assertEquals(listOf(true), tappedPages) }
     }
 
     @Test
