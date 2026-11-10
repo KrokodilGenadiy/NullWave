@@ -17,13 +17,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.MotionDurationScale
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PixelMap
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -32,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.zaus.nullwave.core.designsystem.theme.NullWaveColors
 import com.zaus.nullwave.core.designsystem.theme.NullWaveEffects
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -48,6 +52,7 @@ class PlayerQueueTransitionInstrumentedTest {
     private var coverColor by mutableStateOf(Color.Red)
     private val tappedPages = mutableListOf<Boolean>()
     private val sheet get() = compose.onNodeWithTag("sheet")
+    private lateinit var sheetLayer: GraphicsLayer
     private val colors = NullWaveColors.Cyberpunk
 
     @Test
@@ -204,7 +209,12 @@ class PlayerQueueTransitionInstrumentedTest {
         compose.setContent {
             BackHandler(enabled = open) { open = false }
             NullWaveTheme(effects = NullWaveEffects(reduceMotion = reduceMotion)) {
-                PlayerQueueTransition({ open }, active, Modifier.size(180.dp, 240.dp).testTag("sheet")) { queue ->
+                sheetLayer = rememberGraphicsLayer()
+                val sheetModifier = Modifier.size(180.dp, 240.dp).testTag("sheet").drawWithContent {
+                    sheetLayer.record { this@drawWithContent.drawContent() }
+                    drawLayer(sheetLayer)
+                }
+                PlayerQueueTransition({ open }, active, sheetModifier) { queue ->
                     Box(Modifier.fillMaxSize().background(if (queue) Color.Blue else Color.White)
                         .testTag(if (queue) "queue" else "player")
                         .clickable(interactionSource = null, indication = null) { tappedPages += queue }) {
@@ -226,7 +236,11 @@ class PlayerQueueTransitionInstrumentedTest {
     }
 
     private fun advance(timeMs: Long) = compose.mainClock.advanceTimeBy(timeMs)
-    private fun frame() = sheet.captureToImage().toPixelMap()
+    private fun frame(): PixelMap {
+        // Read the sheet's own pixels after drawing, before Android composites its window edges.
+        compose.waitForIdle()
+        return runBlocking { sheetLayer.toImageBitmap() }.toPixelMap()
+    }
     private fun PixelMap.scanY(x: Int) = (0 until height).first { y -> this[x, y] == colors.primary }
 
     private fun assertSplitFrame(moving: PixelMap, player: PixelMap, queue: PixelMap) {
@@ -249,6 +263,8 @@ class PlayerQueueTransitionInstrumentedTest {
         val background = if (queue) Color.Blue else Color.White
         // Both corners are outside either cover. A partially drawn page or rail will change this column.
         val x = pixels.width - 2
-        assertTrue("The destination should fill the sheet", (0 until pixels.height).all { pixels[x, it] == background })
+        for (y in 0 until pixels.height) {
+            assertEquals("Resting page at ($x, $y)", background, pixels[x, y])
+        }
     }
 }
