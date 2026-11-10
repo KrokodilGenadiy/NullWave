@@ -2,6 +2,7 @@ package com.zaus.nullwave.feature.player.ui
 
 import android.content.Intent
 import android.content.res.Configuration
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -119,6 +120,33 @@ class PlayerQueueLayoutInstrumentedTest {
     }
 
     @Test
+    fun removingTheFirstVisibleEntryKeepsItsSuccessorAtTheSameOffset() {
+        val published = mutableStateOf(entries)
+        launch(visibleEntries = { published.value })
+        val before = scrollPartwayIntoRow40()
+
+        compose.runOnIdle { published.value = entries - entries[40] }
+
+        row(40).assertDoesNotExist()
+        assertEquals(before, relativeTop(41), 0.5f)
+    }
+
+    @Test
+    fun recreationAfterRemovalAndPlaybackAdvanceKeepsTheSuccessorAndOffset() {
+        var published = entries
+        val activity = launch(visibleEntries = { published })
+        val before = scrollPartwayIntoRow40()
+
+        activity.onActivity {
+            currentOnCreation = 10
+            published = entries - entries[40]
+        }
+        activity.recreate()
+
+        assertEquals(before, relativeTop(41), 0.5f)
+    }
+
+    @Test
     fun recreationAfterTheAnchorHasPlayedStartsAtTheNewCurrentEntry() {
         val activity = launch()
         list.performScrollToKey("row-15")
@@ -141,6 +169,14 @@ class PlayerQueueLayoutInstrumentedTest {
 
     private fun row(index: Int) = compose.onNodeWithTag("player_queue_entry:row-$index")
 
+    private fun scrollPartwayIntoRow40(): Float {
+        list.performScrollToKey("row-40")
+        list.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, 23f) }
+        val top = relativeTop(40)
+        assertTrue("Expected a partially visible row, top=$top", top < 0f)
+        return top
+    }
+
     private fun relativeTop(index: Int) =
         (row(index).getUnclippedBoundsInRoot().top - list.getUnclippedBoundsInRoot().top).value
 
@@ -149,14 +185,16 @@ class PlayerQueueLayoutInstrumentedTest {
         height: Int = 480,
         fontScale: Float = 1f,
         disconnected: Boolean = false,
+        visibleEntries: () -> List<QueueEntry> = { entries },
     ): ActivityScenario<PlayerHostTestActivity> {
         val artwork = RecordingHostArtworkRenderer()
         PlayerHostTestActivity.fixture = PlayerHostActivityFixture(
             viewport = DpSize(width.dp, height.dp), fontScale = fontScale, locale = Locale.forLanguageTag("ru"),
             content = {
-                val state = remember {
+                val shown = visibleEntries()
+                val state = remember(shown) {
                     val token = PlaybackItemToken(session, entries[currentOnCreation].entryId, 0)
-                    val snapshot = PlaybackSnapshot.create(session, queue = PlaybackQueue.create(entries, current = token))
+                    val snapshot = PlaybackSnapshot.create(session, queue = PlaybackQueue.create(shown, current = token))
                     if (disconnected) PlayerState(
                         connection = PlaybackConnection.Unavailable(PlaybackConnectionError.ServiceDisconnected),
                         lastKnownSnapshot = snapshot,

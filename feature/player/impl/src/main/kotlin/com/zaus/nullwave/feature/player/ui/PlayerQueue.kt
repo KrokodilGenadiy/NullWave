@@ -138,16 +138,22 @@ private fun rememberQueueScrollState(queue: PlaybackQueue, currentIndex: Int): L
     val list = rememberSaveable(session, saver = listSaver<LazyListState, Any>(
         save = { list ->
             val index = list.firstVisibleItemIndex
-            val measuredKey = list.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.key
-            val entryId = if (index > 0) queue.playOrder.getOrNull(currentIndex + index - 1)?.value else null
-            listOf(session, measuredKey ?: entryId ?: QueueIntroKey, list.firstVisibleItemScrollOffset)
+            val orderIndex = currentIndex + index - 1
+            val key = if (index == 0) null else list.measuredEntryKey(index) ?: queue.playOrder.getOrNull(orderIndex)?.value
+            val nextKey = list.measuredEntryKey(index + 1) ?: queue.playOrder.getOrNull(orderIndex + 1)?.value
+            listOf(session, key ?: QueueIntroKey, list.firstVisibleItemScrollOffset, index, nextKey ?: QueueIntroKey)
         },
         restore = { saved ->
             when {
-                saved.size != 3 || saved[0] != session -> null
+                saved.size < 3 || saved[0] != session -> null
                 saved[1] == QueueIntroKey -> LazyListState(0, saved[2] as Int)
                 else -> {
-                    val index = queue.rowIndex(saved[1] as String, currentIndex)
+                    // Older saves contain only the session, entry key and pixel offset.
+                    val index = queue.anchorIndex(
+                        saved[1] as String, currentIndex,
+                        previousIndex = saved.getOrNull(3) as? Int,
+                        nextKey = saved.getOrNull(4) as? String,
+                    )
                     if (index == null) LazyListState(1) else LazyListState(index, saved[2] as Int)
                 }
             }
@@ -156,17 +162,26 @@ private fun rememberQueueScrollState(queue: PlaybackQueue, currentIndex: Int): L
     SideEffect(list, queue.playOrder, currentIndex) {
         // The last layout still identifies the occurrence the user was reading before remeasurement.
         val index = list.firstVisibleItemIndex
-        val key = list.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.key as? String ?: return@SideEffect
-        val newIndex = queue.rowIndex(key, currentIndex)
+        val key = list.measuredEntryKey(index) ?: return@SideEffect
+        val newIndex = queue.anchorIndex(key, currentIndex, index, list.measuredEntryKey(index + 1))
         if (newIndex == null) list.requestScrollToItem(1)
         else if (newIndex != index) list.requestScrollToItem(newIndex, list.firstVisibleItemScrollOffset)
     }
     return list
 }
 
-private fun PlaybackQueue.rowIndex(key: String, currentIndex: Int): Int? {
+private fun LazyListState.measuredEntryKey(index: Int): String? =
+    layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.key as? String
+
+private fun PlaybackQueue.anchorIndex(key: String, currentIndex: Int, previousIndex: Int?, nextKey: String?): Int? {
     val position = playOrder.indexOf(QueueEntryId(key))
-    return if (position < currentIndex) null else 1 + position - currentIndex
+    if (position >= currentIndex) return 1 + position - currentIndex
+    if (position >= 0) return null // Playback moved beyond the anchor. Show the current row from its start.
+
+    // The anchor was removed. Its successor can also have moved to a different list index.
+    val successor = nextKey?.let { playOrder.indexOf(QueueEntryId(it)) } ?: -1
+    return if (successor >= currentIndex) 1 + successor - currentIndex
+    else previousIndex?.coerceIn(1, playOrder.size - currentIndex)
 }
 
 @Composable
