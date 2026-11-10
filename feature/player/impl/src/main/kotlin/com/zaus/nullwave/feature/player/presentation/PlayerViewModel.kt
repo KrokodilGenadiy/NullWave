@@ -47,6 +47,12 @@ internal class PlayerViewModel(private val playbackController: PlaybackControlle
         on<PlayerIntent.Previous> {
             if (state.supportsItemCommand(PlaybackCapability.Previous)) submit(request, PlayerRequest.Transport(PlaybackCommand.Previous))
         }
+        on<PlayerIntent.SelectQueueEntry> { intent ->
+            val snapshot = state.liveSnapshot ?: return@on
+            if (PlaybackCapability.SelectQueueEntry !in snapshot.capabilities) return@on
+            val command = PlaybackCommand.SelectQueueEntry(intent.sessionId, intent.entryId)
+            if (command.resolveBaseIndex(snapshot) is AppResult.Success) submit(request, PlayerRequest.Transport(command))
+        }
         on<PlayerIntent.SeekTo> { intent ->
             val snapshot = state.liveSnapshot ?: return@on
             if (!state.supportsItemCommand(PlaybackCapability.SeekTo) || snapshot.queue.current != intent.target ||
