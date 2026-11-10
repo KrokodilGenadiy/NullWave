@@ -12,6 +12,7 @@
     <string name="player_queue_save">В ПЛЕЙЛИСТ</string>
     <string name="player_queue_shuffle_rest">ПЕРЕМЕШАТЬ ОСТАТОК</string>
     <string name="player_queue_next">ДАЛЕЕ</string>
+    <string name="player_queue_remove_hint">Смахните строку влево, чтобы убрать её из очереди.</string>
     <plurals name="player_queue_tracks">
         <item quantity="one">ОЧЕРЕДЬ · %1$d ТРЕК</item>
         <item quantity="few">ОЧЕРЕДЬ · %1$d ТРЕКА</item>

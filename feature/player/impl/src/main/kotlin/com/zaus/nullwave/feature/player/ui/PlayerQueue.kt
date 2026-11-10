@@ -71,7 +71,9 @@ internal fun PlayerQueue(
     currentIndex: Int,
     artwork: LibraryArtworkRenderer,
     modifier: Modifier = Modifier,
+    actionsEnabled: Boolean = true,
     onSelectEntry: ((QueueEntryId) -> Unit)? = null,
+    onRemoveEntry: ((QueueEntryId) -> Unit)? = null,
     header: @Composable () -> Unit = {},
 ) {
     val entriesById = remember(queue.entries) { queue.entries.associateBy { it.entryId } }
@@ -95,14 +97,30 @@ internal fun PlayerQueue(
                 ) { offset ->
                     val entry = entriesById.getValue(queue.playOrder[currentIndex + offset])
                     val row = Modifier.testTag("player_queue_entry:${entry.entryId.value}")
-                    val select: (() -> Unit)? = onSelectEntry?.let { action -> { action(entry.entryId) } }
+                    val select: (() -> Unit)? = if (actionsEnabled && onSelectEntry != null) {
+                        { onSelectEntry(entry.entryId) }
+                    } else null
                     if (offset == 0) {
-                        CurrentTrack(entry.track, artwork, select, row)
+                        QueueEntrySwipe(modifier = Modifier, onRemove = null) {
+                            CurrentTrack(entry.track, artwork, select, row)
+                        }
                         if (currentIndex < queue.playOrder.lastIndex) QueueHeading(stringResource(R.string.player_queue_next))
                     } else {
                         val modifier = if (select != null) row.clickable(role = Role.Button, onClick = select)
                         else row.semantics(mergeDescendants = true) {}
-                        UpcomingTrack(entry.track, artwork, stackedDuration, modifier)
+                        QueueEntrySwipe(
+                            modifier = modifier,
+                            onRemove = if (actionsEnabled && onRemoveEntry != null) {
+                                { onRemoveEntry(entry.entryId) }
+                            } else null,
+                        ) {
+                            UpcomingTrack(entry.track, artwork, stackedDuration)
+                        }
+                        if (currentIndex + offset == queue.playOrder.lastIndex && onRemoveEntry != null) {
+                            Text(stringResource(R.string.player_queue_remove_hint),
+                                modifier = Modifier.padding(horizontal = NullWaveTheme.dimens.gutter, vertical = 8.dp),
+                                style = NullWaveTheme.typography.mono, color = NullWaveTheme.colors.textSecondary)
+                        }
                     }
                 }
             }
@@ -192,10 +210,10 @@ private fun QueueHeading(label: String) {
 }
 
 @Composable
-private fun UpcomingTrack(track: MediaTrack, artwork: LibraryArtworkRenderer, stackedDuration: Boolean, modifier: Modifier) {
+private fun UpcomingTrack(track: MediaTrack, artwork: LibraryArtworkRenderer, stackedDuration: Boolean) {
     val colors = NullWaveTheme.colors
     val duration = libraryDuration(track.durationMs)
-    Column(modifier.fillMaxWidth()) {
+    Column(Modifier.fillMaxWidth()) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = 68.dp)
                 .padding(horizontal = NullWaveTheme.dimens.gutter, vertical = 8.dp),

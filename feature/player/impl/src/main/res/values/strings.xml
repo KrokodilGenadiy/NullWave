@@ -12,6 +12,7 @@
     <string name="player_queue_save">SAVE AS PLAYLIST</string>
     <string name="player_queue_shuffle_rest">SHUFFLE REST</string>
     <string name="player_queue_next">NEXT UP</string>
+    <string name="player_queue_remove_hint">Swipe a row left to remove it from the queue.</string>
     <plurals name="player_queue_tracks">
         <item quantity="one">QUEUE · %1$d TRACK</item>
         <item quantity="other">QUEUE · %1$d TRACKS</item>
