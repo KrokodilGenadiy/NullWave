@@ -84,7 +84,7 @@ class PlaybackForegroundNotificationInstrumentedTest {
                 when (shutdown) {
                     Shutdown.EmptyQueue -> {
                         fixture.player.stop()
-                        fixture.player.clearMediaItems()
+                        fixture.player.setMediaItems(emptyList())
                         fixture.notification.update()
                         assertEquals(0, fixture.player.mediaItemCount)
                     }

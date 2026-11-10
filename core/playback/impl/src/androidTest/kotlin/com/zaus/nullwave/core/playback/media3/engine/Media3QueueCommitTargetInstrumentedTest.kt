@@ -100,7 +100,7 @@ class Media3QueueCommitTargetInstrumentedTest {
     @Test
     fun seekNeedsKnownDurationAndClampsToActualEngineDuration() = onMain {
         Fixture().use { fixture ->
-            success(fixture.target.install(fixture.commit(listOf("a"))))
+            success(fixture.target.install(fixture.commit(listOf("a"), play = false)))
             fixture.setDuration(C.TIME_UNSET)
             val token = fixture.snapshot().queue.current!!
             assertFalse(PlaybackCapability.SeekTo in fixture.snapshot().capabilities)
@@ -120,7 +120,7 @@ class Media3QueueCommitTargetInstrumentedTest {
     @Test
     fun oldSeekTokenIsRejectedAfterReturningToTheSameQueueOccurrence() = onMain {
         Fixture().use { fixture ->
-            success(fixture.target.install(fixture.commit(listOf("a", "b"))))
+            success(fixture.target.install(fixture.commit(listOf("a", "b"), play = false)))
             val firstA = fixture.snapshot().queue.current!!
             fixture.player.seekTo(1, 0)
             fixture.target.publish()
@@ -157,7 +157,8 @@ class Media3QueueCommitTargetInstrumentedTest {
             assertEquals(repeated.entryId, restarted.entryId)
             assertNotEquals(repeated, restarted)
             assertEquals(repeated.activation + 1, restarted.activation)
-            assertEquals(0L, fixture.player.currentPosition)
+            assertEquals(0L, fixture.seekPositions.single())
+            assertTrue(fixture.snapshot().transport.playRequested)
         }
     }
 
@@ -190,7 +191,7 @@ class Media3QueueCommitTargetInstrumentedTest {
     @Test
     fun nativeScrubWithinTheSameEntryKeepsItsActivation() = onMain {
         Fixture().use { fixture ->
-            success(fixture.target.install(fixture.commit(listOf("a"))))
+            success(fixture.target.install(fixture.commit(listOf("a"), play = false)))
             fixture.setDuration(10_000)
             val before = fixture.snapshot()
 
@@ -208,7 +209,7 @@ class Media3QueueCommitTargetInstrumentedTest {
     fun nativeNextFromEndedRepeatingTheSameEntryUsesExactlyOneActivation() = onMain {
         Fixture().use { fixture ->
             fixture.player.repeatMode = Player.REPEAT_MODE_ALL
-            success(fixture.target.install(fixture.commit(listOf("a"))))
+            success(fixture.target.install(fixture.commit(listOf("a"), play = false)))
             fixture.player.setPosition(5_000)
             fixture.player.setPlaybackState(Player.STATE_ENDED)
             fixture.target.publish()
@@ -379,7 +380,18 @@ class Media3QueueCommitTargetInstrumentedTest {
             QueueEntryId("entry-${entry++}")
         }
         val startPositions = mutableListOf<Long>()
+        val seekPositions = mutableListOf<Long>()
         private val observedPlayer = object : ForwardingPlayer(player) {
+            override fun clearMediaItems() {
+                // FakePlayer supports installing an empty playlist but does not implement removal.
+                player.setMediaItems(emptyList())
+            }
+
+            override fun seekTo(positionMs: Long) {
+                seekPositions += positionMs
+                super.seekTo(positionMs)
+            }
+
             override fun setMediaItems(mediaItems: List<MediaItem>, startIndex: Int, startPositionMs: Long) {
                 startPositions += startPositionMs
                 super.setMediaItems(mediaItems, startIndex, startPositionMs)

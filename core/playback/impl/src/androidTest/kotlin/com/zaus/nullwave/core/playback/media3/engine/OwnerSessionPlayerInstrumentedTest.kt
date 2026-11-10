@@ -46,9 +46,9 @@ class OwnerSessionPlayerInstrumentedTest {
                 assertTrue(future.isDone)
                 future.get()
 
-                assertEquals(listOf("foreground", "seek", "release"), fixture.events)
+                assertEquals(listOf("foreground", "seek:123", "release"), fixture.events)
                 assertEquals(Player.STATE_READY, fixture.raw.playbackState)
-                assertEquals(123L, fixture.raw.currentPosition)
+                assertTrue(fixture.raw.playWhenReady)
             } finally { fixture.close() }
         }
     }
@@ -62,7 +62,7 @@ class OwnerSessionPlayerInstrumentedTest {
                 assertTrue(future.isDone)
                 future.get()
 
-                assertEquals(listOf("seek"), fixture.events)
+                assertEquals(listOf("seek:123"), fixture.events)
                 assertEquals(123L, fixture.raw.currentPosition)
             } finally { fixture.close() }
         }
@@ -127,7 +127,7 @@ class OwnerSessionPlayerInstrumentedTest {
         val raw = FakePlayer(Player.STATE_IDLE, false, emptyList(), 1f, 0)
         private val observed = object : ForwardingPlayer(raw) {
             override fun seekTo(positionMs: Long) {
-                events += "seek"
+                events += "seek:$positionMs"
                 super.seekTo(positionMs)
             }
         }
