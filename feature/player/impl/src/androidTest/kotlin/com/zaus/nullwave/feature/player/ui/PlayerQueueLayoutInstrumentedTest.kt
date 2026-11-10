@@ -1,9 +1,14 @@
 package com.zaus.nullwave.feature.player.ui
 
 import android.content.Intent
+import android.content.res.Configuration
 import androidx.compose.runtime.remember
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
@@ -21,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
+import com.zaus.nullwave.core.designsystem.R as DesignSystemR
 import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.core.playback.api.PlaybackClock
@@ -32,6 +38,7 @@ import com.zaus.nullwave.core.playback.api.model.PlaybackSessionId
 import com.zaus.nullwave.core.playback.api.model.PlaybackSnapshot
 import com.zaus.nullwave.core.playback.api.model.QueueEntry
 import com.zaus.nullwave.core.playback.api.model.QueueEntryId
+import com.zaus.nullwave.feature.player.impl.R
 import com.zaus.nullwave.feature.player.presentation.PlayerState
 import java.util.Locale
 import org.junit.After
@@ -68,6 +75,20 @@ class PlayerQueueLayoutInstrumentedTest {
         val notice = compose.onNodeWithTag("player_notice").assertIsDisplayed().getUnclippedBoundsInRoot()
         val mini = compose.onNodeWithTag("player_mini").assertIsDisplayed().getUnclippedBoundsInRoot()
         assertTrue("Expected list, notice and transport in separate bands", viewport.bottom <= notice.top && notice.bottom <= mini.top)
+    }
+
+    @Test
+    fun cachedQueueKeepsItsCurrentMarkerWithoutUnavailableLabelsOrButtonActions() {
+        launch(height = 640, disconnected = true)
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val localized = context.createConfigurationContext(Configuration(context.resources.configuration).apply {
+            setLocale(Locale.forLanguageTag("ru"))
+        })
+        val marker = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, localized.getString(R.string.player_queue_current))
+        compose.onNode(marker).assertIsDisplayed().assertIsEnabled().assertHasNoClickAction()
+        row(1).assertIsDisplayed().assertIsEnabled().assertHasNoClickAction()
+        compose.onNodeWithText(localized.getString(DesignSystemR.string.nw_track_unavailable), useUnmergedTree = true)
+            .assertDoesNotExist()
     }
 
     @Test

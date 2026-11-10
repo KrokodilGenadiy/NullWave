@@ -39,11 +39,12 @@ private val QueueSweep = tween<Float>(380, easing = CubicBezierEasing(0.25f, 0f,
 
 @Composable
 internal fun PlayerQueueTransition(
-    queueOpen: Boolean,
+    isQueueOpen: () -> Boolean,
     active: Boolean,
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.(showQueue: Boolean) -> Unit,
 ) {
+    val queueOpen = isQueueOpen()
     val target = if (queueOpen) 1f else 0f
     val progress = if (active && decorativeMotionEnabled()) {
         animateFloatAsState(target, QueueSweep, label = "Queue scan")
@@ -57,11 +58,12 @@ internal fun PlayerQueueTransition(
             val destination = showQueue == queueOpen
             if (destination || moving) key(showQueue) {
                 val page = when {
-                    !destination -> Modifier.blockPageInput()
+                    !destination -> Modifier.clearAndSetSemantics {}
                     moving -> Modifier.zIndex(1f).queueScan(showQueue, colors) { progress.value }
                     else -> Modifier
                 }
-                Column(Modifier.matchParentSize().then(page).background(colors.bg)) { content(showQueue) }
+                Column(Modifier.matchParentSize().then(page)
+                    .blockInputUnless { isQueueOpen() == showQueue }.background(colors.bg)) { content(showQueue) }
             }
         }
     }
@@ -116,10 +118,13 @@ private fun Modifier.queueScan(queue: Boolean, colors: NullWaveColors, progress:
         clip = true
     }
 
-private fun Modifier.blockPageInput() = clearAndSetSemantics {}
-    .onPreviewKeyEvent { true }
-    .pointerInput(Unit) {
+// Back changes the destination immediately. A held press can end before the next composition.
+private fun Modifier.blockInputUnless(isDestination: () -> Boolean) = onPreviewKeyEvent { !isDestination() }
+    .pointerInput(isDestination) {
         awaitPointerEventScope {
-            while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                if (!isDestination()) event.changes.forEach { it.consume() }
+            }
         }
     }

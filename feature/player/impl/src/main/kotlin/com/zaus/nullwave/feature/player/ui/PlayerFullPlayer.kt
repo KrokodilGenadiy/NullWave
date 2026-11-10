@@ -84,7 +84,7 @@ internal fun PlayerFullPlayer(
     val active = lifecycle.isAtLeast(Lifecycle.State.STARTED)
     val spacing = NullWaveTheme.spacing
     PlayerQueueTransition(
-        navigation.queueOpen, active,
+        { navigation.queueOpen }, active,
         modifier = modifier.fillMaxSize().background(NullWaveTheme.colors.bg).testTag("player_full"),
     ) { showQueue ->
         val header: @Composable () -> Unit = {
@@ -97,7 +97,7 @@ internal fun PlayerFullPlayer(
             Column(Modifier.fillMaxSize()) {
                 if (showQueue) {
                     if (queue != null && currentIndex != null) {
-                        PlayerQueue(queue, currentIndex, renderer, Modifier.weight(1f), header)
+                        PlayerQueue(queue, currentIndex, renderer, Modifier.weight(1f), header = header)
                     } else {
                         header()
                         Text(

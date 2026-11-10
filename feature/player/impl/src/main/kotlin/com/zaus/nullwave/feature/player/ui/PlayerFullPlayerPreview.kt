@@ -57,7 +57,7 @@ private fun PlayerQueuePreview() {
         current = PlaybackItemToken(PlaybackSessionId("preview"), repeat.entryId, 0),
         shuffleEnabled = true,
     )
-    NullWaveTheme { PlayerQueue(queue, 1, FullPreviewArtwork) }
+    NullWaveTheme { PlayerQueue(queue, 1, FullPreviewArtwork, onSelectEntry = {}) }
 }
 
 @Preview(name = "Full player disconnected", widthDp = 360, heightDp = 720)

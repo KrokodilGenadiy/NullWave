@@ -1,5 +1,6 @@
 package com.zaus.nullwave.feature.player.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -24,6 +25,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -68,6 +70,7 @@ internal fun PlayerQueue(
     currentIndex: Int,
     artwork: LibraryArtworkRenderer,
     modifier: Modifier = Modifier,
+    onSelectEntry: ((QueueEntryId) -> Unit)? = null,
     header: @Composable () -> Unit = {},
 ) {
     val entriesById = remember(queue.entries) { queue.entries.associateBy { it.entryId } }
@@ -91,11 +94,14 @@ internal fun PlayerQueue(
                 ) { offset ->
                     val entry = entriesById.getValue(queue.playOrder[currentIndex + offset])
                     val row = Modifier.testTag("player_queue_entry:${entry.entryId.value}")
+                    val select: (() -> Unit)? = onSelectEntry?.let { action -> { action(entry.entryId) } }
                     if (offset == 0) {
-                        CurrentTrack(entry.track, artwork, row)
+                        CurrentTrack(entry.track, artwork, select, row)
                         if (currentIndex < queue.playOrder.lastIndex) QueueHeading(stringResource(R.string.player_queue_next))
                     } else {
-                        UpcomingTrack(entry.track, artwork, stackedDuration, row)
+                        val modifier = if (select != null) row.clickable(role = Role.Button, onClick = select)
+                        else row.semantics(mergeDescendants = true) {}
+                        UpcomingTrack(entry.track, artwork, stackedDuration, modifier)
                     }
                 }
             }
@@ -146,10 +152,16 @@ private fun QueueActions() {
 }
 
 @Composable
-private fun CurrentTrack(track: MediaTrack, artwork: LibraryArtworkRenderer, modifier: Modifier) {
+private fun CurrentTrack(
+    track: MediaTrack,
+    artwork: LibraryArtworkRenderer,
+    onSelect: (() -> Unit)?,
+    modifier: Modifier,
+) {
     val artist = track.artist ?: stringResource(R.string.player_unknown_artist)
     NullWaveTrackRow(
         title = track.title,
+        onClick = onSelect,
         subtitle = track.album?.let { stringResource(R.string.player_queue_credit, artist, it) } ?: artist,
         durationLabel = libraryDuration(track.durationMs),
         playing = true,
@@ -169,7 +181,7 @@ private fun QueueHeading(label: String) {
 private fun UpcomingTrack(track: MediaTrack, artwork: LibraryArtworkRenderer, stackedDuration: Boolean, modifier: Modifier) {
     val colors = NullWaveTheme.colors
     val duration = libraryDuration(track.durationMs)
-    Column(modifier.fillMaxWidth().semantics(mergeDescendants = true) {}) {
+    Column(modifier.fillMaxWidth()) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = 68.dp)
                 .padding(horizontal = NullWaveTheme.dimens.gutter, vertical = 8.dp),

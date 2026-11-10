@@ -1,5 +1,10 @@
 package com.zaus.nullwave.feature.player.ui
 
+import android.os.SystemClock
+import android.view.InputDevice
+import android.view.MotionEvent
+import androidx.activity.compose.BackHandler
+import androidx.activity.findViewTreeOnBackPressedDispatcherOwner
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -16,6 +21,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
@@ -55,6 +61,36 @@ class PlayerQueueTransitionInstrumentedTest {
         assertSplitFrame(entering, player, queue)
         navigate(false, 144)
         assertSplitFrame(frame(), player, queue)
+        advance(480)
+        assertRestingPage(false)
+    }
+
+    @Test
+    fun backBetweenPressAndReleaseBeforeTheNextFrameCancelsTheQueueTap() {
+        showSheet()
+        navigate(true, 304)
+        sheet.performTouchInput { click(center) }
+        compose.runOnIdle { assertEquals(listOf(true), tappedPages) }
+        val node = sheet.fetchSemanticsNode()
+        val point = node.boundsInRoot.center
+        val view = (node.root as ViewRootForTest).view
+        compose.runOnIdle {
+            val downTime = SystemClock.uptimeMillis()
+            fun dispatch(action: Int) {
+                val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action, point.x, point.y, 0)
+                try {
+                    event.source = InputDevice.SOURCE_TOUCHSCREEN
+                    view.dispatchTouchEvent(event)
+                } finally {
+                    event.recycle()
+                }
+            }
+            val back = checkNotNull(view.findViewTreeOnBackPressedDispatcherOwner()).onBackPressedDispatcher
+            dispatch(MotionEvent.ACTION_DOWN)
+            back.onBackPressed()
+            dispatch(MotionEvent.ACTION_UP)
+            assertEquals(listOf(true), tappedPages)
+        }
         advance(480)
         assertRestingPage(false)
     }
@@ -166,8 +202,9 @@ class PlayerQueueTransitionInstrumentedTest {
     private fun showSheet() {
         compose.mainClock.autoAdvance = false
         compose.setContent {
+            BackHandler(enabled = open) { open = false }
             NullWaveTheme(effects = NullWaveEffects(reduceMotion = reduceMotion)) {
-                PlayerQueueTransition(open, active, Modifier.size(180.dp, 240.dp).testTag("sheet")) { queue ->
+                PlayerQueueTransition({ open }, active, Modifier.size(180.dp, 240.dp).testTag("sheet")) { queue ->
                     Box(Modifier.fillMaxSize().background(if (queue) Color.Blue else Color.White)
                         .testTag(if (queue) "queue" else "player")
                         .clickable(interactionSource = null, indication = null) { tappedPages += queue }) {
