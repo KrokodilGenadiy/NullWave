@@ -372,7 +372,10 @@ class Media3QueueCommitTargetInstrumentedTest {
         }
     }
 
-    private class Fixture(val registry: PlaybackServiceRegistry = PlaybackServiceRegistry()) : AutoCloseable {
+    private class Fixture(
+        val registry: PlaybackServiceRegistry = PlaybackServiceRegistry(),
+        acquireForeground: () -> AppResult<AutoCloseable, PlaybackCommandError> = { error("Unexpected foreground request") },
+    ) : AutoCloseable {
         val player = FakePlayer(Player.STATE_IDLE, false, emptyList(), 1f, 0)
         var now = 100L
         private var entry = 0
@@ -397,7 +400,7 @@ class Media3QueueCommitTargetInstrumentedTest {
                 super.setMediaItems(mediaItems, startIndex, startPositionMs)
             }
         }
-        val target = Media3QueueCommitTarget(observedPlayer, identities, registry, PlaybackClock { now })
+        val target = Media3QueueCommitTarget(observedPlayer, identities, registry, PlaybackClock { now }, acquireForeground)
 
         fun snapshot() = registry.snapshot.value!!
 

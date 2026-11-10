@@ -41,6 +41,7 @@ internal class Media3QueueCommitTarget(
     private val identities: PlaybackIdentities,
     private val registry: PlaybackServiceRegistry,
     private val clock: PlaybackClock,
+    private val acquireForeground: () -> AppResult<AutoCloseable, PlaybackCommandError>,
 ) : QueueCommitTarget, Player.Listener, AutoCloseable {
     private val metadata = mutableMapOf<String, QueueEntry>()
     private var current: PlaybackItemToken? = null
@@ -104,6 +105,7 @@ internal class Media3QueueCommitTarget(
         return when (command) {
             is PlaybackCommand.ReplaceQueue -> error("ReplaceQueue must enter through PlaybackQueueOwner.")
             is PlaybackCommand.SetPlayRequested -> setPlayRequested(command.value)
+            is PlaybackCommand.SelectQueueEntry -> selectQueueEntry(command)
             is PlaybackCommand.SeekTo -> {
                 if (command.target != current) stale()
                 else {
@@ -174,6 +176,29 @@ internal class Media3QueueCommitTarget(
                 player.prepare()
             }
             player.playWhenReady = value
+        }
+    }
+
+    private fun selectQueueEntry(command: PlaybackCommand.SelectQueueEntry): EmptyResult<PlaybackCommandError> {
+        val index = when (val selection = command.resolveBaseIndex(published)) {
+            is AppResult.Failure -> return selection
+            is AppResult.Success -> selection.value
+        }
+        if (command.entryId == current?.entryId) return AppResult.Success(Unit)
+        if (PlaybackCapability.SelectQueueEntry !in published.capabilities) return unavailable()
+
+        // Acquire only for a live move that can resume audio. A stale tap must never start the service.
+        val lease = if (player.playWhenReady) {
+            when (val result = acquireForeground()) {
+                is AppResult.Failure -> return result
+                is AppResult.Success -> result.value
+            }
+        } else null
+        return lease.use {
+            mutate {
+                player.seekTo(index, 0L)
+                if (player.playbackState == Player.STATE_IDLE) player.prepare()
+            }
         }
     }
 
@@ -348,6 +373,10 @@ internal class Media3QueueCommitTarget(
             add(PlaybackCapability.StopAndClear)
         }
         if (hasCurrent) {
+            if (supports(Player.COMMAND_SEEK_TO_MEDIA_ITEM) &&
+                (player.playbackState != Player.STATE_IDLE || supports(Player.COMMAND_PREPARE))) {
+                add(PlaybackCapability.SelectQueueEntry)
+            }
             if (supports(Player.COMMAND_PLAY_PAUSE)) add(PlaybackCapability.SetPlayRequested)
             if (durationMs() != null && supports(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) add(PlaybackCapability.SeekTo)
             if (supports(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)) add(PlaybackCapability.Next)

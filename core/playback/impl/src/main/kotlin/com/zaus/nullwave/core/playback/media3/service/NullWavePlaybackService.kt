@@ -24,6 +24,7 @@ import com.zaus.nullwave.core.playback.media3.session.PlaybackSessionProtocol
 import com.zaus.nullwave.core.playback.preparation.QueuePreparer
 import com.zaus.nullwave.core.playback.runtime.PlaybackIdentities
 import com.zaus.nullwave.core.playback.runtime.PlaybackQueueOwner
+import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.EmptyResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -95,11 +96,11 @@ private class ServicePlaybackRuntime(service: NullWavePlaybackService, private v
         .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), true)
         .setWakeMode(C.WAKE_MODE_LOCAL)
         .build()
-    private val target = Media3QueueCommitTarget(raw, identities, dependencies.registry, dependencies.clock)
+    private val target = Media3QueueCommitTarget(raw, identities, dependencies.registry, dependencies.clock, ::acquireForeground)
     private val owner = PlaybackQueueOwner(scope, dependencies.main, QueuePreparer(dependencies.resolver, dependencies.default), target, identities)
     private val foreground: PlaybackForegroundNotification
     private val startGuard = PlaybackStartGuard(
-        acquire = { foreground.acquire() },
+        acquire = ::acquireForeground,
         onDenied = { stopAfterDeniedStart() },
     )
     private val player = OwnerSessionPlayer(raw, owner, target, scope, startGuard)
@@ -157,7 +158,15 @@ private class ServicePlaybackRuntime(service: NullWavePlaybackService, private v
     fun updateNotification() { if (!closed) foreground.update() }
     fun finishIdleStart() { if (!closed) foreground.finishIdleStart() }
 
+    private fun acquireForeground() = foreground.acquire()
+
     private suspend fun execute(command: PlaybackCommand): EmptyResult<PlaybackCommandError> {
+        if (command is PlaybackCommand.SelectQueueEntry) {
+            // The target validates the entry under owner admission before requesting foreground.
+            val result = owner.execute(command)
+            if (result is AppResult.Failure && result.error == PlaybackCommandError.StartNotAllowed) stopAfterDeniedStart()
+            return result
+        }
         val needsForeground = when (command) {
             // Even a paused replacement owns preparation and a started service beyond UI release.
             is PlaybackCommand.ReplaceQueue -> true

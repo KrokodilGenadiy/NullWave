@@ -42,7 +42,9 @@ interface PlaybackController {
      * Success means dispatch through a live playback connection, not audible sound, universal
      * execution acknowledgement or durable persistence. The service owns work it has accepted.
      * ReplaceQueue additionally awaits preflight/whole-queue installation; SeekTo/Retry require
-     * owner-side token checks. Standard relative actions must not be replayed automatically after
+     * owner-side token checks. SelectQueueEntry requires the same live session and an installed
+     * occurrence, checked together at execution. Selection preserves the owner's playRequested value.
+     * Standard relative actions must not be replayed automatically after
      * cancellation/disconnection: their result may already have happened. Connection attempts are
      * bounded by the adapter. Expected failures retain cause/originalMessage in AppResult.Failure;
      * cancellation and unexpected programming failures propagate.

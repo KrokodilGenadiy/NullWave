@@ -2,7 +2,11 @@ package com.zaus.nullwave.core.playback.api.command
 
 import com.zaus.nullwave.core.playback.api.model.PlaybackItemToken
 import com.zaus.nullwave.core.playback.api.model.PlaybackProblemId
+import com.zaus.nullwave.core.playback.api.model.PlaybackSessionId
+import com.zaus.nullwave.core.playback.api.model.PlaybackSnapshot
+import com.zaus.nullwave.core.playback.api.model.QueueEntryId
 import com.zaus.nullwave.core.playback.api.model.RepeatMode
+import com.zaus.nullwave.core.result.AppResult
 
 /** Desired values avoid toggle races. Next/Previous are relative ordered actions, not latest state. */
 sealed interface PlaybackCommand {
@@ -11,6 +15,24 @@ sealed interface PlaybackCommand {
     data class SeekTo(val target: PlaybackItemToken, val positionMs: Long) : PlaybackCommand {
         init { require(positionMs >= 0) { "Seek position must not be negative." } }
     }
+
+    /**
+     * Selects an occurrence in the installed queue, preserving the owner's play/pause intent.
+     * A different entry starts at its beginning. Selecting the current entry preserves its position.
+     */
+    data class SelectQueueEntry(val sessionId: PlaybackSessionId, val entryId: QueueEntryId) : PlaybackCommand {
+        /**
+         * Resolve against the owner's live snapshot immediately before selecting the entry.
+         * A session mismatch or a missing occurrence returns [PlaybackCommandError.StaleTarget].
+         * The index is in the base timeline, regardless of shuffle order or current activation.
+         */
+        fun resolveBaseIndex(snapshot: PlaybackSnapshot): AppResult<Int, PlaybackCommandError> {
+            if (snapshot.sessionId != sessionId) return AppResult.Failure(PlaybackCommandError.StaleTarget)
+            val index = snapshot.queue.entries.indexOfFirst { it.entryId == entryId }
+            return if (index >= 0) AppResult.Success(index) else AppResult.Failure(PlaybackCommandError.StaleTarget)
+        }
+    }
+
     data object Next : PlaybackCommand
     data object Previous : PlaybackCommand
     data class SetRepeat(val mode: RepeatMode) : PlaybackCommand

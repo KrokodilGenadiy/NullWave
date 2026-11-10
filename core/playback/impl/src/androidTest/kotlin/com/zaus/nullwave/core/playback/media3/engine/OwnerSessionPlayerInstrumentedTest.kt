@@ -76,7 +76,9 @@ class OwnerSessionPlayerInstrumentedTest {
                 val raw = FakePlayer(Player.STATE_IDLE, false, emptyList(), 1f, 0)
                 val registry = PlaybackServiceRegistry()
                 val identities = PlaybackIdentities()
-                val target = Media3QueueCommitTarget(raw, identities, registry, PlaybackClock { 100L })
+                val target = Media3QueueCommitTarget(raw, identities, registry, PlaybackClock { 100L }) {
+                    error("Unexpected queue selection")
+                }
                 val scope = CoroutineScope(serviceJob + Dispatchers.Main.immediate)
                 val source = object : PlaybackSourceResolver {
                     override suspend fun resolveTrack(id: TrackId): AppResult<ResolvedPlaybackTrack, PlaybackSourceError> =
@@ -132,7 +134,9 @@ class OwnerSessionPlayerInstrumentedTest {
             }
         }
         private val identities = PlaybackIdentities()
-        private val target = Media3QueueCommitTarget(observed, identities, PlaybackServiceRegistry(), PlaybackClock { 100L })
+        private val target = Media3QueueCommitTarget(observed, identities, PlaybackServiceRegistry(), PlaybackClock { 100L }) {
+            error("Unexpected queue selection")
+        }
         private val source = object : PlaybackSourceResolver {
             override suspend fun resolveTrack(id: TrackId): AppResult<ResolvedPlaybackTrack, PlaybackSourceError> =
                 error("A native seek uses the installed resource")
