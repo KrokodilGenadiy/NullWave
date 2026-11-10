@@ -2,6 +2,8 @@ package com.zaus.nullwave.feature.player.ui
 
 import android.content.Intent
 import android.view.KeyEvent
+import androidx.activity.findViewTreeOnBackPressedDispatcherOwner
+import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -50,6 +52,30 @@ class PlayerQueueInstrumentedTest {
     fun close() {
         compose.mainClock.autoAdvance = true
         try { scenario?.close() } finally { PlayerHostTestActivity.fixture = null }
+    }
+
+    @Test
+    fun backBeforeTheFirstQueueFrameReturnsToPlayerAndTheNextBackDismissesIt() {
+        fixture = PlayerHostActivityFixture(reduceMotion = false)
+        val first = entry(0)
+        publish(listOf(first), first)
+        launchFullPlayer(first.track.title)
+        val action = compose.onNodeWithText(instrumentation.targetContext.getString(R.string.player_queue))
+            .performScrollTo().fetchSemanticsNode()
+        compose.runOnIdle {
+            val view = (action.root as ViewRootForTest).view
+            val dispatcher = checkNotNull(view.findViewTreeOnBackPressedDispatcherOwner()).onBackPressedDispatcher
+            // Deliver both events in one main-thread turn, before Compose can install another handler.
+            assertTrue(checkNotNull(action.config[SemanticsActions.OnClick].action).invoke())
+            dispatcher.onBackPressed()
+        }
+        compose.onNodeWithTag("player_full_close").assertIsDisplayed()
+        compose.onNodeWithTag("player_queue").assertDoesNotExist()
+
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+        compose.waitUntil(5_000) { compose.onAllNodes(hasTestTag("player_full")).fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithTag("player_mini").assertIsDisplayed()
+        compose.runOnIdle { assertTrue(fixture.playback.commands.isEmpty()) }
     }
 
     @Test

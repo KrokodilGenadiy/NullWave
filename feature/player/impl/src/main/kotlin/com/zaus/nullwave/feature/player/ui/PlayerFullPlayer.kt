@@ -1,6 +1,5 @@
 package com.zaus.nullwave.feature.player.ui
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -23,7 +22,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,18 +78,17 @@ internal fun PlayerFullPlayer(
         queue?.current?.let { queue.playOrder.indexOf(it.entryId) }
     }
     val renderer = remember(artwork) { artwork() }
-    var queueOpen by rememberSaveable { mutableStateOf(false) }
+    val navigation = rememberPlayerQueueNavigation()
     val playerScroll = rememberScrollState()
-    if (queueOpen) BackHandler { queueOpen = false }
     val lifecycle by lifecycleOwner.lifecycle.currentStateAsState()
     val active = lifecycle.isAtLeast(Lifecycle.State.STARTED)
     val spacing = NullWaveTheme.spacing
     PlayerQueueTransition(
-        queueOpen, active,
+        navigation.queueOpen, active,
         modifier = modifier.fillMaxSize().background(NullWaveTheme.colors.bg).testTag("player_full"),
     ) { showQueue ->
         val header: @Composable () -> Unit = {
-            PlayerHeader(showQueue, queue, currentIndex) { if (showQueue) queueOpen = false else onClose() }
+            PlayerHeader(showQueue, queue, currentIndex) { if (showQueue) navigation.showQueue(false) else onClose() }
         }
         if (!showQueue) header()
         // The pinned MiniPlayer gets its natural height before the notice and scroll viewport.
@@ -126,7 +123,7 @@ internal fun PlayerFullPlayer(
                         PlayerFullMetadata(track)
                         val timeline = if (state.liveSnapshot != null) waveform(track.id) else PlayerWaveform.Unavailable
                         PlayerFullControls(state, canSubmit && active, onIntent, clock, track.id, timeline)
-                        PlayerSecondaryActions { queueOpen = true }
+                        PlayerSecondaryActions { navigation.showQueue(true) }
                     }
                 } else {
                     Text(
@@ -146,7 +143,7 @@ internal fun PlayerFullPlayer(
         }
         if (showQueue) {
             PlayerMiniPlayer(state, canSubmit, onIntent, clock, artwork, lifecycleOwner,
-                onExpand = { queueOpen = false })
+                onExpand = { navigation.showQueue(false) })
         }
     }
 }
