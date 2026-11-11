@@ -113,7 +113,7 @@ internal fun PlayerFullPlayer(
                                     { id -> onIntent(PlayerIntent.RemoveQueueEntry(sessionId, id)) }
                                 } else null,
                                 onMoveEntry = if (state.supportsItemCommand(PlaybackCapability.MoveQueueEntry)) {
-                                    { id, before -> onIntent(PlayerIntent.MoveQueueEntry(sessionId, id, before)) }
+                                    { id, before -> onIntent(PlayerIntent.MoveQueueEntry(snapshot.queue, id, before)) }
                                 } else null,
                                 modifier = Modifier.weight(1f),
                                 header = header,

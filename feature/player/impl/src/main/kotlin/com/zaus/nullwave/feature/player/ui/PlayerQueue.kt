@@ -89,7 +89,7 @@ internal fun PlayerQueue(
     val list = rememberQueueScrollState(queue, currentIndex)
     val order = queue.playOrder
     val canMove = actionsEnabled && onMoveEntry != null && order.lastIndex - currentIndex >= 2
-    val reorder = remember(list, order, currentIndex, canMove) {
+    val reorder = remember(list, order, queue.current, canMove) {
         if (canMove) QueueReorderGesture(list, order, currentIndex) else null
     }
     val upLabel = stringResource(DesignR.string.nw_queue_move_up)

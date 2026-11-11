@@ -3,6 +3,7 @@ package com.zaus.nullwave.feature.player.presentation
 import com.zaus.nullwave.core.mvi.UiIntent
 import com.zaus.nullwave.core.playback.api.model.PlaybackItemToken
 import com.zaus.nullwave.core.playback.api.model.PlaybackProblemId
+import com.zaus.nullwave.core.playback.api.model.PlaybackQueue
 import com.zaus.nullwave.core.playback.api.model.PlaybackSessionId
 import com.zaus.nullwave.core.playback.api.model.QueueEntryId
 import com.zaus.nullwave.core.playback.api.model.RepeatMode
@@ -15,9 +16,9 @@ internal sealed interface PlayerIntent : UiIntent {
     data class SelectQueueEntry(val sessionId: PlaybackSessionId, val entryId: QueueEntryId) : PlayerIntent
     /** Remove the displayed occurrence only while it is still upcoming in this session. */
     data class RemoveQueueEntry(val sessionId: PlaybackSessionId, val entryId: QueueEntryId) : PlayerIntent
-    /** Move the displayed occurrence before its captured neighbour, or to the end if null. */
+    /** Keep the immutable queue shown when the user chose this insertion point. */
     data class MoveQueueEntry(
-        val sessionId: PlaybackSessionId,
+        val displayedQueue: PlaybackQueue,
         val entryId: QueueEntryId,
         val beforeEntryId: QueueEntryId?,
     ) : PlayerIntent

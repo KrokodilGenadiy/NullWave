@@ -62,7 +62,10 @@ internal class PlayerViewModel(private val playbackController: PlaybackControlle
         on<PlayerIntent.MoveQueueEntry> { intent ->
             val snapshot = state.liveSnapshot ?: return@on
             if (PlaybackCapability.MoveQueueEntry !in snapshot.capabilities) return@on
-            val command = PlaybackCommand.MoveQueueEntry(intent.sessionId, intent.entryId, intent.beforeEntryId)
+            val displayed = intent.displayedQueue
+            val current = displayed.current ?: return@on
+            if (current != snapshot.queue.current || displayed.playOrder != snapshot.queue.playOrder) return@on
+            val command = PlaybackCommand.MoveQueueEntry(current.sessionId, intent.entryId, intent.beforeEntryId)
             if (command.hasLiveTargets(snapshot)) submit(request, PlayerRequest.Transport(command))
         }
         on<PlayerIntent.SeekTo> { intent ->

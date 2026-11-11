@@ -218,6 +218,25 @@ class PlayerQueueInstrumentedTest {
     }
 
     @Test
+    fun reorderPublishedBeforeReleaseCancelsDropEvenBeforeTheNextFrame() {
+        val entries = List(4, ::entry)
+        val (current, source, neighbour, anchor) = entries
+        publish(entries, current, capabilities = queueEdits)
+        launchQueue(current.track.title)
+        dragHandleTo(source, neighbour, release = false)
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.runOnUiThread {
+                publish(entries, current, listOf(current, anchor, neighbour, source), capabilities = queueEdits)
+            }
+            compose.onNodeWithTag("player_queue").performTouchInput { up() }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.runOnIdle { assertTrue(fixture.playback.commands.isEmpty()) }
+    }
+
+    @Test
     fun holdingAtTheListEdgeMovesAnOccurrenceBeyondItsOriginalViewport() {
         val entries = List(18, ::entry)
         val source = entries[3]

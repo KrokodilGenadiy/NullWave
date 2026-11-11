@@ -33,13 +33,13 @@ class PlayerQueueMoveTest {
     private val other = active.copy(entryId = QueueEntryId("other"))
     private val last = active.copy(entryId = QueueEntryId("last"))
     private val entries = listOf(active, source, other, destination, last)
-    private val move = PlayerIntent.MoveQueueEntry(session, source.entryId, destination.entryId)
+    private val move = PlayerIntent.MoveQueueEntry(queue().snapshot.queue, source.entryId, destination.entryId)
     private val command = PlaybackCommand.MoveQueueEntry(session, source.entryId, destination.entryId)
 
     @Before fun setUp() = fixture.setUp()
     @After fun tearDown() = fixture.tearDown()
 
-    @Test fun `move keeps the captured copies after shuffle and waits for the confirmed order`() = with(fixture) {
+    @Test fun `move requires the displayed traversal and waits for the confirmed order`() = with(fixture) {
         runTest(dispatcher) {
             val vm = readyVm(queue())
             val shuffled = queue(order = listOf(active, destination, other, source, last), revision = 1)
@@ -48,6 +48,8 @@ class PlayerQueueMoveTest {
             progress(sample)
 
             send(vm, move)
+            assertTrue(playback.calls.isEmpty())
+            send(vm, move.copy(displayedQueue = shuffled.snapshot.queue))
             assertEquals(command, playback.calls.single().command)
             assertSame(shuffled.snapshot, vm.snapshot.value.state.displaySnapshot)
             respond(AppResult.Success(Unit))
