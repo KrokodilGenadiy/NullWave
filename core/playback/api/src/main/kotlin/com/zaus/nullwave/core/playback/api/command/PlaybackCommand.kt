@@ -63,28 +63,32 @@ sealed interface PlaybackCommand {
         val entryId: QueueEntryId,
         val beforeEntryId: QueueEntryId?,
     ) : PlaybackCommand {
+        /** Check both occurrences against the live traversal without constructing a reordered queue. */
+        fun hasLiveTargets(snapshot: PlaybackSnapshot): Boolean = resolveIndices(snapshot) != null
+
         /**
          * Compute the desired queue from the owner's live snapshot. With shuffle enabled the edit
          * affects only traversal order. An already satisfied move returns the original queue.
          */
         fun resolveQueue(snapshot: PlaybackSnapshot): AppResult<PlaybackQueue, PlaybackCommandError> {
+            val (fromIndex, toIndex) = resolveIndices(snapshot) ?: return AppResult.Failure(PlaybackCommandError.StaleTarget)
+            return AppResult.Success(snapshot.queue.moveInPlayOrder(fromIndex, toIndex))
+        }
+
+        private fun resolveIndices(snapshot: PlaybackSnapshot): Pair<Int, Int>? {
             val queue = snapshot.queue
-            val current = queue.current
-            if (current == null || snapshot.sessionId != sessionId) {
-                return AppResult.Failure(PlaybackCommandError.StaleTarget)
-            }
+            val current = queue.current ?: return null
+            if (snapshot.sessionId != sessionId) return null
 
             val order = queue.playOrder
             val currentIndex = order.indexOf(current.entryId)
             val fromIndex = order.indexOf(entryId)
             val beforeIndex = beforeEntryId?.let(order::indexOf) ?: order.size
-            if (fromIndex <= currentIndex || beforeIndex <= currentIndex) {
-                return AppResult.Failure(PlaybackCommandError.StaleTarget)
-            }
+            if (fromIndex <= currentIndex || beforeIndex <= currentIndex) return null
 
             // Removing the source shifts a later anchor (including the end) one slot to the left.
             val toIndex = if (fromIndex < beforeIndex) beforeIndex - 1 else beforeIndex
-            return AppResult.Success(queue.moveInPlayOrder(fromIndex, toIndex))
+            return fromIndex to toIndex
         }
     }
 
