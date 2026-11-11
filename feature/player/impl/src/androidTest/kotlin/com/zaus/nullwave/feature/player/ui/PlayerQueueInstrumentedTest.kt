@@ -64,6 +64,7 @@ class PlayerQueueInstrumentedTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val session = PlaybackSessionId("queue-session")
     private val selectAndRemove = setOf(PlaybackCapability.SelectQueueEntry, PlaybackCapability.RemoveQueueEntry)
+    private val queueEdits = selectAndRemove + PlaybackCapability.MoveQueueEntry
     private var scenario: ActivityScenario<PlayerHostTestActivity>? = null
 
     @After
@@ -173,6 +174,128 @@ class PlayerQueueInstrumentedTest {
         row(first).assertDoesNotExist()
         row(duplicate).performTouchInput { click() }
         compose.runOnIdle { assertEquals(listOf(expected, expected), fixture.playback.commands) }
+    }
+
+    @Test
+    fun draggingAShuffledDuplicateSendsOneMoveAndWaitsForTheConfirmedOrder() {
+        val current = entry(0)
+        val first = entry(1)
+        val second = first.copy(entryId = QueueEntryId("second-copy"))
+        val last = entry(3)
+        val entries = listOf(current, first, last, second)
+        val order = listOf(current, second, first, last)
+        publish(entries, current, order, capabilities = queueEdits)
+        launchQueue(current.track.title)
+
+        dragHandleTo(second, first)
+        assertOrderAndCurrent(order, current)
+        val expected = PlaybackCommand.MoveQueueEntry(session, second.entryId, last.entryId)
+        compose.runOnIdle {
+            assertEquals(listOf(expected), fixture.playback.commands)
+            publish(entries, current, listOf(current, first, second, last), capabilities = queueEdits)
+        }
+        assertOrderAndCurrent(listOf(current, first, second, last), current)
+    }
+
+    @Test
+    fun replacingTheNeighbourDuringADragCancelsTheDropAndAllowsAFreshDrag() {
+        val entries = List(4, ::entry)
+        val (current, source, neighbour, last) = entries
+        publish(entries, current, capabilities = queueEdits)
+        launchQueue(current.track.title)
+        dragHandleTo(source, neighbour, release = false)
+
+        val replacement = neighbour.copy(entryId = QueueEntryId("replacement"))
+        compose.runOnIdle { publish(listOf(current, source, replacement, last), current, capabilities = queueEdits) }
+        row(replacement).assertIsDisplayed()
+        compose.onNodeWithTag("player_queue").performTouchInput { up() }
+        compose.runOnIdle { assertTrue(fixture.playback.commands.isEmpty()) }
+
+        dragHandleTo(replacement, last)
+        compose.runOnIdle {
+            assertEquals(listOf(PlaybackCommand.MoveQueueEntry(session, replacement.entryId, null)), fixture.playback.commands)
+        }
+    }
+
+    @Test
+    fun holdingAtTheListEdgeMovesAnOccurrenceBeyondItsOriginalViewport() {
+        val entries = List(18, ::entry)
+        val source = entries[3]
+        publish(entries, entries.first(), capabilities = queueEdits)
+        launchQueue(entries.first().track.title)
+        val list = compose.onNodeWithTag("player_queue")
+        list.performSemanticsAction(SemanticsActions.ScrollToIndex) { it(4) }
+        val handle = compose.onNodeWithTag("player_queue_handle:${source.entryId.value}", useUnmergedTree = true)
+        val start = handle.fetchSemanticsNode().boundsInRoot.center - list.fetchSemanticsNode().boundsInRoot.topLeft
+        compose.mainClock.autoAdvance = false
+        try {
+            list.performTouchInput {
+                down(start)
+                moveBy(Offset.Zero, delayMillis = viewConfiguration.longPressTimeoutMillis + 50)
+            }
+            compose.mainClock.advanceTimeBy(500)
+            assertEquals(start, handle.fetchSemanticsNode().boundsInRoot.center - list.fetchSemanticsNode().boundsInRoot.topLeft)
+            list.performTouchInput { moveTo(Offset(start.x, bottom - 2f)) }
+            compose.mainClock.advanceTimeBy(5_000)
+            row(entries.last()).assertIsDisplayed()
+            assertTrue("The source should have scrolled away", !row(source).isDisplayed())
+            list.performTouchInput { up() }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.runOnIdle {
+            assertEquals(listOf(PlaybackCommand.MoveQueueEntry(session, source.entryId, null)), fixture.playback.commands)
+        }
+    }
+
+    @Test
+    fun accessibilityMovesUseOccurrenceIdsAndOfferOnlyAvailableDirections() {
+        val current = entry(0)
+        val a = entry(1)
+        val b = a.copy(entryId = QueueEntryId("second-copy"))
+        val c = a.copy(entryId = QueueEntryId("third-copy"))
+        val entries = listOf(current, a, b, c)
+        publish(entries, current, listOf(current, c, b, a), capabilities = queueEdits)
+        launchQueue(current.track.title)
+        val up = instrumentation.targetContext.getString(DesignSystemR.string.nw_queue_move_up)
+        val down = instrumentation.targetContext.getString(DesignSystemR.string.nw_queue_move_down)
+        val remove = instrumentation.targetContext.getString(DesignSystemR.string.nw_queue_remove)
+        fun actions(entry: QueueEntry) = row(entry).fetchSemanticsNode().config[SemanticsActions.CustomActions]
+        row(current).assert(SemanticsMatcher.keyNotDefined(SemanticsActions.CustomActions))
+        assertEquals(setOf(down, remove), actions(c).map { it.label }.toSet())
+        assertEquals(setOf(up, remove), actions(a).map { it.label }.toSet())
+
+        val gate = CompletableDeferred<Unit>()
+        fixture.playback.commandGate = gate
+        val moveUp = actions(b).single { it.label == up }
+        try {
+            compose.runOnIdle { assertTrue(moveUp.action()) }
+            row(b).assert(SemanticsMatcher.keyNotDefined(SemanticsActions.CustomActions))
+        } finally {
+            gate.complete(Unit)
+        }
+        val moveDown = actions(b).single { it.label == down }
+        compose.runOnIdle { assertTrue(moveDown.action()) }
+        compose.runOnIdle {
+            assertEquals(listOf(PlaybackCommand.MoveQueueEntry(session, b.entryId, c.entryId),
+                PlaybackCommand.MoveQueueEntry(session, b.entryId, null)), fixture.playback.commands)
+        }
+    }
+
+    private fun dragHandleTo(source: QueueEntry, over: QueueEntry, release: Boolean = true) {
+        val list = compose.onNodeWithTag("player_queue")
+        val handle = compose.onNodeWithTag("player_queue_handle:${source.entryId.value}", useUnmergedTree = true)
+        val start = handle.fetchSemanticsNode().boundsInRoot.center
+        val bounds = row(over).fetchSemanticsNode().boundsInRoot
+        val origin = list.fetchSemanticsNode().boundsInRoot.topLeft
+        list.performTouchInput {
+            down(start - origin)
+            moveBy(Offset.Zero, delayMillis = viewConfiguration.longPressTimeoutMillis + 50)
+            moveTo(Offset(start.x, bounds.bottom - 2f) - origin)
+        }
+        val dragging = instrumentation.targetContext.getString(DesignSystemR.string.nw_queue_dragging)
+        row(source).assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, dragging))
+        if (release) list.performTouchInput { up() }
     }
 
     @Test

@@ -33,23 +33,35 @@ import kotlin.math.abs
 private val RemoveDistance = 72.dp
 
 @Composable
-internal fun QueueEntrySwipe(modifier: Modifier, onRemove: (() -> Unit)?, content: @Composable () -> Unit) {
+internal fun QueueEntrySwipe(
+    modifier: Modifier,
+    onRemove: (() -> Unit)?,
+    moveActions: List<CustomAccessibilityAction> = emptyList(),
+    content: @Composable () -> Unit,
+) {
     val remove by rememberUpdatedState(onRemove)
+    val hasReorderHandle by rememberUpdatedState(moveActions.isNotEmpty())
     val canRemove = onRemove != null
     val dragOffset = remember(canRemove) { if (canRemove) mutableFloatStateOf(0f) else null }
     val activeOffset by rememberUpdatedState(dragOffset)
     val label = stringResource(R.string.nw_queue_remove)
-    val actions = if (!canRemove) Modifier else Modifier
+    val actions = if (!canRemove && moveActions.isEmpty()) Modifier else Modifier
         .semantics {
-            customActions = listOf(CustomAccessibilityAction(label) {
-                val action = remove ?: return@CustomAccessibilityAction false
-                action()
-                true
-            })
+            customActions = buildList {
+                addAll(moveActions)
+                if (canRemove) add(CustomAccessibilityAction(label) {
+                    val action = remove ?: return@CustomAccessibilityAction false
+                    action()
+                    true
+                })
+            }
         }
     val swipe = Modifier.pointerInput(Unit) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
+            // The handle consumes down. Keep watching the current row's nested playback button
+            // so a horizontal swipe there still cancels its click.
+            if (hasReorderHandle && down.isConsumed) return@awaitEachGesture
             // Revoking removal detaches this offset. A later grant belongs to a new press.
             val offset = activeOffset
             var yieldedToList = false

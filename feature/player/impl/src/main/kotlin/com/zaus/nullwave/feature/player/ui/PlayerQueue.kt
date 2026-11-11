@@ -3,13 +3,16 @@ package com.zaus.nullwave.feature.player.ui
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -22,16 +25,21 @@ import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.zaus.nullwave.core.designsystem.R as DesignR
 import com.zaus.nullwave.core.designsystem.components.content.NullWaveTrackRow
 import com.zaus.nullwave.core.designsystem.components.content.trackMetadataBelow
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButton
@@ -74,10 +82,21 @@ internal fun PlayerQueue(
     actionsEnabled: Boolean = true,
     onSelectEntry: ((QueueEntryId) -> Unit)? = null,
     onRemoveEntry: ((QueueEntryId) -> Unit)? = null,
+    onMoveEntry: ((QueueEntryId, QueueEntryId?) -> Unit)? = null,
     header: @Composable () -> Unit = {},
 ) {
     val entriesById = remember(queue.entries) { queue.entries.associateBy { it.entryId } }
     val list = rememberQueueScrollState(queue, currentIndex)
+    val order = queue.playOrder
+    val canMove = actionsEnabled && onMoveEntry != null && order.lastIndex - currentIndex >= 2
+    val reorder = remember(list, order, currentIndex, canMove) {
+        if (canMove) QueueReorderGesture(list, order, currentIndex) else null
+    }
+    val upLabel = stringResource(DesignR.string.nw_queue_move_up)
+    val downLabel = stringResource(DesignR.string.nw_queue_move_down)
+    val draggingLabel = stringResource(DesignR.string.nw_queue_dragging)
+    val accent = NullWaveTheme.colors.primary
+    reorder?.ScrollAtEdge()
     BoxWithConstraints(modifier.fillMaxWidth()) {
         // The notice and MiniPlayer have already been measured. A tall summary can scroll with
         // the rows in a short viewport; the pinned MiniPlayer and system Back still return to Player.
@@ -85,7 +104,7 @@ internal fun PlayerQueue(
         val stackedDuration = trackMetadataBelow(maxWidth, LocalDensity.current.fontScale)
         Column {
             if (!scrollHeader) header()
-            LazyColumn(Modifier.fillMaxWidth().testTag("player_queue"), state = list) {
+            LazyColumn(Modifier.fillMaxWidth().testTag("player_queue").queueReorderInput(reorder, onMoveEntry), state = list) {
                 item(key = QueueIntroKey) {
                     if (scrollHeader) header()
                     QueueActions()
@@ -106,30 +125,54 @@ internal fun PlayerQueue(
                         }
                         if (currentIndex < queue.playOrder.lastIndex) QueueHeading(stringResource(R.string.player_queue_next))
                     } else {
+                        val index = currentIndex + offset
                         val modifier = if (select != null) row.clickable(role = Role.Button, onClick = select)
                         else row.semantics(mergeDescendants = true) {}
                         QueueEntrySwipe(
-                            modifier = modifier,
+                            modifier = modifier.semantics {
+                                if (reorder?.dragging == entry.entryId) stateDescription = draggingLabel
+                            }.drawWithContent {
+                                drawContent()
+                                val gap = reorder?.insertionIndex
+                                val stroke = 2.dp.toPx()
+                                val y = when {
+                                    gap == index -> stroke / 2
+                                    index == order.lastIndex && gap == order.size -> size.height - stroke / 2
+                                    else -> return@drawWithContent
+                                }
+                                drawLine(accent, Offset(0f, y), Offset(size.width, y), stroke)
+                            },
                             onRemove = if (actionsEnabled && onRemoveEntry != null) {
                                 { onRemoveEntry(entry.entryId) }
                             } else null,
+                            moveActions = if (canMove && onMoveEntry != null) buildList {
+                                if (offset > 1) add(CustomAccessibilityAction(upLabel) {
+                                    onMoveEntry(entry.entryId, order[index - 1])
+                                    true
+                                })
+                                if (index < order.lastIndex) add(CustomAccessibilityAction(downLabel) {
+                                    onMoveEntry(entry.entryId, order.getOrNull(index + 2))
+                                    true
+                                })
+                            } else emptyList(),
                         ) {
-                            UpcomingTrack(entry.track, artwork, stackedDuration)
-                        }
-                        if (currentIndex + offset == queue.playOrder.lastIndex && onRemoveEntry != null) {
-                            Text(stringResource(R.string.player_queue_remove_hint),
-                                modifier = Modifier.padding(horizontal = NullWaveTheme.dimens.gutter, vertical = 8.dp),
-                                style = NullWaveTheme.typography.mono, color = NullWaveTheme.colors.textSecondary)
+                            UpcomingTrack(entry, artwork, stackedDuration, reorder)
                         }
                     }
+                }
+                if (currentIndex < order.lastIndex && onRemoveEntry != null) item(key = QueueHintKey) {
+                    Text(stringResource(R.string.player_queue_remove_hint),
+                        modifier = Modifier.padding(horizontal = NullWaveTheme.dimens.gutter, vertical = 8.dp),
+                        style = NullWaveTheme.typography.mono, color = NullWaveTheme.colors.textSecondary)
                 }
             }
         }
     }
 }
 
-// The intro uses an Int key, so every String (including "0") is available as an entry ID.
+// Int keys leave every String (including "0") available as an entry ID.
 private const val QueueIntroKey = 0
+private const val QueueHintKey = -1
 private val CompactQueueHeight = 240.dp
 
 @Composable
@@ -139,7 +182,8 @@ private fun rememberQueueScrollState(queue: PlaybackQueue, currentIndex: Int): L
         save = { list ->
             val index = list.firstVisibleItemIndex
             val orderIndex = currentIndex + index - 1
-            val key = if (index == 0) null else list.measuredEntryKey(index) ?: queue.playOrder.getOrNull(orderIndex)?.value
+            val key = if (index == 0) QueueIntroKey else list.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.key
+                ?: queue.playOrder.getOrNull(orderIndex)?.value
             val nextKey = list.measuredEntryKey(index + 1) ?: queue.playOrder.getOrNull(orderIndex + 1)?.value
             listOf(session, key ?: QueueIntroKey, list.firstVisibleItemScrollOffset, index, nextKey ?: QueueIntroKey)
         },
@@ -147,6 +191,7 @@ private fun rememberQueueScrollState(queue: PlaybackQueue, currentIndex: Int): L
             when {
                 saved.size < 3 || saved[0] != session -> null
                 saved[1] == QueueIntroKey -> LazyListState(0, saved[2] as Int)
+                saved[1] == QueueHintKey -> LazyListState(queue.playOrder.size - currentIndex + 1, saved[2] as Int)
                 else -> {
                     // Older saves contain only the session, entry key and pixel offset.
                     val index = queue.anchorIndex(
@@ -225,18 +270,24 @@ private fun QueueHeading(label: String) {
 }
 
 @Composable
-private fun UpcomingTrack(track: MediaTrack, artwork: LibraryArtworkRenderer, stackedDuration: Boolean) {
+private fun UpcomingTrack(entry: QueueEntry, artwork: LibraryArtworkRenderer, stackedDuration: Boolean, reorder: QueueReorderGesture?) {
+    val track = entry.track
     val colors = NullWaveTheme.colors
     val duration = libraryDuration(track.durationMs)
     Column(Modifier.fillMaxWidth()) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = 68.dp)
-                .padding(horizontal = NullWaveTheme.dimens.gutter, vertical = 8.dp),
+                .padding(end = NullWaveTheme.dimens.gutter, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            NullWaveIcon(NullWaveIcons.Reorder, null, Modifier.size(20.dp), tint = colors.outline)
+            Box(Modifier.size(NullWaveTheme.dimens.touchTarget)
+                .testTag("player_queue_handle:${entry.entryId.value}").queueReorderHandle(reorder, entry.entryId),
+                contentAlignment = Alignment.Center) {
+                NullWaveIcon(NullWaveIcons.Reorder, null, Modifier.size(20.dp),
+                    tint = if (reorder?.dragging == entry.entryId) colors.primary else colors.outline)
+            }
             artwork.Artwork(track.artwork, track.album ?: track.title, 44.dp, Modifier.clearAndSetSemantics {})
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(track.title, style = NullWaveTheme.typography.body, color = colors.textPrimary,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -245,7 +296,8 @@ private fun UpcomingTrack(track: MediaTrack, artwork: LibraryArtworkRenderer, st
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (stackedDuration && duration != null) Text(duration, style = NullWaveTheme.typography.mono, color = colors.textSecondary)
             }
-            if (!stackedDuration && duration != null) Text(duration, style = NullWaveTheme.typography.mono, color = colors.textSecondary)
+            if (!stackedDuration && duration != null) Text(duration, Modifier.padding(start = 12.dp),
+                style = NullWaveTheme.typography.mono, color = colors.textSecondary)
         }
         HorizontalDivider(color = colors.surfaceRaised, thickness = NullWaveTheme.dimens.hairline)
     }
