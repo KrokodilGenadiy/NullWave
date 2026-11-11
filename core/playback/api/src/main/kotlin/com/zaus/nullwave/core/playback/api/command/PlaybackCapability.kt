@@ -12,4 +12,5 @@ enum class PlaybackCapability(internal val requiresCurrentItem: Boolean = false)
     Retry(true),
     StopAndClear,
     SelectQueueEntry(true),
+    RemoveQueueEntry(true),
 }

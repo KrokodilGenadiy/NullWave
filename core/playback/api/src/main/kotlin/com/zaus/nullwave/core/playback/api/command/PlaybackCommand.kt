@@ -33,6 +33,29 @@ sealed interface PlaybackCommand {
         }
     }
 
+    /**
+     * Removes one upcoming occurrence. The current activation, transport and position continue
+     * uninterrupted. The remaining entries keep their relative order in both timelines.
+     */
+    data class RemoveQueueEntry(val sessionId: PlaybackSessionId, val entryId: QueueEntryId) : PlaybackCommand {
+        /** Resolve against the live snapshot immediately before editing the owner's base timeline. */
+        fun resolveBaseIndex(snapshot: PlaybackSnapshot): AppResult<Int, PlaybackCommandError> {
+            val queue = snapshot.queue
+            val current = queue.current
+            if (current == null || snapshot.sessionId != sessionId) {
+                return AppResult.Failure(PlaybackCommandError.StaleTarget)
+            }
+
+            val orderIndex = queue.playOrder.indexOf(entryId)
+            if (orderIndex <= queue.playOrder.indexOf(current.entryId)) {
+                return AppResult.Failure(PlaybackCommandError.StaleTarget)
+            }
+
+            val baseIndex = if (queue.shuffleEnabled) queue.entries.indexOfFirst { it.entryId == entryId } else orderIndex
+            return AppResult.Success(baseIndex)
+        }
+    }
+
     data object Next : PlaybackCommand
     data object Previous : PlaybackCommand
     data class SetRepeat(val mode: RepeatMode) : PlaybackCommand

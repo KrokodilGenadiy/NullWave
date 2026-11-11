@@ -723,12 +723,15 @@ class SharedPlaybackClientTest {
             registry.publish(snapshot(), anchor())
         }
 
-        fun snapshot() = PlaybackSnapshot.create(
-            sessionId = session,
+        fun snapshot() = snapshotFor(token, revision)
+
+        private fun snapshotFor(current: PlaybackItemToken, revision: Long) = PlaybackSnapshot.create(
+            sessionId = current.sessionId,
             revision = revision,
-            queue = PlaybackQueue.create(entries = listOf(entry), current = token),
+            queue = PlaybackQueue.create(entries = listOf(entry), current = current),
             transport = PlaybackTransport(phase, playRequested),
-            capabilities = PlaybackCapability.entries.filterNot { it == PlaybackCapability.Retry }.toSet(),
+            capabilities = setOf(PlaybackCapability.Next, PlaybackCapability.Previous,
+                PlaybackCapability.ReplaceQueue, PlaybackCapability.SetPlayRequested),
         )
 
         fun publish(phase: PlaybackPhase, playRequested: Boolean) {
@@ -740,12 +743,7 @@ class SharedPlaybackClientTest {
 
         fun replaceService(id: PlaybackSessionId): PlaybackSnapshot {
             val nextToken = token.copy(sessionId = id)
-            val nextSnapshot = PlaybackSnapshot.create(
-                sessionId = id,
-                queue = PlaybackQueue.create(entries = listOf(entry), current = nextToken),
-                transport = PlaybackTransport(phase, playRequested),
-                capabilities = PlaybackCapability.entries.filterNot { it == PlaybackCapability.Retry }.toSet(),
-            )
+            val nextSnapshot = snapshotFor(nextToken, revision = 0)
             registry.attach(id) { samples++; anchor().copy(target = nextToken) }
             registry.publish(nextSnapshot, anchor().copy(target = nextToken))
             return nextSnapshot

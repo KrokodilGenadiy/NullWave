@@ -106,6 +106,7 @@ internal class Media3QueueCommitTarget(
             is PlaybackCommand.ReplaceQueue -> error("ReplaceQueue must enter through PlaybackQueueOwner.")
             is PlaybackCommand.SetPlayRequested -> setPlayRequested(command.value)
             is PlaybackCommand.SelectQueueEntry -> selectQueueEntry(command)
+            is PlaybackCommand.RemoveQueueEntry -> removeQueueEntry(command)
             is PlaybackCommand.SeekTo -> {
                 if (command.target != current) stale()
                 else {
@@ -200,6 +201,15 @@ internal class Media3QueueCommitTarget(
                 if (player.playbackState == Player.STATE_IDLE) player.prepare()
             }
         }
+    }
+
+    private fun removeQueueEntry(command: PlaybackCommand.RemoveQueueEntry): EmptyResult<PlaybackCommandError> {
+        val index = when (val result = command.resolveBaseIndex(published)) {
+            is AppResult.Failure -> return result
+            is AppResult.Success -> result.value
+        }
+        if (PlaybackCapability.RemoveQueueEntry !in published.capabilities) return unavailable()
+        return mutate { player.removeMediaItem(index) }
     }
 
     private fun previous(): EmptyResult<PlaybackCommandError> {
@@ -325,7 +335,7 @@ internal class Media3QueueCommitTarget(
             suppression = player.playbackSuppressionReason.toSuppression(),
             problem = problem,
         )
-        val capabilities = capabilities(entries.isNotEmpty(), transport.problem != null)
+        val capabilities = capabilities(queue, transport.problem != null)
         if (queue !== oldQueue || transport != published.transport || positionRevision != published.positionRevision ||
             capabilities != published.capabilities) {
             published = PlaybackSnapshot.create(
@@ -363,7 +373,7 @@ internal class Media3QueueCommitTarget(
         return result
     }
 
-    private fun capabilities(hasCurrent: Boolean, hasProblem: Boolean): Set<PlaybackCapability> = buildSet {
+    private fun capabilities(queue: PlaybackQueue, hasProblem: Boolean): Set<PlaybackCapability> = buildSet {
         if (supports(Player.COMMAND_SET_MEDIA_ITEM, Player.COMMAND_PREPARE, Player.COMMAND_PLAY_PAUSE)) {
             add(PlaybackCapability.ReplaceQueue)
         }
@@ -372,7 +382,8 @@ internal class Media3QueueCommitTarget(
         if (supports(Player.COMMAND_STOP, Player.COMMAND_CHANGE_MEDIA_ITEMS, Player.COMMAND_PLAY_PAUSE)) {
             add(PlaybackCapability.StopAndClear)
         }
-        if (hasCurrent) {
+        if (queue.hasUpcomingEntries && supports(Player.COMMAND_CHANGE_MEDIA_ITEMS)) add(PlaybackCapability.RemoveQueueEntry)
+        if (queue.current != null) {
             if (supports(Player.COMMAND_SEEK_TO_MEDIA_ITEM) &&
                 (player.playbackState != Player.STATE_IDLE || supports(Player.COMMAND_PREPARE))) {
                 add(PlaybackCapability.SelectQueueEntry)

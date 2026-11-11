@@ -590,7 +590,7 @@ class SharedPlaybackReconnectTest {
             transport = if (engineProblem) PlaybackTransport(problem = PlaybackProblem(
                 PlaybackProblemId("engine-problem"), PlaybackProblemCode.DecoderFailure, token,
             )) else PlaybackTransport(phase = PlaybackPhase.Ready, playRequested = true),
-            capabilities = PlaybackCapability.entries.filterNot { it == PlaybackCapability.Retry && !engineProblem }.toSet(),
+            capabilities = if (engineProblem) setOf(PlaybackCapability.Retry) else emptySet(),
         )
         var samples = 0
 

@@ -18,6 +18,9 @@ data class PlaybackQueue private constructor(
     val repeatMode: RepeatMode,
     val shuffleEnabled: Boolean,
 ) {
+    /** The current occurrence has a successor in this traversal, before any repeat wrap. */
+    val hasUpcomingEntries: Boolean get() = playOrder.lastOrNull() != current?.entryId
+
     init {
         require(revision >= 0) { "Queue revision must not be negative." }
         val identities = entries.map { it.entryId }

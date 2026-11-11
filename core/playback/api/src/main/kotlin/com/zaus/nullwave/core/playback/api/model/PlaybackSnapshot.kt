@@ -32,6 +32,9 @@ data class PlaybackSnapshot private constructor(
         require(PlaybackCapability.Retry !in capabilities || transport.problem != null) {
             "Retry requires an active playback problem."
         }
+        require(PlaybackCapability.RemoveQueueEntry !in capabilities || queue.hasUpcomingEntries) {
+            "Removing an upcoming entry requires a successor in playback order."
+        }
     }
 
     companion object {

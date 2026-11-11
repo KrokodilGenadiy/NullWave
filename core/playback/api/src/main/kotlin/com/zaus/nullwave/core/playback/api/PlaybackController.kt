@@ -44,6 +44,8 @@ interface PlaybackController {
      * ReplaceQueue additionally awaits preflight/whole-queue installation; SeekTo/Retry require
      * owner-side token checks. SelectQueueEntry requires the same live session and an installed
      * occurrence, checked together at execution. Selection preserves the owner's playRequested value.
+     * RemoveQueueEntry also requires the occurrence to follow the current item in playback order.
+     * Removal preserves the current activation, transport and progress anchor.
      * Standard relative actions must not be replayed automatically after
      * cancellation/disconnection: their result may already have happened. Connection attempts are
      * bounded by the adapter. Expected failures retain cause/originalMessage in AppResult.Failure;

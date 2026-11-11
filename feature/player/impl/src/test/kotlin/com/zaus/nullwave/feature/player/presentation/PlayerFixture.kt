@@ -92,7 +92,7 @@ internal class PlayerFixture {
         revision: Long = 0,
         transport: PlaybackTransport = PlaybackTransport(phase = PlaybackPhase.Ready),
         capabilities: Set<PlaybackCapability> = PlaybackCapability.entries.filterTo(mutableSetOf()) {
-            it != PlaybackCapability.Retry || transport.problem != null
+            it != PlaybackCapability.RemoveQueueEntry && (it != PlaybackCapability.Retry || transport.problem != null)
         },
     ): PlaybackConnection.Connected {
         val session = PlaybackSessionId(sessionId)
