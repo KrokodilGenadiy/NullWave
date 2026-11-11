@@ -177,6 +177,29 @@ class PlayerQueueInstrumentedTest {
     }
 
     @Test
+    fun holdingTheInactiveHandleColumnPreservesPlaybackAndTheRowStillSelects() {
+        val entries = List(3, ::entry)
+        val next = entries[1]
+        publish(entries, entries.first(), capabilities = queueEdits)
+        launchQueue(entries.first().track.title)
+        val handle = compose.onNodeWithTag("player_queue_handle:${next.entryId.value}", useUnmergedTree = true)
+        val withinRow = handle.fetchSemanticsNode().boundsInRoot.center - row(next).fetchSemanticsNode().boundsInRoot.topLeft
+
+        compose.runOnIdle { publish(entries.take(2), entries.first(), capabilities = selectAndRemove) }
+        handle.assertDoesNotExist()
+        row(next).performTouchInput {
+            down(withinRow)
+            moveBy(Offset.Zero, delayMillis = viewConfiguration.longPressTimeoutMillis + 50)
+            up()
+        }
+        compose.runOnIdle { assertTrue(fixture.playback.commands.isEmpty()) }
+        row(next).performTouchInput { click() }
+        compose.runOnIdle {
+            assertEquals(listOf(PlaybackCommand.SelectQueueEntry(session, next.entryId)), fixture.playback.commands)
+        }
+    }
+
+    @Test
     fun draggingAShuffledDuplicateSendsOneMoveAndWaitsForTheConfirmedOrder() {
         val current = entry(0)
         val first = entry(1)

@@ -86,11 +86,11 @@ internal class QueueReorderGesture(
 }
 
 internal fun Modifier.queueReorderHandle(gesture: QueueReorderGesture?, id: QueueEntryId): Modifier {
-    if (gesture == null) return this
     return pointerInput(gesture, id) {
         awaitEachGesture {
             val down = awaitFirstDown()
-            gesture.pressedHandle = id
+            // The handle column never forwards a press to playback, even when the icon is hidden.
+            gesture?.pressedHandle = id
             down.consume()
         }
     }

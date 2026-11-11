@@ -37,10 +37,10 @@ internal fun QueueEntrySwipe(
     modifier: Modifier,
     onRemove: (() -> Unit)?,
     moveActions: List<CustomAccessibilityAction> = emptyList(),
+    watchChildPlaybackButton: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val remove by rememberUpdatedState(onRemove)
-    val hasReorderHandle by rememberUpdatedState(moveActions.isNotEmpty())
     val canRemove = onRemove != null
     val dragOffset = remember(canRemove) { if (canRemove) mutableFloatStateOf(0f) else null }
     val activeOffset by rememberUpdatedState(dragOffset)
@@ -56,12 +56,12 @@ internal fun QueueEntrySwipe(
                 })
             }
         }
-    val swipe = Modifier.pointerInput(Unit) {
+    val swipe = Modifier.pointerInput(watchChildPlaybackButton) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
             // The handle consumes down. Keep watching the current row's nested playback button
             // so a horizontal swipe there still cancels its click.
-            if (hasReorderHandle && down.isConsumed) return@awaitEachGesture
+            if (down.isConsumed && !watchChildPlaybackButton) return@awaitEachGesture
             // Revoking removal detaches this offset. A later grant belongs to a new press.
             val offset = activeOffset
             var yieldedToList = false

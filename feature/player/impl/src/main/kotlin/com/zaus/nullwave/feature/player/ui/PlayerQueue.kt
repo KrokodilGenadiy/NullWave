@@ -120,7 +120,7 @@ internal fun PlayerQueue(
                         { onSelectEntry(entry.entryId) }
                     } else null
                     if (offset == 0) {
-                        QueueEntrySwipe(modifier = Modifier, onRemove = null) {
+                        QueueEntrySwipe(modifier = Modifier, onRemove = null, watchChildPlaybackButton = true) {
                             CurrentTrack(entry.track, artwork, select, row)
                         }
                         if (currentIndex < queue.playOrder.lastIndex) QueueHeading(stringResource(R.string.player_queue_next))
@@ -281,10 +281,13 @@ private fun UpcomingTrack(entry: QueueEntry, artwork: LibraryArtworkRenderer, st
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.size(NullWaveTheme.dimens.touchTarget)
-                .testTag("player_queue_handle:${entry.entryId.value}").queueReorderHandle(reorder, entry.entryId),
+                .queueReorderHandle(reorder, entry.entryId),
                 contentAlignment = Alignment.Center) {
-                NullWaveIcon(NullWaveIcons.Reorder, null, Modifier.size(20.dp),
-                    tint = if (reorder?.dragging == entry.entryId) colors.primary else colors.outline)
+                if (reorder != null) {
+                    NullWaveIcon(NullWaveIcons.Reorder, null, Modifier.size(20.dp)
+                        .testTag("player_queue_handle:${entry.entryId.value}"),
+                        tint = if (reorder.dragging == entry.entryId) colors.primary else colors.outline)
+                }
             }
             artwork.Artwork(track.artwork, track.album ?: track.title, 44.dp, Modifier.clearAndSetSemantics {})
             Spacer(Modifier.width(12.dp))
