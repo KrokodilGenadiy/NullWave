@@ -8,6 +8,7 @@ import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumQuery
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
 import com.zaus.nullwave.core.media.model.track.MediaTrack
+import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 
 /** [query]/[body] belong to Songs; [selectedBody] exposes the active tab's loading/error status. */
@@ -25,6 +26,8 @@ internal data class LibraryState(
     val monitorPlayback: Boolean = false,
     /** A handled access denial cannot close a freshly checked catalog again on rebind. */
     val lastPlaybackDenial: LibraryPlaybackProblemKey? = null,
+    /** Track of the current queue entry, kept through reconnection; display only, never persisted. */
+    val playingTrackId: TrackId? = null,
 ) : UiState {
     val playbackError: UiText? get() = playbackNotice?.message
 

@@ -64,6 +64,10 @@ internal class LibraryViewModel(
             input = { monitorPlayback },
             flow = { enabled -> if (enabled) playbackObservation.observe() else emptyFlow() },
         ) { _, update -> withPlaybackAccess(update) }
+        source(
+            name = "library.nowPlaying",
+            flow = playbackObservation::observeCurrentTrack,
+        ) { trackId -> copy(playingTrackId = trackId) }
 
         on<LibraryIntent.PlaySong> { intent ->
             if (state.selectedTab != LibraryTab.Songs || state.body !is LibraryBody.Ready) return@on

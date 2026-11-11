@@ -34,6 +34,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -83,13 +84,13 @@ class LibraryPlaybackViewModelTest {
         assertEquals(1, request.startIndex)
         assertEquals(0L, request.startPositionMs)
         assertTrue(request.playRequested)
-        assertEquals(1, playback.stateObservations)
-        assertEquals(1, playback.activeStateCollectors)
+        assertEquals(NOW_PLAYING + 1, playback.stateObservations)
+        assertEquals(NOW_PLAYING + 1, playback.activeStateCollectors)
         assertEquals(0, playback.progressObservations)
         assertEquals(LibraryBody.Ready(songs), vm.snapshot.value.state.body)
         respond(AppResult.Success(Unit))
-        assertEquals(1, playback.stateObservations)
-        assertEquals(1, playback.activeStateCollectors)
+        assertEquals(NOW_PLAYING + 1, playback.stateObservations)
+        assertEquals(NOW_PLAYING + 1, playback.activeStateCollectors)
     }
 
     @Test
@@ -339,17 +340,77 @@ class LibraryPlaybackViewModelTest {
     }
 
     @Test
-    fun `opening and reading Library never acquires a playback connection before the first tap`() = runTest(dispatcher) {
+    fun `before the first tap Library only observes the current track for its highlight`() = runTest(dispatcher) {
         val vm = readyVm(songs)
-        playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "unobserved")
+        playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "before-first-tap")
         runCurrent()
 
         assertFalse(vm.snapshot.value.state.monitorPlayback)
         assertNull(vm.snapshot.value.state.playbackError)
-        assertEquals(0, playback.stateObservations)
-        assertEquals(0, playback.activeStateCollectors)
+        assertNull(vm.snapshot.value.state.lastPlaybackDenial)
+        assertEquals(LibraryBody.Ready(songs), vm.snapshot.value.state.body)
+        assertEquals(beta.id, vm.snapshot.value.state.playingTrackId)
+        assertEquals(NOW_PLAYING, playback.stateObservations)
+        assertEquals(NOW_PLAYING, playback.activeStateCollectors)
         assertEquals(0, playback.progressObservations)
         assertTrue(playback.calls.isEmpty())
+    }
+
+    @Test
+    fun `highlight follows the current entry, survives reconnection and clears with an empty queue`() = runTest(dispatcher) {
+        val vm = readyVm(songs)
+        assertNull("The initial empty queue has no current track", vm.snapshot.value.state.playingTrackId)
+
+        playback.states.value = healthySnapshot(entryId = "current-alpha", track = alpha)
+        runCurrent()
+        assertEquals(alpha.id, vm.snapshot.value.state.playingTrackId)
+
+        for (connection in listOf(
+            PlaybackConnection.Connecting,
+            PlaybackConnection.Unavailable(PlaybackConnectionError.ServiceDisconnected),
+            PlaybackConnection.Disconnected,
+        )) {
+            playback.states.value = connection
+            runCurrent()
+            assertEquals(alpha.id, vm.snapshot.value.state.playingTrackId)
+        }
+
+        playback.states.value = PlaybackConnection.Connected(PlaybackSnapshot.create(PlaybackSessionId("library-test-session")))
+        runCurrent()
+        assertNull(vm.snapshot.value.state.playingTrackId)
+        assertTrue(playback.calls.isEmpty())
+    }
+
+    @Test
+    fun `transport updates and another occurrence of the same track keep one highlight emission`() = runTest(dispatcher) {
+        val first = healthySnapshot()
+        playback.states.value = first
+        val highlights = mutableListOf<TrackId?>()
+        backgroundScope.launch { LibraryPlaybackObservation(playback).observeCurrentTrack().toList(highlights) }
+        runCurrent()
+
+        playback.states.value = PlaybackConnection.Connected(PlaybackSnapshot.create(
+            sessionId = first.snapshot.sessionId, queue = first.snapshot.queue,
+            revision = 1, transport = PlaybackTransport(playRequested = true),
+        ))
+        runCurrent()
+        playback.states.value = healthySnapshot(entryId = "another-beta")
+        runCurrent()
+        playback.states.value = healthySnapshot(track = alpha, sessionId = "new-session")
+        runCurrent()
+        assertEquals(listOf(beta.id, alpha.id), highlights)
+    }
+
+    @Test
+    fun `restoring Library never restores the playing highlight`() = runTest(dispatcher) {
+        val handle = SavedStateHandle()
+        val first = readyVm(songs, handle)
+        playback.states.value = healthySnapshot()
+        runCurrent()
+        assertEquals(beta.id, first.snapshot.value.state.playingTrackId)
+
+        val restored = createVm(handle)
+        assertNull(restored.snapshot.value.state.playingTrackId)
     }
 
     @Test
@@ -361,13 +422,13 @@ class LibraryPlaybackViewModelTest {
         assertTrue(vm.snapshot.value.state.monitorPlayback)
         assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.snapshot.value.state.body)
         assertNull(vm.snapshot.value.state.playbackError)
-        assertEquals(1, playback.stateObservations)
+        assertEquals(NOW_PLAYING + 1, playback.stateObservations)
 
         respond(AppResult.Success(Unit))
 
         assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.snapshot.value.state.body)
         assertNull(vm.snapshot.value.state.playbackError)
-        assertEquals(1, playback.stateObservations)
+        assertEquals(NOW_PLAYING + 1, playback.stateObservations)
         assertEquals(PlaybackProblemId("before-first-ack"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
     }
 
@@ -391,7 +452,7 @@ class LibraryPlaybackViewModelTest {
         assertSame(notice, vm.snapshot.value.state.playbackNotice)
         assertEquals(UiText.Resource(R.string.library_playback_not_found), vm.snapshot.value.state.playbackError)
         assertEquals(PlaybackProblemId("installed-with-cancelled-ack"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
-        assertEquals(1, playback.activeStateCollectors)
+        assertEquals(NOW_PLAYING + 1, playback.activeStateCollectors)
         assertEquals(0, playback.progressObservations)
     }
 
@@ -490,7 +551,7 @@ class LibraryPlaybackViewModelTest {
     fun `delayed UI observation gates a new pre-ack denial instead of treating it as the baseline`() = runTest(dispatcher) {
         val vm = readyVm(songs)
         val allowUiObservation = CompletableDeferred<Unit>()
-        playback.beforeStateCollection = { observation -> if (observation == 1) allowUiObservation.await() }
+        playback.beforeStateCollection = { observation -> if (observation == NOW_PLAYING + 1) allowUiObservation.await() }
         playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "old-before-dispatch")
         send(vm, LibraryIntent.PlaySong(beta.id, songs))
         assertEquals(1, playback.calls.size)
@@ -516,11 +577,11 @@ class LibraryPlaybackViewModelTest {
         playback.states.value = PlaybackConnection.Connecting
         send(vm, LibraryIntent.PlaySong(beta.id, songs))
         assertTrue(playback.calls.isEmpty())
-        assertEquals(0, playback.activeStateCollectors)
+        assertEquals(NOW_PLAYING, playback.activeStateCollectors)
 
         send(vm, LibraryIntent.PlaySong(alpha.id, songs))
         assertTrue(playback.calls.isEmpty())
-        assertEquals(0, playback.activeStateCollectors)
+        assertEquals(NOW_PLAYING, playback.activeStateCollectors)
         playback.states.value = healthySnapshot()
         allowConnection.complete(Unit)
         runCurrent()
@@ -528,7 +589,7 @@ class LibraryPlaybackViewModelTest {
         assertEquals(1, playback.calls.size)
         assertEquals(2, request().startIndex)
         respond(AppResult.Success(Unit))
-        assertEquals(1, playback.activeStateCollectors)
+        assertEquals(NOW_PLAYING + 1, playback.activeStateCollectors)
         assertNull(vm.snapshot.value.state.playbackError)
     }
 
@@ -555,7 +616,7 @@ class LibraryPlaybackViewModelTest {
         playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "while-ui-stopped")
         bind(vm)
 
-        assertEquals(1, playback.activeStateCollectors)
+        assertEquals(NOW_PLAYING + 1, playback.activeStateCollectors)
         assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.snapshot.value.state.body)
         assertNull(vm.snapshot.value.state.playbackNotice)
         assertEquals(1, playback.calls.size)
@@ -573,7 +634,7 @@ class LibraryPlaybackViewModelTest {
 
             assertTrue(playback.calls.isEmpty())
             assertEquals(UiText.Resource(message), vm.snapshot.value.state.playbackError)
-            assertEquals(0, playback.activeStateCollectors)
+            assertEquals(NOW_PLAYING, playback.activeStateCollectors)
         }
 
         // A failed connection is not a baseline for a previously unseen service problem.
@@ -585,7 +646,7 @@ class LibraryPlaybackViewModelTest {
         assertEquals(LibraryBody.Ready(songs), vm.snapshot.value.state.body)
         respond(AppResult.Success(Unit))
 
-        assertEquals(1, playback.activeStateCollectors)
+        assertEquals(NOW_PLAYING + 1, playback.activeStateCollectors)
     }
 
     @Test
@@ -597,13 +658,13 @@ class LibraryPlaybackViewModelTest {
 
         assertTrue(playback.calls.isEmpty())
         assertNull(vm.snapshot.value.state.playbackError)
-        assertEquals(0, playback.activeStateCollectors)
+        assertEquals(NOW_PLAYING, playback.activeStateCollectors)
         playback.beforeCommandDispatch = {}
         send(vm, LibraryIntent.PlaySong(alpha.id, songs))
         assertEquals(1, playback.calls.size)
         assertEquals(2, request().startIndex)
         respond(AppResult.Success(Unit))
-        assertEquals(1, playback.activeStateCollectors)
+        assertEquals(NOW_PLAYING + 1, playback.activeStateCollectors)
     }
 
     @Test
@@ -647,7 +708,7 @@ class LibraryPlaybackViewModelTest {
         assertNull(vm.snapshot.value.state.playbackNotice)
         assertEquals(PlaybackProblemId("before-next-ack"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
         assertEquals(2, playback.calls.size)
-        assertEquals(1, playback.stateObservations)
+        assertEquals(NOW_PLAYING + 1, playback.stateObservations)
     }
 
     @Test
@@ -677,7 +738,7 @@ class LibraryPlaybackViewModelTest {
             assertSame(catalog, vm.snapshot.value.state.body)
         }
         assertEquals(2, playback.calls.size)
-        assertEquals(1, playback.stateObservations)
+        assertEquals(NOW_PLAYING + 1, playback.stateObservations)
         assertEquals(0, playback.progressObservations)
     }
 
@@ -743,10 +804,10 @@ class LibraryPlaybackViewModelTest {
         send(vm, LibraryIntent.AccessChecked(LibraryAccess.Granted))
         reply(AppResult.Success(songs))
         assertEquals(LibraryBody.Ready(songs), vm.snapshot.value.state.body)
-        assertEquals(1, playback.activeStateCollectors)
+        assertEquals(NOW_PLAYING + 1, playback.activeStateCollectors)
         binding.cancel()
         runCurrent()
-        assertEquals("The existing UI source grace period still applies", 1, playback.activeStateCollectors)
+        assertEquals("The existing UI source grace period still applies", NOW_PLAYING + 1, playback.activeStateCollectors)
         advanceTimeBy(5_000)
         runCurrent()
         assertEquals(0, playback.activeStateCollectors)
@@ -754,8 +815,8 @@ class LibraryPlaybackViewModelTest {
         reply(AppResult.Success(songs))
 
         assertEquals(LibraryBody.Ready(songs), vm.snapshot.value.state.body)
-        assertEquals(1, playback.activeStateCollectors)
-        assertEquals(2, playback.stateObservations)
+        assertEquals(NOW_PLAYING + 1, playback.activeStateCollectors)
+        assertEquals(2 * (NOW_PLAYING + 1), playback.stateObservations)
         assertEquals(1, playback.calls.size)
         assertNull(vm.snapshot.value.state.playbackError)
         assertEquals(PlaybackProblemId("before-background"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
@@ -882,6 +943,11 @@ class LibraryPlaybackViewModelTest {
     }
 
     private class DiagnosticFailure(message: String, val diagnostic: String) : IllegalArgumentException(message)
+
+    private companion object {
+        /** The bound ViewModel's control-only current-track observer, independent of access monitoring. */
+        const val NOW_PLAYING = 1
+    }
 
     private val zulu = MediaTrack(TrackId("primary:31"), "Zulu", "Third", null, 210_000)
     private val beta = MediaTrack(TrackId("primary:4"), "Beta", "First", null, 95_000)
