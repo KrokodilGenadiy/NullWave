@@ -1,5 +1,5 @@
 <resources>
-    <string name="library_title">Библиотека</string>
+    <string name="library_title">БИБЛИОТЕКА</string>
     <string name="library_action">О приложении</string>
     <string name="library_load_failed">Не удалось загрузить аудиотеку. Попробуйте ещё раз.</string>
     <string name="library_refresh_failed">Не удалось обновить библиотеку. Показаны предыдущие результаты.</string>
