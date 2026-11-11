@@ -285,6 +285,32 @@ class PlayerQueueInstrumentedTest {
     }
 
     @Test
+    fun leavingTheListStopsEdgeScrollingAndReleaseOverMiniPlayerCancelsTheDrop() {
+        val entries = List(18, ::entry)
+        publish(entries, entries.first(), capabilities = queueEdits)
+        launchQueue(entries.first().track.title)
+        dragHandleTo(entries[1], entries[2], release = false)
+        val list = compose.onNodeWithTag("player_queue")
+        fun scrollPosition() = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+        compose.mainClock.autoAdvance = false
+        try {
+            val start = scrollPosition()
+            list.performTouchInput { moveTo(Offset(centerX, bottom - 2f)) }
+            compose.mainClock.advanceTimeBy(250)
+            assertTrue(scrollPosition() > start)
+            list.performTouchInput { moveTo(Offset(centerX, bottom + 22.dp.toPx())) }
+            compose.mainClock.advanceTimeByFrame()
+            val outside = scrollPosition()
+            compose.mainClock.advanceTimeBy(500)
+            assertEquals(outside, scrollPosition(), 0f)
+            list.performTouchInput { up() }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.runOnIdle { assertTrue(fixture.playback.commands.isEmpty()) }
+    }
+
+    @Test
     fun holdingAtTheListEdgeMovesAnOccurrenceBeyondItsOriginalViewport() {
         val entries = List(18, ::entry)
         val source = entries[3]

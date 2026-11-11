@@ -120,15 +120,17 @@ internal fun Modifier.queueReorderInput(
             val held = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
             if (held.id != down.id || gesture.pressedHandle != source) return@awaitEachGesture
             gesture.dragging = source
+            var movedVertically = false
             try {
                 while (true) {
                     val event = awaitPointerEvent(PointerEventPass.Initial)
                     val change = event.changes.singleOrNull() ?: break
                     if (change.id != down.id || change.isConsumed) break
-                    // A stationary long press near the edge must not start scrolling or reorder.
-                    if (gesture.pointerY != null || change.position.y != held.position.y) {
-                        gesture.pointerY = change.position.y
-                    }
+                    val (x, y) = change.position
+                    if (y != held.position.y) movedVertically = true
+                    // Only an insertion point inside the list can drive edge scrolling or a drop.
+                    val inside = x >= 0f && x < size.width && y >= 0f && y < size.height
+                    gesture.pointerY = if (movedVertically && inside) y else null
                     change.consume()
                     if (!change.pressed) {
                         move?.let(gesture::drop)
