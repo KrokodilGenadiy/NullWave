@@ -136,6 +136,23 @@ class Media3QueueCommitTargetInstrumentedTest {
     }
 
     @Test
+    fun removalValidatesTheLiveOccurrenceBeforeCheckingPlaylistWriteAccess() = onMain {
+        Fixture().use { fixture ->
+            val commit = fixture.commit(listOf("a", "a"))
+            success(fixture.target.install(commit))
+            fixture.player.removeCommands(Player.COMMAND_CHANGE_MEDIA_ITEMS)
+            fixture.target.publish()
+            val before = fixture.snapshot()
+            val remove = PlaybackCommand.RemoveQueueEntry(before.sessionId, commit.entries.last().entryId)
+            assertFalse(PlaybackCapability.RemoveQueueEntry in before.capabilities)
+            failure(fixture.target.execute(remove), PlaybackCommandError.CommandUnavailable)
+            failure(fixture.target.execute(remove.copy(entryId = commit.current.entryId)), PlaybackCommandError.StaleTarget)
+            failure(fixture.target.execute(remove.copy(sessionId = PlaybackSessionId("old"))), PlaybackCommandError.StaleTarget)
+            assertSame(before, fixture.snapshot())
+        }
+    }
+
+    @Test
     fun idleSelectionNeedsPrepareAndAnAllowedStartBeforeChangingThePlayingEntry() = onMain {
         var allowed = false
         val leases = mutableListOf<String>()

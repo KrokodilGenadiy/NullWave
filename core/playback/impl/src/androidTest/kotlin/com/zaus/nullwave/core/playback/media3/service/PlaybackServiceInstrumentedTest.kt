@@ -27,11 +27,10 @@ import com.zaus.nullwave.core.playback.media3.session.PlaybackSessionProtocol
 import com.zaus.nullwave.core.playback.media3.notification.PlaybackNotificationMetadata
 import com.zaus.nullwave.core.playback.media3.testing.PlaybackTestActivity
 import com.zaus.nullwave.core.playback.media3.testing.PlaybackTestApplication
+import com.zaus.nullwave.core.playback.media3.testing.createSilentWav
 import com.zaus.nullwave.core.playback.media3.testing.withPlaybackTestCleanup
 import com.zaus.nullwave.core.result.AppResult
 import java.io.File
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -227,11 +226,11 @@ class PlaybackServiceInstrumentedTest {
         ) {
             withTimeout(15_000.milliseconds) {
                 states.connected { true }
-                val request = PlaybackQueueRequest.create(listOf(ID, ID), 1, startPositionMs = 120, playRequested = false)
+                val request = PlaybackQueueRequest.create(listOf(ID, ID, ID), 1, startPositionMs = 120, playRequested = false)
                 assertEquals(AppResult.Success(Unit), controller.execute(PlaybackCommand.ReplaceQueue(request)))
-                val ready = states.connected { it.queue.entries.size == 2 && it.transport.phase == PlaybackPhase.Ready }
+                val ready = states.connected { it.queue.entries.size == 3 && it.transport.phase == PlaybackPhase.Ready }
                 val token = requireNotNull(ready.queue.current)
-                assertEquals(2, ready.queue.entries.map { it.entryId }.toSet().size)
+                assertEquals(3, ready.queue.entries.map { it.entryId }.toSet().size)
                 assertEquals(ready.queue.entries[1].entryId, token.entryId)
                 val failure = controller.execute(PlaybackCommand.ReplaceQueue(PlaybackQueueRequest.create(listOf(TrackId("missing")), 0)))
                 assertEquals(PlaybackCommandError.SourceFailure(TrackId("missing"), PlaybackSourceError.NotFound), (failure as AppResult.Failure).error)
@@ -242,6 +241,11 @@ class PlaybackServiceInstrumentedTest {
                 assertEquals(AppResult.Success(Unit), controller.execute(PlaybackCommand.SeekTo(token, 250)))
                 val anchor = controller.observeProgress().filterNotNull().first { it.positionMs >= 250 }
                 assertEquals(token, anchor.target)
+                val remove = PlaybackCommand.RemoveQueueEntry(ready.sessionId, ready.queue.entries.last().entryId)
+                assertEquals(AppResult.Success(Unit), controller.execute(remove))
+                val edited = states.connected { it.queue.entries == ready.queue.entries.take(2) }
+                assertTrue(anchor.matches(edited))
+                assertFalse(edited.transport.playRequested)
                 assertEquals(AppResult.Success(Unit), controller.execute(PlaybackCommand.StopAndClear))
                 states.connected { it.queue.entries.isEmpty() }
             }
@@ -610,14 +614,7 @@ class PlaybackServiceInstrumentedTest {
         }
 
     private fun installSilentTrack(app: PlaybackTestApplication): File {
-        val file = File(app.cacheDir, "playback-integration.wav")
-        val pcmBytes = 8_000 * 4 * 2
-        val data = ByteBuffer.allocate(44 + pcmBytes).order(ByteOrder.LITTLE_ENDIAN)
-        data.put("RIFF".toByteArray(Charsets.US_ASCII)).putInt(36 + pcmBytes)
-        data.put("WAVEfmt ".toByteArray(Charsets.US_ASCII)).putInt(16)
-        data.putShort(1).putShort(1).putInt(8_000).putInt(16_000).putShort(2).putShort(16)
-        data.put("data".toByteArray(Charsets.US_ASCII)).putInt(pcmBytes)
-        file.writeBytes(data.array())
+        val file = createSilentWav(app.cacheDir, durationSeconds = 4)
         app.tracks[ID] = ResolvedPlaybackTrack(MediaTrack(ID, "Silent fixture", null, null, 4_000), Uri.fromFile(file).toString())
         return file
     }
