@@ -28,6 +28,7 @@ import com.zaus.nullwave.core.designsystem.R
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcon
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
+import kotlin.math.abs
 
 private val RemoveDistance = 72.dp
 
@@ -51,9 +52,15 @@ internal fun QueueEntrySwipe(modifier: Modifier, onRemove: (() -> Unit)?, conten
             val down = awaitFirstDown(requireUnconsumed = false)
             // Revoking removal detaches this offset. A later grant belongs to a new press.
             val offset = activeOffset
+            var yieldedToList = false
             val drag = awaitHorizontalPointerSlopOrCancellation(down.id, down.type) { change, overSlop ->
-                change.consume()
-                offset?.floatValue = overSlop
+                val travel = change.position - down.position
+                // The child sees a move before the list. Let a vertical or tied move start scrolling.
+                if (change.id != down.id || abs(travel.y) >= abs(travel.x)) yieldedToList = true
+                if (!yieldedToList) {
+                    change.consume()
+                    offset?.floatValue = overSlop
+                }
             } ?: return@awaitEachGesture
             try {
                 val released = horizontalDrag(drag.id) { change ->
