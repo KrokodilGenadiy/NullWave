@@ -226,11 +226,11 @@ class PlaybackServiceInstrumentedTest {
         ) {
             withTimeout(15_000.milliseconds) {
                 states.connected { true }
-                val request = PlaybackQueueRequest.create(listOf(ID, ID, ID), 1, startPositionMs = 120, playRequested = false)
+                val request = PlaybackQueueRequest.create(listOf(ID, ID, ID, ID), 1, startPositionMs = 120, playRequested = false)
                 assertEquals(AppResult.Success(Unit), controller.execute(PlaybackCommand.ReplaceQueue(request)))
-                val ready = states.connected { it.queue.entries.size == 3 && it.transport.phase == PlaybackPhase.Ready }
+                val ready = states.connected { it.queue.entries.size == 4 && it.transport.phase == PlaybackPhase.Ready }
                 val token = requireNotNull(ready.queue.current)
-                assertEquals(3, ready.queue.entries.map { it.entryId }.toSet().size)
+                assertEquals(4, ready.queue.entries.map { it.entryId }.toSet().size)
                 assertEquals(ready.queue.entries[1].entryId, token.entryId)
                 val failure = controller.execute(PlaybackCommand.ReplaceQueue(PlaybackQueueRequest.create(listOf(TrackId("missing")), 0)))
                 assertEquals(PlaybackCommandError.SourceFailure(TrackId("missing"), PlaybackSourceError.NotFound), (failure as AppResult.Failure).error)
@@ -241,9 +241,14 @@ class PlaybackServiceInstrumentedTest {
                 assertEquals(AppResult.Success(Unit), controller.execute(PlaybackCommand.SeekTo(token, 250)))
                 val anchor = controller.observeProgress().filterNotNull().first { it.positionMs >= 250 }
                 assertEquals(token, anchor.target)
-                val remove = PlaybackCommand.RemoveQueueEntry(ready.sessionId, ready.queue.entries.last().entryId)
+                val (past, current, next, last) = ready.queue.entries
+                val move = PlaybackCommand.MoveQueueEntry(ready.sessionId, last.entryId, next.entryId)
+                assertEquals(AppResult.Success(Unit), controller.execute(move))
+                val moved = states.connected { it.queue.entries == listOf(past, current, last, next) }
+                assertTrue(anchor.matches(moved))
+                val remove = PlaybackCommand.RemoveQueueEntry(ready.sessionId, last.entryId)
                 assertEquals(AppResult.Success(Unit), controller.execute(remove))
-                val edited = states.connected { it.queue.entries == ready.queue.entries.take(2) }
+                val edited = states.connected { it.queue.entries == listOf(past, current, next) }
                 assertTrue(anchor.matches(edited))
                 assertFalse(edited.transport.playRequested)
                 assertEquals(AppResult.Success(Unit), controller.execute(PlaybackCommand.StopAndClear))

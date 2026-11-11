@@ -1,13 +1,9 @@
 package com.zaus.nullwave.core.playback.media3.engine
 
-import android.content.Context
-import android.net.Uri
 import android.os.SystemClock
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
 import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.core.playback.api.PlaybackClock
@@ -19,19 +15,13 @@ import com.zaus.nullwave.core.playback.api.model.PlaybackPhase
 import com.zaus.nullwave.core.playback.api.model.RepeatMode
 import com.zaus.nullwave.core.playback.api.source.ResolvedPlaybackTrack
 import com.zaus.nullwave.core.playback.media3.state.PlaybackServiceRegistry
-import com.zaus.nullwave.core.playback.media3.testing.createSilentWav
 import com.zaus.nullwave.core.playback.preparation.PreparedQueue
 import com.zaus.nullwave.core.playback.runtime.PlaybackIdentities
 import com.zaus.nullwave.core.playback.runtime.QueueCommit
 import com.zaus.nullwave.core.result.AppResult
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -47,20 +37,7 @@ class Media3QueueRemovalInstrumentedTest {
     @Test fun removingEarlierBaseDuplicateWhilePausedKeepsCurrentEntryAndExactPosition() =
         verifyShuffledRemoval(playing = false)
 
-    private fun verifyShuffledRemoval(playing: Boolean): Unit = runBlocking {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val file = createSilentWav(context.cacheDir, durationSeconds = 60)
-        try {
-            withContext(Dispatchers.Main) {
-                withTimeout(15_000) { checkRemoval(context, Uri.fromFile(file).toString(), playing) }
-            }
-        } finally {
-            file.delete()
-        }
-    }
-
-    private suspend fun checkRemoval(context: Context, uri: String, playing: Boolean) {
-        val player = ExoPlayer.Builder(context).build()
+    private fun verifyShuffledRemoval(playing: Boolean) = withSilentExoPlayer { player, uri ->
         val registry = PlaybackServiceRegistry()
         val ids = PlaybackIdentities()
         val target = Media3QueueCommitTarget(player, ids, registry, PlaybackClock(SystemClock::elapsedRealtime)) {
@@ -88,24 +65,16 @@ class Media3QueueRemovalInstrumentedTest {
             val anchor = requireNotNull(target.sampleProgress())
             assertEquals(commit.current, anchor.target)
             assertEquals(playing, before.transport.playRequested)
+            assertEquals(playing, anchor.advancing)
+            if (!playing) assertEquals(request.startPositionMs, anchor.positionMs)
             assertEquals(1, player.currentMediaItemIndex)
             assertTrue(PlaybackCapability.RemoveQueueEntry in before.capabilities)
 
             val remove = PlaybackCommand.RemoveQueueEntry(before.sessionId, upcoming.entryId)
             assertEquals(AppResult.Success(Unit), target.execute(remove))
-            // Wait for the playback thread to process the edit as well as the immediate playlist update.
-            val applied = CompletableDeferred<Unit>()
-            player.createMessage { _, _ -> applied.complete(Unit) }.send()
-            applied.await()
-            val positionAfterEdit = player.currentPosition
-            assertTrue(
-                "Removal rewound playback from ${anchor.positionMs} to $positionAfterEdit",
-                positionAfterEdit >= anchor.positionMs,
-            )
-            if (playing) while (player.currentPosition <= positionAfterEdit) delay(10)
+            assertPositionAfterQueueEdit(player, target, anchor)
 
             val after = requireNotNull(registry.snapshot.value)
-            val progress = requireNotNull(target.sampleProgress())
             assertEquals(listOf(active, past), after.queue.entries)
             assertEquals(listOf(past.entryId, active.entryId), after.queue.playOrder)
             assertEquals(0, player.currentMediaItemIndex)
@@ -114,23 +83,10 @@ class Media3QueueRemovalInstrumentedTest {
             assertTrue(after.queue.revision > before.queue.revision)
             assertFalse(PlaybackCapability.RemoveQueueEntry in after.capabilities)
             assertTrue(anchor.matches(after))
-            assertTrue(progress.matches(after))
             assertEquals(before.transport, after.transport)
-            assertEquals(playing, progress.advancing)
-            if (playing) {
-                val advance = progress.positionMs - anchor.positionMs
-                assertTrue(
-                    "Position must advance continuously: $anchor -> $progress",
-                    advance in 1..(progress.sampledAtMs - anchor.sampledAtMs + 100),
-                )
-            } else {
-                assertEquals(request.startPositionMs, anchor.positionMs)
-                assertEquals(anchor.positionMs, progress.positionMs)
-            }
             assertEquals(AppResult.Failure(PlaybackCommandError.StaleTarget), target.execute(remove))
         } finally {
             target.close()
-            player.release()
         }
     }
 }
