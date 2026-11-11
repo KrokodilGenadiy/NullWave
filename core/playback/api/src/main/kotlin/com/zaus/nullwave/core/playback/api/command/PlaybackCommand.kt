@@ -2,6 +2,7 @@ package com.zaus.nullwave.core.playback.api.command
 
 import com.zaus.nullwave.core.playback.api.model.PlaybackItemToken
 import com.zaus.nullwave.core.playback.api.model.PlaybackProblemId
+import com.zaus.nullwave.core.playback.api.model.PlaybackQueue
 import com.zaus.nullwave.core.playback.api.model.PlaybackSessionId
 import com.zaus.nullwave.core.playback.api.model.PlaybackSnapshot
 import com.zaus.nullwave.core.playback.api.model.QueueEntryId
@@ -53,6 +54,37 @@ sealed interface PlaybackCommand {
 
             val baseIndex = if (queue.shuffleEnabled) queue.entries.indexOfFirst { it.entryId == entryId } else orderIndex
             return AppResult.Success(baseIndex)
+        }
+    }
+
+    /** Move an upcoming occurrence immediately before another upcoming occurrence, or to the end. */
+    data class MoveQueueEntry(
+        val sessionId: PlaybackSessionId,
+        val entryId: QueueEntryId,
+        val beforeEntryId: QueueEntryId?,
+    ) : PlaybackCommand {
+        /**
+         * Compute the desired queue from the owner's live snapshot. With shuffle enabled the edit
+         * affects only traversal order. An already satisfied move returns the original queue.
+         */
+        fun resolveQueue(snapshot: PlaybackSnapshot): AppResult<PlaybackQueue, PlaybackCommandError> {
+            val queue = snapshot.queue
+            val current = queue.current
+            if (current == null || snapshot.sessionId != sessionId) {
+                return AppResult.Failure(PlaybackCommandError.StaleTarget)
+            }
+
+            val order = queue.playOrder
+            val currentIndex = order.indexOf(current.entryId)
+            val fromIndex = order.indexOf(entryId)
+            val beforeIndex = beforeEntryId?.let(order::indexOf) ?: order.size
+            if (fromIndex <= currentIndex || beforeIndex <= currentIndex) {
+                return AppResult.Failure(PlaybackCommandError.StaleTarget)
+            }
+
+            // Removing the source shifts a later anchor (including the end) one slot to the left.
+            val toIndex = if (fromIndex < beforeIndex) beforeIndex - 1 else beforeIndex
+            return AppResult.Success(queue.moveInPlayOrder(fromIndex, toIndex))
         }
     }
 

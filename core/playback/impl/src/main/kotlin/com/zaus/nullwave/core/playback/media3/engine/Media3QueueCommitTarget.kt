@@ -107,6 +107,7 @@ internal class Media3QueueCommitTarget(
             is PlaybackCommand.SetPlayRequested -> setPlayRequested(command.value)
             is PlaybackCommand.SelectQueueEntry -> selectQueueEntry(command)
             is PlaybackCommand.RemoveQueueEntry -> removeQueueEntry(command)
+            is PlaybackCommand.MoveQueueEntry -> unavailable()
             is PlaybackCommand.SeekTo -> {
                 if (command.target != current) stale()
                 else {

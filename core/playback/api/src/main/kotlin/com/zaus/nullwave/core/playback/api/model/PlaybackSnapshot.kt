@@ -35,6 +35,9 @@ data class PlaybackSnapshot private constructor(
         require(PlaybackCapability.RemoveQueueEntry !in capabilities || queue.hasUpcomingEntries) {
             "Removing an upcoming entry requires a successor in playback order."
         }
+        require(PlaybackCapability.MoveQueueEntry !in capabilities || queue.hasMultipleUpcomingEntries) {
+            "Reordering requires at least two upcoming entries in playback order."
+        }
     }
 
     companion object {

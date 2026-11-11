@@ -21,6 +21,10 @@ data class PlaybackQueue private constructor(
     /** The current occurrence has a successor in this traversal, before any repeat wrap. */
     val hasUpcomingEntries: Boolean get() = playOrder.lastOrNull() != current?.entryId
 
+    /** Two upcoming occurrences allow a change in their relative order. */
+    val hasMultipleUpcomingEntries: Boolean get() =
+        hasUpcomingEntries && playOrder[playOrder.lastIndex - 1] != current?.entryId
+
     init {
         require(revision >= 0) { "Queue revision must not be negative." }
         val identities = entries.map { it.entryId }
@@ -32,6 +36,15 @@ data class PlaybackQueue private constructor(
         require(shuffleEnabled || playOrder == identities) { "Unshuffled playback follows the base order." }
         require(entries.isEmpty() == (current == null)) { "A nonempty committed queue requires a current item." }
         require(current == null || current.entryId in identitySet) { "Current item must belong to this queue." }
+    }
+
+    internal fun moveInPlayOrder(fromIndex: Int, toIndex: Int): PlaybackQueue {
+        if (fromIndex == toIndex) return this
+        return copy(
+            entries = if (shuffleEnabled) entries else entries.moved(fromIndex, toIndex),
+            playOrder = playOrder.moved(fromIndex, toIndex),
+            revision = revision + 1,
+        )
     }
 
     companion object {
@@ -51,4 +64,11 @@ data class PlaybackQueue private constructor(
             shuffleEnabled = shuffleEnabled,
         )
     }
+}
+
+private fun <T> List<T>.moved(fromIndex: Int, toIndex: Int): List<T> {
+    val reordered = toMutableList()
+    val item = reordered.removeAt(fromIndex)
+    reordered.add(toIndex, item)
+    return reordered.snapshotList()
 }

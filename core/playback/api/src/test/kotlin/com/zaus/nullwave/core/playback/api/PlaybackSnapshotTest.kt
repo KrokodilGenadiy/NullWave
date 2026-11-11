@@ -103,7 +103,8 @@ class PlaybackSnapshotTest {
     @Test fun emptySnapshotCannotAdvertiseItemCommands() {
         for (capability in listOf(
             PlaybackCapability.SetPlayRequested, PlaybackCapability.SeekTo, PlaybackCapability.SelectQueueEntry,
-            PlaybackCapability.RemoveQueueEntry, PlaybackCapability.Next, PlaybackCapability.Previous, PlaybackCapability.Retry,
+            PlaybackCapability.RemoveQueueEntry, PlaybackCapability.MoveQueueEntry, PlaybackCapability.Next,
+            PlaybackCapability.Previous, PlaybackCapability.Retry,
         )) {
             assertThrows("Empty queue / $capability", IllegalArgumentException::class.java) {
                 PlaybackSnapshot.create(sessionId = session, capabilities = setOf(capability))

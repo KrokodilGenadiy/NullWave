@@ -91,8 +91,12 @@ internal class PlayerFixture {
         positionRevision: Long = 0,
         revision: Long = 0,
         transport: PlaybackTransport = PlaybackTransport(phase = PlaybackPhase.Ready),
-        capabilities: Set<PlaybackCapability> = PlaybackCapability.entries.filterTo(mutableSetOf()) {
-            it != PlaybackCapability.RemoveQueueEntry && (it != PlaybackCapability.Retry || transport.problem != null)
+        capabilities: Set<PlaybackCapability> = PlaybackCapability.entries.filterTo(mutableSetOf()) { capability ->
+            when (capability) {
+                PlaybackCapability.RemoveQueueEntry, PlaybackCapability.MoveQueueEntry -> false
+                PlaybackCapability.Retry -> transport.problem != null
+                else -> true
+            }
         },
     ): PlaybackConnection.Connected {
         val session = PlaybackSessionId(sessionId)
