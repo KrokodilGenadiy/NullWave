@@ -200,6 +200,31 @@ class PlayerQueueInstrumentedTest {
     }
 
     @Test
+    fun movingOffTheHandleBeforeTheLongPressCannotTurnASwipeIntoAMove() {
+        val entries = List(4, ::entry)
+        publish(entries, entries.first(), capabilities = queueEdits)
+        launchQueue(entries.first().track.title)
+        val list = compose.onNodeWithTag("player_queue")
+        val origin = list.fetchSemanticsNode().boundsInRoot.topLeft
+        val handle = compose.onNodeWithTag("player_queue_handle:${entries[1].entryId.value}", useUnmergedTree = true)
+        val start = handle.fetchSemanticsNode().boundsInRoot.center - origin
+        val targetY = row(entries[2]).fetchSemanticsNode().boundsInRoot.bottom - origin.y - 2f
+        list.performTouchInput {
+            down(start)
+            val outside = start + Offset(112.dp.toPx(), 0f)
+            moveTo(outside, delayMillis = 30)
+            moveBy(Offset.Zero, delayMillis = viewConfiguration.longPressTimeoutMillis + 50)
+            moveTo(Offset(outside.x, targetY))
+            up()
+        }
+        compose.runOnIdle { assertTrue(fixture.playback.commands.isEmpty()) }
+        dragHandleTo(entries[1], entries[2])
+        compose.runOnIdle {
+            assertEquals(listOf(PlaybackCommand.MoveQueueEntry(session, entries[1].entryId, entries[3].entryId)), fixture.playback.commands)
+        }
+    }
+
+    @Test
     fun draggingAShuffledDuplicateSendsOneMoveAndWaitsForTheConfirmedOrder() {
         val current = entry(0)
         val first = entry(1)

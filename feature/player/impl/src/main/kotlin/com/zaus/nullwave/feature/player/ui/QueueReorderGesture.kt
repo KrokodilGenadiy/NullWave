@@ -4,6 +4,7 @@ import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
+import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -92,6 +93,12 @@ internal fun Modifier.queueReorderHandle(gesture: QueueReorderGesture?, id: Queu
             // The handle column never forwards a press to playback, even when the icon is hidden.
             gesture?.pressedHandle = id
             down.consume()
+            if (gesture != null) {
+                awaitTouchSlopOrCancellation(down.id) { _, _ ->
+                    // Revoke the pending hold. Leave the movement available to the scrolling list.
+                    gesture.pressedHandle = null
+                }
+            }
         }
     }
 }
@@ -111,7 +118,7 @@ internal fun Modifier.queueReorderInput(
             awaitPointerEvent(PointerEventPass.Main) // The touched handle claims this down first.
             val source = gesture.pressedHandle ?: return@awaitEachGesture
             val held = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
-            if (held.id != down.id) return@awaitEachGesture
+            if (held.id != down.id || gesture.pressedHandle != source) return@awaitEachGesture
             gesture.dragging = source
             try {
                 while (true) {
