@@ -153,6 +153,28 @@ class Media3QueueCommitTargetInstrumentedTest {
     }
 
     @Test
+    fun movesCheckTheLiveTargetAndOnlyRequireWriteAccessForAnActualEdit() = onMain {
+        Fixture().use { fixture ->
+            val commit = fixture.commit(listOf("a", "b", "a"))
+            success(fixture.target.install(commit))
+            fixture.player.addCommands(Player.COMMAND_CHANGE_MEDIA_ITEMS)
+            fixture.target.publish()
+            assertTrue(PlaybackCapability.MoveQueueEntry in fixture.snapshot().capabilities)
+
+            fixture.player.removeCommands(Player.COMMAND_CHANGE_MEDIA_ITEMS)
+            fixture.target.publish()
+            val before = fixture.snapshot()
+            val move = PlaybackCommand.MoveQueueEntry(before.sessionId, commit.entries.last().entryId, commit.entries[1].entryId)
+            assertFalse(PlaybackCapability.MoveQueueEntry in before.capabilities)
+            failure(fixture.target.execute(move), PlaybackCommandError.CommandUnavailable)
+            failure(fixture.target.execute(move.copy(beforeEntryId = commit.current.entryId)), PlaybackCommandError.StaleTarget)
+            failure(fixture.target.execute(move.copy(sessionId = PlaybackSessionId("old"))), PlaybackCommandError.StaleTarget)
+            success(fixture.target.execute(move.copy(beforeEntryId = null)))
+            assertSame(before, fixture.snapshot())
+        }
+    }
+
+    @Test
     fun idleSelectionNeedsPrepareAndAnAllowedStartBeforeChangingThePlayingEntry() = onMain {
         var allowed = false
         val leases = mutableListOf<String>()

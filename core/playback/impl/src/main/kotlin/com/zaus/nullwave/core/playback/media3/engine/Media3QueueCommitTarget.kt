@@ -6,6 +6,8 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
 import com.zaus.nullwave.core.playback.api.PlaybackClock
 import com.zaus.nullwave.core.playback.api.command.PlaybackCapability
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommand
@@ -30,6 +32,7 @@ import com.zaus.nullwave.core.playback.runtime.QueueCommitTarget
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.EmptyResult
 import java.util.UUID
+import kotlin.random.Random
 
 /**
  * Application-looper adapter of the service's raw player. The session wrapper calls the owner,
@@ -107,7 +110,7 @@ internal class Media3QueueCommitTarget(
             is PlaybackCommand.SetPlayRequested -> setPlayRequested(command.value)
             is PlaybackCommand.SelectQueueEntry -> selectQueueEntry(command)
             is PlaybackCommand.RemoveQueueEntry -> removeQueueEntry(command)
-            is PlaybackCommand.MoveQueueEntry -> unavailable()
+            is PlaybackCommand.MoveQueueEntry -> moveQueueEntry(command)
             is PlaybackCommand.SeekTo -> {
                 if (command.target != current) stale()
                 else {
@@ -211,6 +214,28 @@ internal class Media3QueueCommitTarget(
         }
         if (PlaybackCapability.RemoveQueueEntry !in published.capabilities) return unavailable()
         return mutate { player.removeMediaItem(index) }
+    }
+
+    private fun moveQueueEntry(command: PlaybackCommand.MoveQueueEntry): EmptyResult<PlaybackCommandError> {
+        val queue = published.queue
+        val desired = when (val result = command.resolveQueue(published)) {
+            is AppResult.Failure -> return result
+            is AppResult.Success -> result.value
+        }
+        if (desired === queue) return AppResult.Success(Unit)
+        if (!supports(Player.COMMAND_CHANGE_MEDIA_ITEMS)) return unavailable()
+
+        if (!queue.shuffleEnabled) {
+            val from = queue.playOrder.indexOf(command.entryId)
+            val to = desired.playOrder.indexOf(command.entryId)
+            return mutate { player.moveMediaItem(from, to) }
+        }
+
+        val exoPlayer = player as? ExoPlayer ?: return unavailable()
+        // ExoPlayer's shuffle permutation addresses slots in the unchanged base playlist.
+        val baseIndices = queue.entries.withIndex().associate { (index, entry) -> entry.entryId to index }
+        val order = IntArray(desired.playOrder.size) { baseIndices.getValue(desired.playOrder[it]) }
+        return mutate { exoPlayer.setShuffleOrder(DefaultShuffleOrder(order, Random.nextLong())) }
     }
 
     private fun previous(): EmptyResult<PlaybackCommandError> {
@@ -383,7 +408,12 @@ internal class Media3QueueCommitTarget(
         if (supports(Player.COMMAND_STOP, Player.COMMAND_CHANGE_MEDIA_ITEMS, Player.COMMAND_PLAY_PAUSE)) {
             add(PlaybackCapability.StopAndClear)
         }
-        if (queue.hasUpcomingEntries && supports(Player.COMMAND_CHANGE_MEDIA_ITEMS)) add(PlaybackCapability.RemoveQueueEntry)
+        if (supports(Player.COMMAND_CHANGE_MEDIA_ITEMS)) {
+            if (queue.hasUpcomingEntries) add(PlaybackCapability.RemoveQueueEntry)
+            if (queue.hasMultipleUpcomingEntries && (!queue.shuffleEnabled || player is ExoPlayer)) {
+                add(PlaybackCapability.MoveQueueEntry)
+            }
+        }
         if (queue.current != null) {
             if (supports(Player.COMMAND_SEEK_TO_MEDIA_ITEM) &&
                 (player.playbackState != Player.STATE_IDLE || supports(Player.COMMAND_PREPARE))) {

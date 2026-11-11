@@ -102,7 +102,7 @@ class PlaybackQueueOwnerTest {
 
     @Test
     fun `transport revokes pending replacement before the engine action including rejected actions`() = runTest {
-        for (action in listOf("pause", "play", "seek", "select", "remove", "next", "previous", "stop", "retry")) {
+        for (action in listOf("pause", "play", "seek", "select", "remove", "move", "next", "previous", "stop", "retry")) {
             val fixture = Fixture(this)
             fixture.replace("old").also { runCurrent(); assertSuccess(it.await()) }
             val old = fixture.target.current!!
@@ -119,6 +119,7 @@ class PlaybackQueueOwnerTest {
                 "seek" -> PlaybackCommand.SeekTo(old.current, 4)
                 "select" -> PlaybackCommand.SelectQueueEntry(old.current.sessionId, old.current.entryId)
                 "remove" -> PlaybackCommand.RemoveQueueEntry(old.current.sessionId, old.current.entryId)
+                "move" -> PlaybackCommand.MoveQueueEntry(old.current.sessionId, old.current.entryId, null)
                 "next" -> PlaybackCommand.Next
                 "previous" -> PlaybackCommand.Previous
                 "stop" -> PlaybackCommand.StopAndClear
