@@ -132,7 +132,13 @@ internal class PlaybackForegroundNotification(
         return Appearance(
             title = metadata.title?.toString()?.takeIf(String::isNotBlank)
                 ?: service.getString(if (policy.preparing && !hasItem) R.string.playback_notification_preparing else R.string.playback_notification_app_name),
-            description = listOfNotNull(metadata.artist?.toString()?.takeIf(String::isNotBlank), metadata.albumTitle?.toString()?.takeIf(String::isNotBlank)).joinToString(" · "),
+            // Same rule as the in-app rows: an item always names its artist slot. Session metadata keeps
+            // the real null, so external controllers never receive a localized placeholder as a tag.
+            description = if (!hasItem) "" else listOfNotNull(
+                metadata.artist?.toString()?.takeIf(String::isNotBlank)
+                    ?: service.getString(R.string.playback_notification_unknown_artist),
+                metadata.albumTitle?.toString()?.takeIf(String::isNotBlank),
+            ).joinToString(" · "),
             playPause = PlaybackNotificationAction.playPause(player.playbackState, player.playWhenReady),
             preparing = policy.preparing && !hasItem,
             foreground = needsForeground,
