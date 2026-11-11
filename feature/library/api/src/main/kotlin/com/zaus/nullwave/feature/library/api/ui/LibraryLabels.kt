@@ -9,8 +9,9 @@ fun libraryAlbumCredit(credit: AlbumArtistCredit, unknown: String, various: Stri
     is AlbumArtistCredit.Named -> credit.name
 }
 
+/** The artist slot always comes first, so a lone album is never read as an artist name. */
 fun librarySubtitle(artist: String?, album: String?, unknownArtist: String): String =
-    listOfNotNull(artist, album).joinToString(" · ").ifEmpty { unknownArtist }
+    listOfNotNull(artist ?: unknownArtist, album).joinToString(" · ")
 
 /** First letters of up to two words, or two code points from a single word (never split a surrogate). */
 fun libraryMonogram(text: String): String {

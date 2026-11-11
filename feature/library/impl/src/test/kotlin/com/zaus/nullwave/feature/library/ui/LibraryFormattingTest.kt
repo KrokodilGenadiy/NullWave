@@ -21,10 +21,10 @@ class LibraryFormattingTest {
     }
 
     @Test
-    fun `subtitle uses the available tags without dangling separators`() {
+    fun `subtitle always names the artist slot without dangling separators`() {
         assertEquals("Artist · Album", librarySubtitle("Artist", "Album", "Unknown"))
         assertEquals("Artist", librarySubtitle("Artist", null, "Unknown"))
-        assertEquals("Album", librarySubtitle(null, "Album", "Unknown"))
+        assertEquals("Unknown · Album", librarySubtitle(null, "Album", "Unknown"))
         assertEquals("Unknown", librarySubtitle(null, null, "Unknown"))
     }
 
