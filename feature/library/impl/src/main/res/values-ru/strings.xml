@@ -42,6 +42,7 @@
     <string name="library_empty_title">Аудиофайлы не найдены</string>
     <string name="library_empty_body">Доступ разрешён, но в медиакаталоге устройства нет аудио. Добавьте аудиофайлы и обновите библиотеку.</string>
     <string name="library_unknown_artist">Неизвестный исполнитель</string>
+    <string name="library_current_track">Текущая композиция</string>
     <string name="library_filters">Фильтры</string>
     <string name="library_filters_action">ФИЛЬТР</string>
     <string name="library_sort">Сортировать по</string>

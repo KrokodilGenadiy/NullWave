@@ -36,6 +36,7 @@
     <string name="library_empty_title">No audio found</string>
     <string name="library_empty_body">Access is granted, but the device media catalog has no audio. Add audio files, then refresh the library.</string>
     <string name="library_unknown_artist">Unknown artist</string>
+    <string name="library_current_track">Current track</string>
     <string name="library_filters">Filters</string>
     <string name="library_filters_action">FILTER</string>
     <string name="library_sort">Sort by</string>

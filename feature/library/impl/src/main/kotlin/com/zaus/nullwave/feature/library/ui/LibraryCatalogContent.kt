@@ -106,6 +106,8 @@ internal fun LibraryReadyContent(
                             onClick = { onIntent(LibraryIntent.PlaySong(track.id, songs.items)) },
                             subtitle = librarySubtitle(track.artist, track.album, stringResource(R.string.library_unknown_artist)),
                             durationLabel = libraryDuration(track.durationMs),
+                            playing = track.id == state.playingTrackId,
+                            playingStateDescription = stringResource(R.string.library_current_track),
                             modifier = Modifier.testTag("library_track:${track.id.value}"),
                             artwork = { LibraryArtwork(track, artworkLoader) },
                         )

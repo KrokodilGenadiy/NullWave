@@ -17,8 +17,10 @@ import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertTouchHeightIsEqualTo
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -55,6 +57,20 @@ class LibraryScreenInstrumentedTest {
     @get:Rule val compose = createComposeRule()
     private val robot by lazy { LibraryScreenRobot(compose) }
     private val track = MediaTrack(TrackId("test:1"), "Low Orbit", null, null, 203_000)
+
+    @Test
+    fun currentTrackIsAnnouncedIndependentlyOfPlayOrPause() {
+        val other = track.copy(id = TrackId("test:2"), title = "Other")
+        robot.show(LibraryBody.Ready(listOf(track, other)))
+        val current = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, robot.text(R.string.library_current_track))
+        robot.updateCurrentTrack(track.id)
+        compose.onNode(current and hasAnyAncestor(hasTestTag("library_track:${track.id.value}"))).assertIsDisplayed()
+        robot.updateCurrentTrack(other.id)
+        compose.onNode(current and hasAnyAncestor(hasTestTag("library_track:${other.id.value}"))).assertIsDisplayed()
+        compose.onAllNodes(current).assertCountEquals(1)
+        robot.updateCurrentTrack(null)
+        compose.onAllNodes(current).assertCountEquals(0)
+    }
 
     @Test
     fun metadataSummaryAndSubtitleFollowTheCurrentSnapshot() {
@@ -247,6 +263,9 @@ private class LibraryScreenRobot(private val compose: ComposeContentTestRule) {
     }
     fun updateBody(body: LibraryBody<MediaTrack>) = apply {
         compose.runOnIdle { state.value = state.value.copy(body = body) }
+    }
+    fun updateCurrentTrack(id: TrackId?) = compose.runOnIdle {
+        state.value = state.value.copy(playingTrackId = id)
     }
     fun updatePlaybackError(error: UiText) = apply {
         compose.runOnIdle { state.value = state.value.copy(playbackNotice = LibraryPlaybackNotice(error)) }
