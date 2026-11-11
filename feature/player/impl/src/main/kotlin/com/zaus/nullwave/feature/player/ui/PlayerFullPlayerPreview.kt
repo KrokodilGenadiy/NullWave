@@ -57,7 +57,7 @@ private fun PlayerQueuePreview() {
         current = PlaybackItemToken(PlaybackSessionId("preview"), repeat.entryId, 0),
         shuffleEnabled = true,
     )
-    NullWaveTheme { PlayerQueue(queue, 1, FullPreviewArtwork, onSelectEntry = {}) }
+    NullWaveTheme { PlayerQueue(queue, 1, FullPreviewArtwork, onSelectEntry = {}, onRemoveEntry = {}) }
 }
 
 @Preview(name = "Full player disconnected", widthDp = 360, heightDp = 720)
@@ -119,6 +119,7 @@ private fun fullPreviewState(russian: Boolean = false, denied: Boolean = false):
             PlaybackCapability.Previous,
             PlaybackCapability.Next,
             PlaybackCapability.SelectQueueEntry,
+            PlaybackCapability.RemoveQueueEntry,
             PlaybackCapability.SeekTo,
             PlaybackCapability.SetShuffle,
             PlaybackCapability.SetRepeat,

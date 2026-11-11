@@ -105,9 +105,13 @@ internal fun PlayerFullPlayer(
                                 queue = snapshot.queue,
                                 currentIndex = currentIndex,
                                 artwork = renderer,
-                                onSelectEntry = if (navigation.queueOpen && active && canSubmit &&
-                                    state.supportsItemCommand(PlaybackCapability.SelectQueueEntry)
-                                ) { id -> onIntent(PlayerIntent.SelectQueueEntry(sessionId, id)) } else null,
+                                actionsEnabled = navigation.queueOpen && active && canSubmit,
+                                onSelectEntry = if (state.supportsItemCommand(PlaybackCapability.SelectQueueEntry)) {
+                                    { id -> onIntent(PlayerIntent.SelectQueueEntry(sessionId, id)) }
+                                } else null,
+                                onRemoveEntry = if (state.supportsItemCommand(PlaybackCapability.RemoveQueueEntry)) {
+                                    { id -> onIntent(PlayerIntent.RemoveQueueEntry(sessionId, id)) }
+                                } else null,
                                 modifier = Modifier.weight(1f),
                                 header = header,
                             )

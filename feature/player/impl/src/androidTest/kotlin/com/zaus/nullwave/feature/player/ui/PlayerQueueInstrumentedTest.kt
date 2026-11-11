@@ -4,10 +4,12 @@ import android.content.Intent
 import android.view.KeyEvent
 import androidx.activity.findViewTreeOnBackPressedDispatcherOwner
 import androidx.compose.ui.MotionDurationScale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHasNoClickAction
@@ -27,7 +29,10 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
+import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import com.zaus.nullwave.core.designsystem.R as DesignSystemR
@@ -58,6 +63,7 @@ class PlayerQueueInstrumentedTest {
     private var fixture = PlayerHostActivityFixture()
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val session = PlaybackSessionId("queue-session")
+    private val selectAndRemove = setOf(PlaybackCapability.SelectQueueEntry, PlaybackCapability.RemoveQueueEntry)
     private var scenario: ActivityScenario<PlayerHostTestActivity>? = null
 
     @After
@@ -167,6 +173,85 @@ class PlayerQueueInstrumentedTest {
         row(first).assertDoesNotExist()
         row(duplicate).performTouchInput { click() }
         compose.runOnIdle { assertEquals(listOf(expected, expected), fixture.playback.commands) }
+    }
+
+    @Test
+    fun swipingADuplicateRemovesOnlyThatUpcomingOccurrenceAfterTheServicePublishes() {
+        val current = entry(0)
+        val firstCopy = current.copy(entryId = QueueEntryId("first-copy"))
+        val secondCopy = current.copy(entryId = QueueEntryId("second-copy"))
+        val entries = listOf(firstCopy, current, secondCopy)
+        val order = listOf(current, secondCopy, firstCopy)
+        publish(entries, current, order, capabilities = selectAndRemove)
+        launchQueue(current.track.title)
+
+        row(current).assert(SemanticsMatcher.keyNotDefined(SemanticsActions.CustomActions))
+        row(secondCopy).performTouchInput { swipeLeft() }
+        val expected = listOf(PlaybackCommand.RemoveQueueEntry(session, secondCopy.entryId))
+        compose.runOnIdle { assertEquals(expected, fixture.playback.commands) }
+        assertOrderAndCurrent(order, current)
+
+        compose.runOnIdle { publish(listOf(firstCopy, current), current, listOf(current, firstCopy), capabilities = selectAndRemove) }
+        row(secondCopy).assertDoesNotExist()
+        assertOrderAndCurrent(listOf(current, firstCopy), current)
+        compose.runOnIdle { assertEquals(expected, fixture.playback.commands) }
+    }
+
+    @Test
+    fun busyQueueIgnoresTapsAndSwipesAndRestoresOnlyThePermittedActions() {
+        val entries = List(3, ::entry)
+        val current = entries.first()
+        val target = entries.last()
+        publish(entries, current, capabilities = selectAndRemove)
+        launchQueue(current.track.title)
+        val gate = CompletableDeferred<Unit>()
+        fixture.playback.commandGate = gate
+        val selected = PlaybackCommand.SelectQueueEntry(session, entries[1].entryId)
+        try {
+            row(entries[1]).performTouchInput { click() }
+            row(target).assertIsEnabled().assertHasNoClickAction()
+                .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.CustomActions))
+                .performTouchInput {
+                    click()
+                    swipeLeft()
+                    down(center)
+                }
+            compose.runOnIdle { assertEquals(listOf(selected), fixture.playback.commands) }
+        } finally {
+            gate.complete(Unit)
+        }
+        row(target).assertHasClickAction().performTouchInput { up() }
+        compose.runOnIdle {
+            assertEquals(listOf(selected), fixture.playback.commands)
+            publish(entries, current, capabilities = setOf(PlaybackCapability.RemoveQueueEntry))
+        }
+        val removeLabel = instrumentation.targetContext.getString(DesignSystemR.string.nw_queue_remove)
+        val remove = row(target).assertHasNoClickAction().fetchSemanticsNode()
+            .config[SemanticsActions.CustomActions].single { it.label == removeLabel }
+        compose.runOnIdle { assertTrue(remove.action()) }
+        compose.runOnIdle {
+            assertEquals(listOf(selected, PlaybackCommand.RemoveQueueEntry(session, target.entryId)), fixture.playback.commands)
+        }
+    }
+
+    @Test
+    fun shortSwipesAndSwipesWithoutRemoveCapabilityDoNotSelectOrRemove() {
+        val entries = List(2, ::entry)
+        val target = entries.last()
+        publish(entries, entries.first(), capabilities = selectAndRemove)
+        launchQueue(entries.first().track.title)
+        row(target).performTouchInput { swipe(center, center - Offset(32.dp.toPx(), 0f)) }
+        compose.runOnIdle {
+            assertTrue(fixture.playback.commands.isEmpty())
+            publish(entries, entries.first(), capabilities = setOf(PlaybackCapability.SelectQueueEntry))
+        }
+        row(target).assertHasClickAction().assert(SemanticsMatcher.keyNotDefined(SemanticsActions.CustomActions))
+            .performTouchInput { swipeLeft() }
+        compose.runOnIdle { assertTrue(fixture.playback.commands.isEmpty()) }
+        row(target).performTouchInput { click() }
+        compose.runOnIdle {
+            assertEquals(listOf(PlaybackCommand.SelectQueueEntry(session, target.entryId)), fixture.playback.commands)
+        }
     }
 
     @Test
