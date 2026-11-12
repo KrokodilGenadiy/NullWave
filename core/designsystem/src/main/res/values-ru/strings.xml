@@ -2,6 +2,7 @@
 <resources>
     <string name="nw_track_more">Другие действия: %1$s</string>
     <string name="nw_track_playing">Воспроизводится</string>
+    <string name="nw_track_current">Текущая композиция</string>
     <string name="nw_track_selected_playing">Выбрано, воспроизводится</string>
     <string name="nw_track_unselected_playing">Не выбрано, воспроизводится</string>
     <string name="nw_track_unavailable">Недоступен</string>

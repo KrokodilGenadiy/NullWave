@@ -42,6 +42,7 @@ import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
 import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.feature.library.impl.R
+import com.zaus.nullwave.core.designsystem.R as DesignR
 import com.zaus.nullwave.feature.library.api.access.AccessAction
 import com.zaus.nullwave.feature.library.presentation.LibraryBody
 import com.zaus.nullwave.feature.library.presentation.LibraryIntent
@@ -62,7 +63,7 @@ class LibraryScreenInstrumentedTest {
     fun currentTrackIsAnnouncedIndependentlyOfPlayOrPause() {
         val other = track.copy(id = TrackId("test:2"), title = "Other")
         robot.show(LibraryBody.Ready(listOf(track, other)))
-        val current = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, robot.text(R.string.library_current_track))
+        val current = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, robot.text(DesignR.string.nw_track_current))
         robot.updateCurrentTrack(track.id)
         compose.onNode(current and hasAnyAncestor(hasTestTag("library_track:${track.id.value}"))).assertIsDisplayed()
         robot.updateCurrentTrack(other.id)

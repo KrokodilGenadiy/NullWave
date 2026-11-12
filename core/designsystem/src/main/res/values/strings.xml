@@ -2,6 +2,7 @@
 <resources>
     <string name="nw_track_more">More actions for %1$s</string>
     <string name="nw_track_playing">Playing</string>
+    <string name="nw_track_current">Current track</string>
     <string name="nw_track_selected_playing">Selected, playing</string>
     <string name="nw_track_unselected_playing">Not selected, playing</string>
     <string name="nw_track_unavailable">Unavailable</string>

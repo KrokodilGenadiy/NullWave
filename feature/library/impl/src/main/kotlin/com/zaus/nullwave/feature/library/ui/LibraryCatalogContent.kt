@@ -50,6 +50,7 @@ import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
 import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
 import com.zaus.nullwave.feature.library.impl.R
+import com.zaus.nullwave.core.designsystem.R as DesignR
 import com.zaus.nullwave.feature.library.presentation.LibraryBody
 import com.zaus.nullwave.feature.library.presentation.LibraryIntent
 import com.zaus.nullwave.feature.library.presentation.LibraryState
@@ -107,7 +108,7 @@ internal fun LibraryReadyContent(
                             subtitle = librarySubtitle(track.artist, track.album, stringResource(R.string.library_unknown_artist)),
                             durationLabel = libraryDuration(track.durationMs),
                             playing = track.id == state.playingTrackId,
-                            playingStateDescription = stringResource(R.string.library_current_track),
+                            playingStateDescription = stringResource(DesignR.string.nw_track_current),
                             modifier = Modifier.testTag("library_track:${track.id.value}"),
                             artwork = { LibraryArtwork(track, artworkLoader) },
                         )
