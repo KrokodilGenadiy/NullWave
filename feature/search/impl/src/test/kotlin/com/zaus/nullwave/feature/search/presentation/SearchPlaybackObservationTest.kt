@@ -26,7 +26,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** Access-only control observation, dispatch baseline, denial deduplication and UI lifetime. */
+/** Highlight and access observations share a controller. Access monitoring waits for the first dispatch baseline. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SearchPlaybackObservationTest {
     private val fixture = SearchPlaybackFixture()
@@ -38,16 +38,43 @@ class SearchPlaybackObservationTest {
     fun tearDown() = fixture.tearDown()
 
     @Test
-    fun `opening and reading Search never acquires a playback connection before the first tap`() = with(fixture) {
+    fun `opening Search observes the current track without handling access denials before the first tap`() = with(fixture) {
         runTest(dispatcher) {
             val vm = readyVm(songs)
-            playback.states.value = problemSnapshot(PlaybackProblemCode.Io, "unobserved")
+            playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "before-first-tap")
             runCurrent()
 
             assertFalse(vm.snapshot.value.state.monitorPlayback)
             assertNull(vm.snapshot.value.state.playbackError)
-            assertEquals(0, playback.stateObservations)
-            assertEquals(0, playback.activeStateCollectors)
+            assertNull(vm.snapshot.value.state.lastPlaybackDenial)
+            assertEquals(beta.id, vm.snapshot.value.state.playingTrackId)
+            assertEquals(SearchBody.Ready(results(songs)), vm.snapshot.value.state.body)
+            assertEquals(1, playback.stateObservations)
+            assertEquals(1, playback.activeStateCollectors)
+            assertEquals(0, playback.progressObservations)
+            assertTrue(playback.calls.isEmpty())
+        }
+    }
+
+    @Test
+    fun `highlight follows external playback through disconnect and clears on a confirmed empty queue`() = with(fixture) {
+        runTest(dispatcher) {
+            playback.states.value = healthySnapshot()
+            val vm = readyVm(songs)
+            val displayed = ready(vm)
+            assertEquals(beta.id, vm.snapshot.value.state.playingTrackId)
+
+            playback.states.value = PlaybackConnection.Disconnected
+            runCurrent()
+            assertEquals(beta.id, vm.snapshot.value.state.playingTrackId)
+            playback.states.value = healthySnapshot(entryId = "next", track = alpha)
+            runCurrent()
+            assertEquals(alpha.id, vm.snapshot.value.state.playingTrackId)
+            playback.states.value = PlaybackConnection.Connected(PlaybackSnapshot.create(PlaybackSessionId("empty")))
+            runCurrent()
+            assertNull(vm.snapshot.value.state.playingTrackId)
+            assertSame(displayed, ready(vm))
+            assertEquals(1, repository.subscriptions.size)
             assertEquals(0, playback.progressObservations)
             assertTrue(playback.calls.isEmpty())
         }
@@ -63,13 +90,13 @@ class SearchPlaybackObservationTest {
             assertTrue(vm.snapshot.value.state.monitorPlayback)
             assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
             assertNull(vm.snapshot.value.state.playbackError)
-            assertEquals(1, playback.stateObservations)
+            assertEquals(2, playback.stateObservations)
 
             respond(AppResult.Success(Unit))
 
             assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
             assertNull(vm.snapshot.value.state.playbackError)
-            assertEquals(1, playback.stateObservations)
+            assertEquals(2, playback.stateObservations)
             assertEquals(PlaybackProblemId("before-first-ack"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
         }
     }
@@ -95,7 +122,7 @@ class SearchPlaybackObservationTest {
             assertSame(notice, vm.snapshot.value.state.playbackNotice)
             assertEquals(UiText.Resource(R.string.search_playback_not_found), vm.snapshot.value.state.playbackError)
             assertEquals(PlaybackProblemId("installed-with-cancelled-ack"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
-            assertEquals(1, playback.activeStateCollectors)
+            assertEquals(2, playback.activeStateCollectors)
             assertEquals(0, playback.progressObservations)
         }
     }
@@ -195,11 +222,11 @@ class SearchPlaybackObservationTest {
             playback.states.value = PlaybackConnection.Connecting
             send(vm, SearchIntent.PlayTrack(beta.id, songs))
             assertTrue(playback.calls.isEmpty())
-            assertEquals(0, playback.activeStateCollectors)
+            assertEquals(1, playback.activeStateCollectors)
 
             send(vm, SearchIntent.PlayTrack(alpha.id, songs))
             assertTrue(playback.calls.isEmpty())
-            assertEquals(0, playback.activeStateCollectors)
+            assertEquals(1, playback.activeStateCollectors)
             playback.states.value = healthySnapshot()
             allowConnection.complete(Unit)
             runCurrent()
@@ -207,7 +234,7 @@ class SearchPlaybackObservationTest {
             assertEquals(1, playback.calls.size)
             assertEquals(2, request().startIndex)
             respond(AppResult.Success(Unit))
-            assertEquals(1, playback.activeStateCollectors)
+            assertEquals(2, playback.activeStateCollectors)
             assertNull(vm.snapshot.value.state.playbackError)
         }
     }
@@ -225,7 +252,7 @@ class SearchPlaybackObservationTest {
 
                 assertTrue(playback.calls.isEmpty())
                 assertEquals(UiText.Resource(message), vm.snapshot.value.state.playbackError)
-                assertEquals(0, playback.activeStateCollectors)
+                assertEquals(1, playback.activeStateCollectors)
             }
 
             // A failed connection is not a baseline for a previously unseen service problem.
@@ -237,7 +264,7 @@ class SearchPlaybackObservationTest {
             assertEquals(SearchBody.Ready(results(songs)), vm.snapshot.value.state.body)
             respond(AppResult.Success(Unit))
 
-            assertEquals(1, playback.activeStateCollectors)
+            assertEquals(2, playback.activeStateCollectors)
         }
     }
 
@@ -298,7 +325,7 @@ class SearchPlaybackObservationTest {
                 assertSame(catalog, vm.snapshot.value.state.body)
             }
             assertEquals(2, playback.calls.size)
-            assertEquals(1, playback.stateObservations)
+            assertEquals(2, playback.stateObservations)
             assertEquals(0, playback.progressObservations)
         }
     }
@@ -484,15 +511,18 @@ class SearchPlaybackObservationTest {
             store.clear()
             runCurrent()
             val restored = createVm(restoredHandle)
+            assertNull(restored.snapshot.value.state.playingTrackId)
+            playback.states.value = healthySnapshot(track = alpha)
             bind(restored)
 
             assertEquals("  M4A  ", restored.snapshot.value.state.rawQuery)
             assertEquals(SearchAccess.Unchecked, restored.snapshot.value.state.access)
             assertFalse(restored.snapshot.value.state.monitorPlayback)
+            assertEquals(alpha.id, restored.snapshot.value.state.playingTrackId)
             assertNull(restored.snapshot.value.state.lastPlaybackDenial)
             assertNull(restored.snapshot.value.state.playbackError)
             assertEquals(1, playback.calls.size)
-            assertEquals(0, playback.activeStateCollectors)
+            assertEquals(1, playback.activeStateCollectors)
         }
     }
 

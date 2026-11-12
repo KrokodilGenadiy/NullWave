@@ -1,6 +1,7 @@
 package com.zaus.nullwave.feature.search.presentation
 
 import com.zaus.nullwave.core.mvi.UiState
+import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.core.mvi.ui.UiText
 import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchQuery
 import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchResults
@@ -17,6 +18,7 @@ internal data class SearchState(
     val monitorPlayback: Boolean = false,
     /** A handled access denial cannot close freshly checked results again on rebind. */
     val lastPlaybackDenial: SearchPlaybackProblemKey? = null,
+    val playingTrackId: TrackId? = null,
 ) : UiState {
     val playbackError: UiText? get() = playbackNotice?.message
 

@@ -46,13 +46,13 @@ class SearchPlaybackCommandTest {
             assertEquals(1, request.startIndex)
             assertEquals(0L, request.startPositionMs)
             assertTrue(request.playRequested)
-            assertEquals(1, playback.stateObservations)
-            assertEquals(1, playback.activeStateCollectors)
+            assertEquals(2, playback.stateObservations)
+            assertEquals(2, playback.activeStateCollectors)
             assertEquals(0, playback.progressObservations)
             assertEquals(SearchBody.Ready(results(songs)), vm.snapshot.value.state.body)
             respond(AppResult.Success(Unit))
-            assertEquals(1, playback.stateObservations)
-            assertEquals(1, playback.activeStateCollectors)
+            assertEquals(2, playback.stateObservations)
+            assertEquals(2, playback.activeStateCollectors)
         }
     }
 

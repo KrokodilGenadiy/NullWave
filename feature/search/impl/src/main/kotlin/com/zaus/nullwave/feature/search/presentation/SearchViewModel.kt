@@ -6,6 +6,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.zaus.nullwave.core.mvi.BaseMviViewModel
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
 import com.zaus.nullwave.core.playback.api.PlaybackController
+import com.zaus.nullwave.core.playback.api.observeCurrentTrackId
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError
 import com.zaus.nullwave.core.playback.api.command.PlaybackQueueRequest
 import com.zaus.nullwave.core.result.EmptyResult
@@ -28,7 +29,7 @@ import kotlin.time.Duration.Companion.milliseconds
 @AssistedInject
 internal class SearchViewModel(
     private val repository: LibrarySearchRepository,
-    playbackController: PlaybackController,
+    private val playbackController: PlaybackController,
     @Assisted savedStateHandle: SavedStateHandle,
     @SearchInitialLocale initialLocaleTag: String,
 ) : BaseMviViewModel<SearchState, SearchIntent, Nothing>(
@@ -75,6 +76,10 @@ internal class SearchViewModel(
             input = { monitorPlayback },
             flow = { enabled -> if (enabled) playbackObservation.observe() else emptyFlow() },
         ) { _, update -> withPlaybackAccess(update) }
+        source(
+            name = "search.nowPlaying",
+            flow = playbackController::observeCurrentTrackId,
+        ) { trackId -> copy(playingTrackId = trackId) }
 
         on<SearchIntent.PlayTrack> { intent ->
             if (state.body !is SearchBody.Ready) return@on
