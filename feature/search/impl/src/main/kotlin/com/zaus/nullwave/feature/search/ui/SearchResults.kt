@@ -30,6 +30,8 @@ import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveDivider
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.media.model.ArtworkRef
+import com.zaus.nullwave.core.media.model.track.TrackId
+import com.zaus.nullwave.core.designsystem.R as DesignR
 import com.zaus.nullwave.feature.library.api.ui.LibraryArtworkRenderer
 import com.zaus.nullwave.feature.library.api.ui.libraryAlbumCredit
 import com.zaus.nullwave.feature.library.api.ui.libraryDuration
@@ -44,6 +46,7 @@ import com.zaus.nullwave.feature.search.presentation.SearchIntent
 internal fun SearchResults(
     body: SearchBody.Ready,
     rawQuery: String,
+    playingTrackId: TrackId?,
     onIntent: (SearchIntent) -> Unit,
     artwork: LibraryArtworkRenderer?,
     insets: PaddingValues,
@@ -74,6 +77,8 @@ internal fun SearchResults(
                         modifier = Modifier.testTag("search_track:${track.id.value}"),
                         subtitle = librarySubtitle(track.artist, track.album, stringResource(R.string.search_unknown_artist)),
                         durationLabel = libraryDuration(track.durationMs),
+                        playing = track.id == playingTrackId,
+                        playingStateDescription = stringResource(DesignR.string.nw_track_current),
                         artwork = { SearchArtwork(track.artwork, track.album ?: track.title, artwork, 48.dp) })
                     NullWaveDivider(Modifier.padding(horizontal = gutter))
                 }

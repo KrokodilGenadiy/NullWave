@@ -4,6 +4,9 @@ import com.zaus.nullwave.feature.search.testing.IdlePlaybackController
 import com.zaus.nullwave.feature.search.testing.RecordingSearchPlaybackController
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
@@ -22,6 +25,15 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.zaus.nullwave.core.playback.api.PlaybackController
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommand
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError
+import com.zaus.nullwave.core.playback.api.model.PlaybackConnection
+import com.zaus.nullwave.core.playback.api.model.PlaybackItemToken
+import com.zaus.nullwave.core.playback.api.model.PlaybackPhase
+import com.zaus.nullwave.core.playback.api.model.PlaybackQueue
+import com.zaus.nullwave.core.playback.api.model.PlaybackSessionId
+import com.zaus.nullwave.core.playback.api.model.PlaybackSnapshot
+import com.zaus.nullwave.core.playback.api.model.PlaybackTransport
+import com.zaus.nullwave.core.playback.api.model.QueueEntry
+import com.zaus.nullwave.core.playback.api.model.QueueEntryId
 import com.zaus.nullwave.core.playback.api.source.PlaybackSourceError
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.DataError
@@ -163,6 +175,46 @@ class SearchRootInstrumentedTest {
         compose.runOnIdle { repository.result.value = AppResult.Success(searchResults()) }
         compose.onNodeWithTag("search_refresh_error").assertDoesNotExist()
         compose.runOnIdle { assertEquals(1, repository.active) }
+    }
+
+    @Test
+    fun currentResultStaysMarkedOnPauseAndMovesWithTheExternalQueue() {
+        val playback = RecordingSearchPlaybackController()
+        val results = searchResults(3)
+        val entries = results.tracks.mapIndexed { index, hit -> QueueEntry(QueueEntryId("entry:$index"), hit.track) }
+        val session = PlaybackSessionId("external")
+        fun publish(index: Int, playing: Boolean) {
+            playback.states.value = PlaybackConnection.Connected(PlaybackSnapshot.create(
+                session, queue = PlaybackQueue.create(entries, current = PlaybackItemToken(session, entries[index].entryId, 0)),
+                transport = PlaybackTransport(phase = PlaybackPhase.Ready, playRequested = playing),
+            ))
+        }
+        val marker = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Current track")
+        fun assertCurrent(index: Int) {
+            compose.onAllNodes(marker).assertCountEquals(1)
+            compose.onNode(marker and hasAnyAncestor(hasTestTag("search_track:${entries[index].track.id.value}"))).assertIsDisplayed()
+        }
+
+        access.access = LibraryAccess.Granted
+        repository.result.value = AppResult.Success(results.copy(tracks = results.tracks.take(2)))
+        publish(0, playing = true)
+        show("Orbit", playback)
+        awaitTrack()
+        compose.onNodeWithTag("search_input").performImeAction()
+        assertCurrent(0)
+        compose.runOnIdle { publish(0, playing = false) }
+        assertCurrent(0)
+        compose.runOnIdle { publish(1, playing = false) }
+        assertCurrent(1)
+        compose.runOnIdle { publish(2, playing = true) }
+        compose.onAllNodes(marker).assertCountEquals(0)
+        // A new result can match the current track without another playback update.
+        compose.runOnIdle { repository.result.value = AppResult.Success(results) }
+        assertCurrent(2)
+        compose.runOnIdle {
+            assertEquals(1, repository.calls.size)
+            assertTrue(playback.calls.isEmpty())
+        }
     }
 
     @Test

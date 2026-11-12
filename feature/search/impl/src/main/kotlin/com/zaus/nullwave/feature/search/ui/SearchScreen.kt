@@ -125,7 +125,7 @@ internal fun SearchScreen(
     ) { padding ->
         val body = state.body
         if (body is SearchBody.Ready) {
-            SearchResults(body, state.rawQuery, onIntent, artwork, padding, resultsScroll)
+            SearchResults(body, state.rawQuery, state.playingTrackId, onIntent, artwork, padding, resultsScroll)
         } else LazyColumn(Modifier.fillMaxSize().consumeWindowInsets(padding), contentPadding = padding) {
             item("state") {
                 when (body) {
