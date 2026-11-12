@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.core.media.model.track.TrackId
+import com.zaus.nullwave.core.playback.api.observeCurrentTrackId
 import com.zaus.nullwave.core.mvi.ui.UiText
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommand
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError
@@ -386,7 +387,7 @@ class LibraryPlaybackViewModelTest {
         val first = healthySnapshot()
         playback.states.value = first
         val highlights = mutableListOf<TrackId?>()
-        backgroundScope.launch { LibraryPlaybackObservation(playback).observeCurrentTrack().toList(highlights) }
+        backgroundScope.launch { playback.observeCurrentTrackId().toList(highlights) }
         runCurrent()
 
         playback.states.value = PlaybackConnection.Connected(PlaybackSnapshot.create(

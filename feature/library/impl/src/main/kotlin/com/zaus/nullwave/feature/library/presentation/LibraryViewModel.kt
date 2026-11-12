@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.zaus.nullwave.core.mvi.BaseMviViewModel
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
 import com.zaus.nullwave.core.playback.api.PlaybackController
+import com.zaus.nullwave.core.playback.api.observeCurrentTrackId
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError
 import com.zaus.nullwave.core.playback.api.command.PlaybackQueueRequest
 import com.zaus.nullwave.core.result.EmptyResult
@@ -28,7 +29,7 @@ internal class LibraryViewModel(
     private val repository: LibraryCatalogRepository,
     @Assisted savedStateHandle: SavedStateHandle,
     @LibraryInitialLocale initialLocaleTag: String,
-    playback: PlaybackController,
+    private val playback: PlaybackController,
 ) : BaseMviViewModel<LibraryState, LibraryIntent, Nothing>(
     initialState = LibraryState(LibraryTrackQuery(initialLocaleTag)),
     savedState = librarySavedState(savedStateHandle),
@@ -66,7 +67,7 @@ internal class LibraryViewModel(
         ) { _, update -> withPlaybackAccess(update) }
         source(
             name = "library.nowPlaying",
-            flow = playbackObservation::observeCurrentTrack,
+            flow = playback::observeCurrentTrackId,
         ) { trackId -> copy(playingTrackId = trackId) }
 
         on<LibraryIntent.PlaySong> { intent ->
