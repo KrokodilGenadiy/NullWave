@@ -43,6 +43,7 @@ data class NullWaveTabItem(val label: String, val enabled: Boolean = true) {
  * cross-fade. Compose's animator duration scale is also respected (zero settles instantly).
  * Material owns horizontal scrolling and selectableGroup; each cell owns Role.Tab/selected/disabled.
  * Press/focus feedback follows the label, never the rectangular hit area. Labels are not ellipsized.
+ * The selected underline carries a soft accent glow unless the theme turns glow off.
  */
 @Composable
 fun NullWaveTabRow(
@@ -56,6 +57,7 @@ fun NullWaveTabRow(
     val colors = NullWaveTheme.colors
     val reducedMotion = NullWaveTheme.effects.withRestrictions(reduceMotion = reduceMotion).reduceMotion
     val animationsEnabled = systemAnimationsEnabled()
+    val glow = NullWaveTheme.effects.glowEnabled
     val animation = remember(items, reducedMotion, animationsEnabled) {
         TabAnimation(items.size, selectedIndex, reducedMotion)
     }
@@ -124,6 +126,7 @@ fun NullWaveTabRow(
                             enabled = item.enabled,
                             pressed = item.enabled && pressed.value,
                             focused = item.enabled && focused.value,
+                            glow = glow,
                         )
                     },
                 )

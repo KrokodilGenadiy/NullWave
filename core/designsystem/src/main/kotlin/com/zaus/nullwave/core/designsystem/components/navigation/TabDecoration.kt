@@ -1,12 +1,15 @@
 package com.zaus.nullwave.core.designsystem.components.navigation
 
+import android.graphics.BlurMaskFilter
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.unit.dp
@@ -21,9 +24,13 @@ internal fun DrawScope.drawTabDecoration(
     enabled: Boolean = true,
     pressed: Boolean = false,
     focused: Boolean = false,
+    glow: Boolean = false,
 ) {
     val accent = if (enabled) colors.primary else colors.textSecondary
     if (pressed) drawUnderline(1f, colors.primary, PressAlpha)
+    // The selected tab is the active element: only its accent bar may glow, and it follows the bar's
+    // width and cross-fade. A disabled tab's grey bar stays flat.
+    if (glow && enabled) drawUnderlineGlow(underline.width, accent, underline.alpha)
     drawUnderline(underline.width, accent, underline.alpha)
     // Persistent focus is independent of selection and survives press, without a filled hit area.
     if (focused) drawBrackets(BracketRest.toPx(), colors.textPrimary, 1f)
@@ -63,6 +70,22 @@ private fun DrawScope.drawUnderline(fraction: Float, color: Color, alpha: Float)
     if (fraction <= 0f || alpha <= 0f) return
     val width = size.width * fraction
     drawRect(color, Offset((size.width - width) / 2f, size.height + IndicatorGap.toPx()), Size(width, IndicatorHeight.toPx()), alpha)
+}
+
+/**
+ * A blurred copy of the bar behind it. Stacked flat rectangles read as a stepped box, so this uses
+ * the platform blur (hardware accelerated from API 28; minSdk is 29). A KMP port needs another blur.
+ */
+private fun DrawScope.drawUnderlineGlow(fraction: Float, color: Color, alpha: Float) {
+    if (fraction <= 0f || alpha <= 0f) return
+    val width = size.width * fraction
+    val left = (size.width - width) / 2f
+    val top = size.height + IndicatorGap.toPx()
+    val paint = Paint().apply {
+        this.color = color.copy(alpha = color.alpha * alpha * GlowAlpha)
+        asFrameworkPaint().maskFilter = BlurMaskFilter(GlowRadius.toPx(), BlurMaskFilter.Blur.NORMAL)
+    }
+    drawIntoCanvas { it.drawRect(left, top, left + width, top + IndicatorHeight.toPx(), paint) }
 }
 
 private fun DrawScope.drawGhost(layout: TextLayoutResult?, gap: Float, offset: Offset, color: Color, bracketAlpha: Float) {
@@ -108,3 +131,5 @@ private val MaxSplit = 3.dp
 private val Jitter = 1.dp
 private const val GhostAlpha = 0.85f
 private const val PressAlpha = 0.35f
+private val GlowRadius = 5.dp
+private const val GlowAlpha = 0.8f
