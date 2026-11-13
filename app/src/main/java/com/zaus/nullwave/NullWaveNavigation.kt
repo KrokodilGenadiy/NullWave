@@ -22,7 +22,7 @@ internal fun NullWaveNavigation(
     val entries = remember(entryProviderInstallers, navigation) {
         with(navigation) {
             entryProvider {
-                entryProviderInstallers.forEach { installer -> installer() }
+                entryProviderInstallers.forEach { installer -> installer {} }
             }
         }
     }

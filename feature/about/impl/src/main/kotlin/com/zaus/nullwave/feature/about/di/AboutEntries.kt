@@ -1,7 +1,6 @@
 package com.zaus.nullwave.feature.about.di
 
 import com.zaus.nullwave.core.navigation.EntryProviderInstaller
-import com.zaus.nullwave.core.navigation.navigateBack
 import com.zaus.nullwave.feature.about.AboutScreen
 import com.zaus.nullwave.feature.about.api.AboutKey
 import dev.zacsweers.metro.AppScope
@@ -15,9 +14,9 @@ import dev.zacsweers.metro.Provides
 object AboutEntries {
     @Provides
     @IntoSet
-    fun entries(): EntryProviderInstaller = {
+    fun entries(): EntryProviderInstaller = { menuButton ->
         entry<AboutKey> {
-            AboutScreen(onBackClick = { navigateBack() })
+            AboutScreen(menuButton = { menuButton(null) })
         }
     }
 }

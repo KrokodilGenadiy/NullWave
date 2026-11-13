@@ -1,5 +1,6 @@
 plugins {
     id("nullwave.android.library")
+    alias(libs.plugins.kotlin.compose)
 }
 
 dependencies {
@@ -9,4 +10,5 @@ dependencies {
 
 android {
     namespace = "com.zaus.nullwave.core.navigation"
+    buildFeatures.compose = true
 }

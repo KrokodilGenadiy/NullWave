@@ -1,9 +1,12 @@
 plugins {
     id("nullwave.android.library")
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.metro)
 }
 
 android {
     namespace = "com.zaus.nullwave.feature.equalizer.impl"
+    buildFeatures.compose = true
 }
 
 dependencies {

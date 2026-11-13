@@ -1,7 +1,10 @@
 package com.zaus.nullwave.core.navigation
 
+import androidx.compose.runtime.Composable
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
 
-/** Features register entries; the host supplies navigation and owns its state. */
-typealias EntryProviderInstaller = context(NavigationScope) EntryProviderScope<NavKey>.() -> Unit
+/** The host renders its menu button; a screen may supply an optional localized detail. */
+typealias SectionMenuButton = @Composable (detail: String?) -> Unit
+
+typealias EntryProviderInstaller = context(NavigationScope) EntryProviderScope<NavKey>.(SectionMenuButton) -> Unit
