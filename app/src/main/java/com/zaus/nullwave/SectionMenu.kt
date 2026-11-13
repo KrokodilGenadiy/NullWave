@@ -2,6 +2,8 @@ package com.zaus.nullwave
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,7 +23,9 @@ import androidx.compose.material3.WideNavigationRailDefaults
 import androidx.compose.material3.WideNavigationRailValue
 import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +49,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation3.runtime.NavKey
 import com.zaus.nullwave.core.designsystem.components.control.iconButton.NullWaveIconButton
 import com.zaus.nullwave.core.designsystem.components.navigation.NullWaveDrawerItem
@@ -63,6 +68,7 @@ import com.zaus.nullwave.feature.settings.api.SettingsKey
 import com.zaus.nullwave.feature.sleeptimer.api.R as SleepTimerR
 import com.zaus.nullwave.feature.sleeptimer.api.SleepTimerKey
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineStart
 
 internal data class MenuDestination(val key: NavKey, @StringRes val title: Int, @DrawableRes val icon: Int)
 
@@ -78,11 +84,27 @@ internal val menuDestinations = listOf(
 internal fun SectionMenu(current: NavKey, detail: String?, onMenuDestination: (NavKey) -> Unit) {
     val drawer = rememberWideNavigationRailState()
     val scope = rememberCoroutineScope()
+    val openingBack = remember(drawer, scope) {
+        object : OnBackPressedCallback(drawer.targetValue == WideNavigationRailValue.Expanded) {
+            override fun handleOnBackPressed() {
+                isEnabled = false
+                scope.launch(start = CoroutineStart.UNDISPATCHED) { drawer.snapTo(WideNavigationRailValue.Collapsed) }
+            }
+        }
+    }
+    val dispatcher = checkNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
+    val owner = LocalLifecycleOwner.current
+    DisposableEffect(dispatcher, owner, openingBack) {
+        dispatcher.addCallback(owner, openingBack)
+        onDispose { openingBack.remove() }
+    }
     val colors = NullWaveTheme.colors
     val uriHandler = LocalUriHandler.current
     val windowWidth = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
     NullWaveIconButton(NullWaveIcons.Menu, stringResource(R.string.menu_open), {
-        scope.launch { drawer.expand() }
+        // Android can deliver Back before Material creates the dialog on an animation frame.
+        openingBack.isEnabled = true
+        scope.launch(start = CoroutineStart.UNDISPATCHED) { drawer.expand() }
     })
     // The standalone modal owns its window, including the scrim over the Activity's MiniPlayer.
     ModalWideNavigationRail(
@@ -96,6 +118,8 @@ internal fun SectionMenu(current: NavKey, detail: String?, onMenuDestination: (N
             modalScrimColor = Color(0xC7030507),
         ),
     ) {
+        val dialogHasFocus = LocalWindowInfo.current.isWindowFocused
+        SideEffect { if (dialogHasFocus) openingBack.isEnabled = false }
         // The modal has its own window. NullWave's surface stays dark in the system light theme.
         val view = LocalView.current
         LaunchedEffect(view) {
