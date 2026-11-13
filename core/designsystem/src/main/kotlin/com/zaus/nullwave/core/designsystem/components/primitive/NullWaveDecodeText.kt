@@ -28,7 +28,8 @@ import kotlin.random.Random
  * [replayKey] changes; nothing repeats on its own. A new composition, for example after Activity
  * recreation, plays it again: the decode is decoration, not state worth saving.
  *
- * Layout is always measured from the final copy, so the size never jumps while glyphs cycle.
+ * Layout is always measured from the final copy, so the size never jumps while glyphs cycle. In a
+ * slot wider than the copy, glyphs and copy share the slot, so text alignment holds across the end.
  * Accessibility services read only [text]; the glyphs are not announced. Reduced motion, the theme
  * policy, or a zero system animation scale show the final copy at once.
  */
@@ -54,7 +55,9 @@ fun NullWaveDecodeText(
         else if (progress.value < 1f) progress.animateTo(1f, tween(frames.durationMs, easing = LinearEasing))
     }
     val decoding = animate && progress.value < 1f
-    Box(modifier) {
+    // The overlay spans the slot, so the final copy must too: centred or end-aligned text would
+    // otherwise sit in a different place once the glyphs are gone.
+    Box(modifier, propagateMinConstraints = true) {
         // The final copy owns size and semantics; it is only hidden while the glyphs are drawn.
         Text(
             text = text,
