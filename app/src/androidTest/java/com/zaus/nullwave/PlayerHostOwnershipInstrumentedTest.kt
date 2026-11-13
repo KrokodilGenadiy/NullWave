@@ -14,7 +14,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import com.zaus.nullwave.feature.about.impl.R as AboutR
+import com.zaus.nullwave.feature.about.api.R as AboutR
 import com.zaus.nullwave.feature.library.impl.R as LibraryR
 
 /** Real app wiring: the host must create its Player through AppGraph in the Activity store. */
@@ -28,18 +28,20 @@ class PlayerHostOwnershipInstrumentedTest {
         val originalOwner = compose.activity
         val originalPlayer = compose.runOnIdle { existingPlayer(originalOwner) }
 
-        compose.onNodeWithContentDescription(text(LibraryR.string.library_action)).performClick()
-        compose.onNodeWithText(text(AboutR.string.about_title)).assertIsDisplayed()
+        compose.onNodeWithContentDescription(text(R.string.menu_open)).performClick()
+        compose.onNodeWithText(text(AboutR.string.about_title)).performClick()
+        compose.onNodeWithText(text(AboutR.string.about_title).uppercase()).assertIsDisplayed()
         compose.runOnIdle { assertSame(originalPlayer, existingPlayer(compose.activity)) }
 
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText(text(AboutR.string.about_title)).assertIsDisplayed()
+        compose.onNodeWithText(text(AboutR.string.about_title).uppercase()).assertIsDisplayed()
         compose.runOnIdle {
             assertNotSame(originalOwner, compose.activity)
             assertSame(originalPlayer, existingPlayer(compose.activity))
         }
 
-        compose.onNodeWithText(text(AboutR.string.about_action)).performClick()
+        compose.onNodeWithContentDescription(text(R.string.menu_open)).performClick()
+        compose.onNodeWithText(text(R.string.menu_library)).performClick()
         compose.onNodeWithText(text(LibraryR.string.library_title)).assertIsDisplayed()
         compose.runOnIdle { assertSame(originalPlayer, existingPlayer(compose.activity)) }
     }

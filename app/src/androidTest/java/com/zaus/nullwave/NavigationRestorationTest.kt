@@ -12,6 +12,7 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 import org.junit.Rule
 import org.junit.Test
+import com.zaus.nullwave.feature.about.api.R as AboutR
 import com.zaus.nullwave.feature.library.impl.R as LibraryR
 
 class NavigationRestorationTest {
@@ -21,7 +22,7 @@ class NavigationRestorationTest {
     val compose = createComposeRule()
 
     @Test
-    fun savedBackStackRestoresBothFeatureKeys() {
+    fun restoredSectionCanReturnToLibraryThroughTheMenu() {
         val application = InstrumentationRegistry.getInstrumentation()
             .targetContext.applicationContext as NullWaveApplication
         val restoration = StateRestorationTester(compose)
@@ -36,11 +37,13 @@ class NavigationRestorationTest {
             }
         }
 
-        compose.onNodeWithContentDescription(libraryText(LibraryR.string.library_action)).performClick()
-        compose.onNodeWithText("Назад").assertIsDisplayed()
+        compose.onNodeWithContentDescription(libraryText(R.string.menu_open)).performClick()
+        compose.onNodeWithText(libraryText(AboutR.string.about_title)).performClick()
+        compose.onNodeWithText(libraryText(AboutR.string.about_title).uppercase()).assertIsDisplayed()
         restoration.emulateSavedInstanceStateRestore()
-        compose.onNodeWithText("Назад").assertIsDisplayed()
-        compose.onNodeWithText("Назад").performClick()
+        compose.onNodeWithText(libraryText(AboutR.string.about_title).uppercase()).assertIsDisplayed()
+        compose.onNodeWithContentDescription(libraryText(R.string.menu_open)).performClick()
+        compose.onNodeWithText(libraryText(R.string.menu_library)).performClick()
         compose.onNodeWithText(libraryText(LibraryR.string.library_title)).assertIsDisplayed()
     }
 }

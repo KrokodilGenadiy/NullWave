@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.lifecycle.Lifecycle
+import com.zaus.nullwave.core.navigation.SectionMenuButton
 import com.zaus.nullwave.core.mvi.ui.collectMviUiWithLifecycle
 import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
 import com.zaus.nullwave.feature.library.platform.AudioPermission
@@ -13,7 +14,7 @@ import dev.zacsweers.metrox.viewmodel.metroViewModel
 
 @Composable
 internal fun LibraryRoot(
-    onAboutClick: () -> Unit,
+    menuButton: SectionMenuButton,
     artworkLoader: LibraryArtworkLoader?,
     viewModel: LibraryViewModel = metroViewModel(),
     permission: AudioPermission = rememberAudioPermission(),
@@ -23,6 +24,6 @@ internal fun LibraryRoot(
     val localeTag = LocalConfiguration.current.locales[0].toLanguageTag()
     LaunchedEffect(viewModel, localeTag) { ui.onIntent(LibraryIntent.LocaleChanged(localeTag)) }
     LibraryPermissionHost(permission, { ui.onIntent(LibraryIntent.AccessChecked(it)) }) { accessUi ->
-        LibraryScreen(ui.state, ui.onIntent, onAboutClick, accessUi, artworkLoader, onSearchClick)
+        LibraryScreen(ui.state, ui.onIntent, menuButton, accessUi, artworkLoader, onSearchClick)
     }
 }

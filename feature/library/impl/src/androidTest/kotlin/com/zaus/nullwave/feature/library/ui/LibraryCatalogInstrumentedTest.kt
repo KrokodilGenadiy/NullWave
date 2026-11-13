@@ -233,7 +233,7 @@ class LibraryCatalogInstrumentedTest {
                                     is LibraryIntent.ArtistSortChanged -> state.value.copy(artistQuery = state.value.artistQuery.copy(direction = intent.direction))
                                     else -> state.value
                                 }
-                            }, onAboutClick = {})
+                            }, menuButton = {})
                         }
                     }
                 }

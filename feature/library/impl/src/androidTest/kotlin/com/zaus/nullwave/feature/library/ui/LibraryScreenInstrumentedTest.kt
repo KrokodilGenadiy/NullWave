@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.testTag
+import com.zaus.nullwave.core.designsystem.components.control.iconButton.NullWaveIconButton
+import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -87,11 +90,16 @@ class LibraryScreenInstrumentedTest {
     }
 
     @Test
-    fun loadingIsNotEmptyAndStillAllowsAbout() {
+    fun menuGetsTheSongCountOnlyAfterTheCatalogIsReady() {
         robot.show(LibraryBody.Loading).visible("library_loading").absent("library_empty")
         compose.onNodeWithContentDescription(robot.text(R.string.library_refresh)).assertIsNotEnabled()
-        compose.onNodeWithContentDescription(robot.text(R.string.library_action)).performClick()
-        compose.runOnIdle { assertEquals(1, robot.aboutClicks) }
+        val menu = compose.onNodeWithTag("test_menu")
+        menu.performClick()
+        robot.updateBody(LibraryBody.Ready(listOf(track)))
+        menu.performClick()
+        val count = InstrumentationRegistry.getInstrumentation().targetContext.resources
+            .getQuantityString(R.plurals.library_track_count, 1, 1)
+        compose.runOnIdle { assertEquals(listOf(null, count), robot.requestedMenuDetails) }
     }
 
     @Test
@@ -240,7 +248,7 @@ class LibraryScreenInstrumentedTest {
 private class LibraryScreenRobot(private val compose: ComposeContentTestRule) {
     val intents = mutableListOf<LibraryIntent>()
     private val state = mutableStateOf(LibraryState(LibraryTrackQuery("en")))
-    var aboutClicks = 0
+    val requestedMenuDetails = mutableListOf<String?>()
     fun text(id: Int, vararg args: Any) = InstrumentationRegistry.getInstrumentation().targetContext.getString(id, *args)
 
     fun show(body: LibraryBody<MediaTrack>, access: LibraryAccessUi = LibraryAccessUi(),
@@ -256,7 +264,10 @@ private class LibraryScreenRobot(private val compose: ComposeContentTestRule) {
                             if (it is LibraryIntent.SortChanged) state.value = state.value.copy(
                                 query = state.value.query.copy(sort = it.sort, direction = it.direction))
                             if (it == LibraryIntent.DismissPlaybackError) state.value = state.value.copy(playbackNotice = null)
-                        }, onAboutClick = { aboutClicks++ }, accessUi = access)
+                        }, menuButton = { detail ->
+                            NullWaveIconButton(NullWaveIcons.Menu, "Menu", { requestedMenuDetails += detail },
+                                modifier = Modifier.testTag("test_menu"))
+                        }, accessUi = access)
                     }
                 }
             }

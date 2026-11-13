@@ -18,11 +18,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.zaus.nullwave.core.navigation.SectionMenuButton
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButton
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButtonVariant
 import com.zaus.nullwave.core.designsystem.components.control.iconButton.NullWaveIconButton
@@ -57,7 +59,7 @@ import com.zaus.nullwave.feature.library.presentation.RefreshState
 internal fun LibraryScreen(
     state: LibraryState,
     onIntent: (LibraryIntent) -> Unit,
-    onAboutClick: () -> Unit,
+    menuButton: SectionMenuButton,
     accessUi: LibraryAccessUi = LibraryAccessUi(),
     artworkLoader: LibraryArtworkLoader? = null,
     onSearchClick: () -> Unit = {},
@@ -98,7 +100,10 @@ internal fun LibraryScreen(
         },
         topBar = {
             Column {
-                NullWaveTopBar(stringResource(R.string.library_title), actions = {
+                NullWaveTopBar(stringResource(R.string.library_title), navigationIcon = {
+                    val count = (state.body as? LibraryBody.Ready<*>)?.items?.size
+                    menuButton(count?.let { pluralStringResource(R.plurals.library_track_count, it, it) })
+                }, actions = {
                     NullWaveIconButton(NullWaveIcons.Search, stringResource(R.string.library_search), onSearchClick,
                         modifier = Modifier.testTag("library_search"))
                     // Same slot throughout refresh: no inserted list item or changing toolbar height.
@@ -110,7 +115,6 @@ internal fun LibraryScreen(
                     } else NullWaveIconButton(NullWaveIcons.Rescan, stringResource(R.string.library_refresh),
                         onClick = { onIntent(LibraryIntent.Refresh) },
                         enabled = ready != null)
-                    NullWaveIconButton(NullWaveIcons.Info, stringResource(R.string.library_action), onAboutClick)
                 })
                 NullWaveTabRow(
                     items = LibraryVisibleTabs.map { NullWaveTabItem(stringResource(it.tabLabel())) },

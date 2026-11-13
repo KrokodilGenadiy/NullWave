@@ -9,6 +9,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelStoreOwner
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.navigation.EntryProviderInstaller
+import com.zaus.nullwave.feature.library.api.LibraryKey
 import com.zaus.nullwave.feature.player.api.ui.PlayerHost
 import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 import dev.zacsweers.metrox.viewmodel.MetroViewModelFactory
@@ -28,12 +29,7 @@ internal fun NullWaveApp(
             playerHost.Content(
                 owner = owner,
                 lifecycleOwner = lifecycleOwner,
-                onOpenLibrary = {
-                    // Library is the root. Returning to it preserves its entry and permission host.
-                    while (navigation.backStack.size > 1) {
-                        navigation.backStack.removeAt(navigation.backStack.lastIndex)
-                    }
-                },
+                onOpenLibrary = { navigation.selectSection(LibraryKey) },
             ) {
                 NullWaveNavigation(entryProviderInstallers, navigation)
             }

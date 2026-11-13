@@ -27,6 +27,10 @@ android {
 
 dependencies {
     implementation(project(":feature:library:api"))
+    implementation(project(":feature:about:api"))
+    implementation(project(":feature:equalizer:api"))
+    implementation(project(":feature:settings:api"))
+    implementation(project(":feature:sleeptimer:api"))
     implementation(project(":feature:player:api"))
     implementation(libs.androidx.navigation3.ui)
     implementation(libs.androidx.lifecycle.viewmodel.navigation3)
@@ -59,7 +63,7 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(project(":core:mvi"))
-    androidTestImplementation(project(":feature:about:api"))
+    androidTestImplementation(project(":feature:search:api"))
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

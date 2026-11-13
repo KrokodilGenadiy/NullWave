@@ -65,7 +65,7 @@ internal class LibraryCatalogPreviewStates : PreviewParameterProvider<LibrarySta
 @Composable
 private fun LibraryCatalogPreview(@PreviewParameter(LibraryCatalogPreviewStates::class) state: LibraryState) {
     NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
-        LibraryScreen(state, {}, {})
+        LibraryScreen(state, {}, previewMenuButton)
     }
 }
 
@@ -74,7 +74,7 @@ private fun LibraryCatalogPreview(@PreviewParameter(LibraryCatalogPreviewStates:
 @Composable
 private fun LibraryAlbumsAdaptivePreview() {
     NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
-        LibraryScreen(sampleCatalog(LibraryTab.Albums), {}, {})
+        LibraryScreen(sampleCatalog(LibraryTab.Albums), {}, previewMenuButton)
     }
 }
 
@@ -100,6 +100,6 @@ private fun LibraryCatalogInteractivePreview() {
                 )
                 else -> state
             }
-        }, onAboutClick = {})
+        }, menuButton = previewMenuButton)
     }
 }

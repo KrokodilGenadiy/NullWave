@@ -1,6 +1,5 @@
 <resources>
     <string name="library_title">LIBRARY</string>
-    <string name="library_action">About</string>
     <string name="library_load_failed">Could not load your audio library. Try again.</string>
     <string name="library_refresh_failed">Could not refresh your library. Showing the previous results.</string>
     <string name="library_tracks">Tracks</string>

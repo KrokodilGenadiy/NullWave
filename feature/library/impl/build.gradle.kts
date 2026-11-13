@@ -15,7 +15,6 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.material3)
     implementation(libs.coil.compose.core)
-    implementation(project(":feature:about:api"))
     implementation(project(":feature:search:api"))
     implementation(project(":feature:library:api"))
     implementation(project(":core:di"))

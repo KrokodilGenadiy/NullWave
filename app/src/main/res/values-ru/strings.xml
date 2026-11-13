@@ -1,0 +1,7 @@
+<resources>
+    <string name="menu_open">Открыть меню навигации</string>
+    <string name="menu_library">Библиотека</string>
+    <string name="menu_local">Локальная медиатека</string>
+    <string name="menu_links">Внешние ссылки</string>
+    <string name="menu_link_error">Нет приложения для открытия ссылки.</string>
+</resources>

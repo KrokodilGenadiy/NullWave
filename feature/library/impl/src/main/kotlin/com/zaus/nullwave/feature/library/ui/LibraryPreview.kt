@@ -1,6 +1,13 @@
 package com.zaus.nullwave.feature.library.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import com.zaus.nullwave.core.designsystem.icon.NullWaveIcon
+import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
+import com.zaus.nullwave.core.navigation.SectionMenuButton
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -48,7 +55,7 @@ internal class LibraryPreviewStates : PreviewParameterProvider<LibraryState> {
 @Composable
 private fun LibraryPreview(@PreviewParameter(LibraryPreviewStates::class) state: LibraryState) {
     NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
-        LibraryScreen(state, onIntent = {}, onAboutClick = {})
+        LibraryScreen(state, onIntent = {}, menuButton = previewMenuButton)
     }
 }
 
@@ -56,7 +63,7 @@ private fun LibraryPreview(@PreviewParameter(LibraryPreviewStates::class) state:
 @Composable
 private fun LibraryLargeTextPreview() {
     NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
-        LibraryScreen(LibraryState(LibraryTrackQuery("ru"), LibraryBody.Ready(previewTracks)), {}, {})
+        LibraryScreen(LibraryState(LibraryTrackQuery("ru"), LibraryBody.Ready(previewTracks)), {}, previewMenuButton)
     }
 }
 
@@ -75,7 +82,7 @@ private fun LibraryPlaybackErrorPreview() {
                 playbackNotice = message?.let(::LibraryPlaybackNotice),
             ),
             onIntent = { if (it == LibraryIntent.DismissPlaybackError) message = null },
-            onAboutClick = {},
+            menuButton = previewMenuButton,
         )
     }
 }
@@ -94,7 +101,7 @@ private fun LibraryFiltersPreview() {
                     query = query.copy(sort = intent.sort, direction = intent.direction)
                 }
             },
-            onAboutClick = {},
+            menuButton = previewMenuButton,
         )
     }
 }
@@ -117,7 +124,11 @@ private fun LibraryRefreshPreview() {
         LibraryScreen(
             LibraryState(LibraryTrackQuery("ru"), LibraryBody.Ready(tracks,
                 if (refreshing) RefreshState.Running else RefreshState.Idle)),
-            onIntent = { if (it == LibraryIntent.Refresh) refreshing = true }, onAboutClick = {},
+            onIntent = { if (it == LibraryIntent.Refresh) refreshing = true }, menuButton = previewMenuButton,
         )
     }
+}
+
+internal val previewMenuButton: SectionMenuButton = {
+    NullWaveIcon(NullWaveIcons.Menu, null, Modifier.size(48.dp).padding(12.dp))
 }

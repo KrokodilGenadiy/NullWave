@@ -1,6 +1,7 @@
 package com.zaus.nullwave
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -9,7 +10,12 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.mvi.ui.collectMviUiWithLifecycle
 import com.zaus.nullwave.core.navigation.EntryProviderInstaller
@@ -19,7 +25,10 @@ import com.zaus.nullwave.di.RestorationGraph
 import com.zaus.nullwave.di.RestorationIntent
 import com.zaus.nullwave.di.RestorationState
 import com.zaus.nullwave.di.RestorationVm
-import com.zaus.nullwave.feature.about.api.AboutKey
+import com.zaus.nullwave.feature.search.api.SearchKey
+import com.zaus.nullwave.feature.settings.api.SettingsKey
+import com.zaus.nullwave.feature.settings.api.R as SettingsR
+import androidx.test.platform.app.InstrumentationRegistry
 import com.zaus.nullwave.feature.library.api.LibraryKey
 import dev.zacsweers.metro.createGraph
 import dev.zacsweers.metrox.viewmodel.metroViewModel
@@ -36,6 +45,47 @@ class NavigationViewModelInstrumentedTest {
     val compose = createComposeRule()
 
     @Test
+    fun returningToLibraryThroughTheMenuRetainsItsVmAndScrolledList() {
+        val graph = createGraph<RestorationGraph>()
+        lateinit var root: RestorationVm
+        val entries: Set<EntryProviderInstaller> = setOf({ menu ->
+            entry<LibraryKey> {
+                val vm = metroViewModel<RestorationVm>()
+                SideEffect { root = vm }
+                Column {
+                    menu(null)
+                    LazyColumn(Modifier.testTag("items")) {
+                        items(100) { Text("Track $it") }
+                    }
+                }
+            }
+            entry<SettingsKey> { menu(null) }
+        })
+        compose.setContent {
+            NullWaveTheme {
+                CompositionLocalProvider(LocalMetroViewModelFactory provides graph.metroViewModelFactory) {
+                    NullWaveNavigation(entries, rememberNullWaveNavigationScope())
+                }
+            }
+        }
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val openMenu = compose.onNodeWithContentDescription(context.getString(R.string.menu_open))
+        val vm = compose.runOnIdle { root }
+        compose.onNodeWithTag("items").performScrollToIndex(75)
+        val before = compose.onNodeWithText("Track 75").fetchSemanticsNode().boundsInRoot.top
+        openMenu.performClick()
+        compose.onNodeWithText(context.getString(SettingsR.string.settings_title)).performClick()
+        compose.onNodeWithTag("items").assertDoesNotExist()
+        openMenu.performClick()
+        compose.onNodeWithText(context.getString(R.string.menu_library)).performClick()
+        assertEquals(before, compose.onNodeWithText("Track 75").fetchSemanticsNode().boundsInRoot.top, 1f)
+        compose.runOnIdle {
+            assertSame(vm, root)
+            assertEquals(0, vm.clears)
+        }
+    }
+
+    @Test
     fun entryOwnsVmAcrossRecompositionAndCoveringButPopClearsIt() {
         val graph = createGraph<RestorationGraph>()
         lateinit var root: RestorationVm
@@ -46,9 +96,9 @@ class NavigationViewModelInstrumentedTest {
                 val vm = metroViewModel<RestorationVm>()
                 val ui = vm.collectMviUiWithLifecycle()
                 SideEffect { root = vm }
-                ProbeScreen("root", ui.state, ui.onIntent, "Open detail") { navigateTo(AboutKey) }
+                ProbeScreen("root", ui.state, ui.onIntent, "Open detail") { navigateTo(SearchKey) }
             }
-            entry<AboutKey> {
+            entry<SearchKey> {
                 val vm = metroViewModel<RestorationVm>()
                 val ui = vm.collectMviUiWithLifecycle()
                 SideEffect { detail = vm; detailIntents = ui.onIntent }
