@@ -26,7 +26,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
@@ -48,6 +48,7 @@ import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveBut
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcon
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.designsystem.modifier.NullWaveBorderStyle
+import com.zaus.nullwave.core.designsystem.motion.decorativeMotionEnabled
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.core.playback.api.model.PlaybackQueue
@@ -95,7 +96,19 @@ internal fun PlayerQueue(
     val upLabel = stringResource(DesignR.string.nw_queue_move_up)
     val downLabel = stringResource(DesignR.string.nw_queue_move_down)
     val draggingLabel = stringResource(DesignR.string.nw_queue_dragging)
-    val accent = NullWaveTheme.colors.primary
+    val colors = NullWaveTheme.colors
+    val accent = colors.primary
+    val glow = NullWaveTheme.effects.glowEnabled
+
+    // A move this queue asked for teleports the row once the service order confirms it.
+    val swaps = remember(queue.current?.sessionId) { QueueSwapTracker() }
+    val swap = rememberSwapPlayback(swaps, order, decorativeMotionEnabled())
+    val moveEntry: ((QueueEntryId, QueueEntryId?) -> Unit)? = onMoveEntry?.let { move ->
+        { id, before ->
+            swaps.requested(id, before, order)
+            move(id, before)
+        }
+    }
     reorder?.ScrollAtEdge()
     BoxWithConstraints(modifier.fillMaxWidth()) {
         // The notice and MiniPlayer have already been measured. A tall summary can scroll with
@@ -104,7 +117,7 @@ internal fun PlayerQueue(
         val stackedDuration = trackMetadataBelow(maxWidth, LocalDensity.current.fontScale)
         Column {
             if (!scrollHeader) header()
-            LazyColumn(Modifier.fillMaxWidth().testTag("player_queue").queueReorderInput(reorder, onMoveEntry), state = list) {
+            LazyColumn(Modifier.fillMaxWidth().testTag("player_queue").queueReorderInput(reorder, moveEntry), state = list) {
                 item(key = QueueIntroKey) {
                     if (scrollHeader) header()
                     QueueActions()
@@ -120,7 +133,7 @@ internal fun PlayerQueue(
                         { onSelectEntry(entry.entryId) }
                     } else null
                     if (offset == 0) {
-                        QueueEntrySwipe(modifier = Modifier, onRemove = null, watchChildPlaybackButton = true) {
+                        QueueEntrySwipe(modifier = Modifier, onRemove = null) {
                             CurrentTrack(entry.track, artwork, select, row)
                         }
                         if (currentIndex < queue.playOrder.lastIndex) QueueHeading(stringResource(R.string.player_queue_next))
@@ -128,30 +141,37 @@ internal fun PlayerQueue(
                         val index = currentIndex + offset
                         val modifier = if (select != null) row.clickable(role = Role.Button, onClick = select)
                         else row.semantics(mergeDescendants = true) {}
+                        // The rows the move passes slide one slot; the moved row itself teleports.
+                        val arrival = swap?.takeIf { it.landing.entry == entry.entryId }
+                        val shift = swap?.landing?.shift(entry.entryId) ?: 0
+                        val passing = swap?.takeIf { shift != 0 }
                         QueueEntrySwipe(
-                            modifier = modifier.semantics {
-                                if (reorder?.dragging == entry.entryId) stateDescription = draggingLabel
-                            }.drawWithContent {
-                                drawContent()
-                                val gap = reorder?.insertionIndex
-                                val stroke = 2.dp.toPx()
-                                val y = when {
-                                    gap == index -> stroke / 2
-                                    index == order.lastIndex && gap == order.size -> size.height - stroke / 2
-                                    else -> return@drawWithContent
-                                }
-                                drawLine(accent, Offset(0f, y), Offset(size.width, y), stroke)
-                            },
+                            modifier = (if (passing == null) Modifier else Modifier.graphicsLayer {
+                                translationY = passing.slideOffset(shift, size.height)
+                            }).then(modifier).semantics {
+                                    if (reorder?.dragging == entry.entryId) stateDescription = draggingLabel
+                                }.drawWithContent {
+                                    if (arrival != null) drawSwapArrival(arrival, accent, colors.bg, glow) else drawContent()
+                                    if (reorder?.dragging == entry.entryId) drawDragGhost(accent, colors.surfaceRaised)
+                                    val gap = reorder?.insertionIndex
+                                    val stroke = 2.dp.toPx()
+                                    val y = when {
+                                        gap == index -> stroke / 2
+                                        index == order.lastIndex && gap == order.size -> size.height - stroke / 2
+                                        else -> return@drawWithContent
+                                    }
+                                    drawDropRail(y, accent, glow)
+                                },
                             onRemove = if (actionsEnabled && onRemoveEntry != null) {
                                 { onRemoveEntry(entry.entryId) }
                             } else null,
-                            moveActions = if (canMove && onMoveEntry != null) buildList {
+                            moveActions = if (canMove && moveEntry != null) buildList {
                                 if (offset > 1) add(CustomAccessibilityAction(upLabel) {
-                                    onMoveEntry(entry.entryId, order[index - 1])
+                                    moveEntry(entry.entryId, order[index - 1])
                                     true
                                 })
                                 if (index < order.lastIndex) add(CustomAccessibilityAction(downLabel) {
-                                    onMoveEntry(entry.entryId, order.getOrNull(index + 2))
+                                    moveEntry(entry.entryId, order.getOrNull(index + 2))
                                     true
                                 })
                             } else emptyList(),
@@ -275,20 +295,12 @@ private fun UpcomingTrack(entry: QueueEntry, artwork: LibraryArtworkRenderer, st
     val colors = NullWaveTheme.colors
     val duration = libraryDuration(track.durationMs)
     Column(Modifier.fillMaxWidth()) {
+        // The handle sits at the trailing edge, so the artwork lines up with the current track's.
         Row(
             Modifier.fillMaxWidth().heightIn(min = 68.dp)
-                .padding(end = NullWaveTheme.dimens.gutter, top = 8.dp, bottom = 8.dp),
+                .padding(start = NullWaveTheme.dimens.gutter, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.size(NullWaveTheme.dimens.touchTarget)
-                .queueReorderHandle(reorder, entry.entryId),
-                contentAlignment = Alignment.Center) {
-                if (reorder != null) {
-                    NullWaveIcon(NullWaveIcons.Reorder, null, Modifier.size(20.dp)
-                        .testTag("player_queue_handle:${entry.entryId.value}"),
-                        tint = if (reorder.dragging == entry.entryId) colors.primary else colors.outline)
-                }
-            }
             artwork.Artwork(track.artwork, track.album ?: track.title, 44.dp, Modifier.clearAndSetSemantics {})
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
@@ -301,6 +313,16 @@ private fun UpcomingTrack(entry: QueueEntry, artwork: LibraryArtworkRenderer, st
             }
             if (!stackedDuration && duration != null) Text(duration, Modifier.padding(start = 12.dp),
                 style = NullWaveTheme.typography.mono, color = colors.textSecondary)
+            // The column stays when moving is unavailable, so the duration never shifts.
+            Box(Modifier.size(NullWaveTheme.dimens.touchTarget)
+                .queueReorderHandle(reorder, entry.entryId),
+                contentAlignment = Alignment.Center) {
+                if (reorder != null) {
+                    NullWaveIcon(NullWaveIcons.Reorder, null, Modifier.size(20.dp)
+                        .testTag("player_queue_handle:${entry.entryId.value}"),
+                        tint = if (reorder.dragging == entry.entryId) colors.primary else colors.outline)
+                }
+            }
         }
         HorizontalDivider(color = colors.surfaceRaised, thickness = NullWaveTheme.dimens.hairline)
     }

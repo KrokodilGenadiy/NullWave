@@ -211,7 +211,8 @@ class PlayerQueueInstrumentedTest {
         val targetY = row(entries[2]).fetchSemanticsNode().boundsInRoot.bottom - origin.y - 2f
         list.performTouchInput {
             down(start)
-            val outside = start + Offset(112.dp.toPx(), 0f)
+            // The handle is at the trailing edge. Leave it sideways, short of the removal threshold.
+            val outside = start - Offset(40.dp.toPx(), 0f)
             moveTo(outside, delayMillis = 30)
             moveBy(Offset.Zero, delayMillis = viewConfiguration.longPressTimeoutMillis + 50)
             moveTo(Offset(outside.x, targetY))
@@ -372,6 +373,70 @@ class PlayerQueueInstrumentedTest {
         compose.runOnIdle {
             assertEquals(listOf(PlaybackCommand.MoveQueueEntry(session, b.entryId, c.entryId),
                 PlaybackCommand.MoveQueueEntry(session, b.entryId, null)), fixture.playback.commands)
+        }
+    }
+
+    @Test
+    fun aConfirmedMoveSlidesThePassedRowsAndTeleportsTheMovedRow() {
+        fixture = PlayerHostActivityFixture(reduceMotion = false)
+        val motion = watchMove(requestFirst = true)
+        assertEquals("The moved row lands at once", motion.landingTop, motion.movedTop, 0.5f)
+        assertTrue("The passed row starts from its old slot: $motion", motion.passedAtFirstFrame > motion.passedFinalTop + 1f)
+        assertTrue("The passed row is on its way: $motion",
+            motion.passedMidway < motion.passedAtFirstFrame && motion.passedMidway > motion.passedFinalTop)
+        assertEquals(motion.passedFinalTop, motion.passedAtEnd, 0.5f)
+    }
+
+    @Test
+    fun aReorderThisQueueDidNotRequestSnapsIntoPlace() {
+        fixture = PlayerHostActivityFixture(reduceMotion = false)
+        val motion = watchMove(requestFirst = false)
+        assertEquals(motion.passedFinalTop, motion.passedAtFirstFrame, 0.5f)
+        assertEquals(motion.passedFinalTop, motion.passedMidway, 0.5f)
+    }
+
+    @Test
+    fun reducedMotionSnapsARequestedMoveIntoPlace() {
+        val motion = watchMove(requestFirst = true)
+        assertEquals(motion.landingTop, motion.movedTop, 0.5f)
+        assertEquals(motion.passedFinalTop, motion.passedAtFirstFrame, 0.5f)
+    }
+
+    private data class MoveMotion(
+        val landingTop: Float, val movedTop: Float, val passedFinalTop: Float,
+        val passedAtFirstFrame: Float, val passedMidway: Float, val passedAtEnd: Float,
+    )
+
+    /**
+     * Moves entry 1 below entry 3 in a five-entry queue, by dragging its handle when [requestFirst],
+     * and records where the passed entry 2 is drawn while the service order is applied.
+     */
+    private fun watchMove(requestFirst: Boolean): MoveMotion {
+        val entries = List(5, ::entry)
+        val (current, source, passed, landing) = entries
+        publish(entries, current, capabilities = queueEdits)
+        launchQueue(current.track.title)
+        fun top(entry: QueueEntry) = row(entry).fetchSemanticsNode().boundsInRoot.top
+        val before = entries.associateWith(::top)
+        if (requestFirst) {
+            dragHandleTo(source, landing)
+            compose.runOnIdle {
+                assertEquals(listOf(PlaybackCommand.MoveQueueEntry(session, source.entryId, entries[4].entryId)),
+                    fixture.playback.commands)
+            }
+        }
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.runOnIdle { publish(entries, current, listOf(current, passed, landing, source, entries[4]), capabilities = queueEdits) }
+            var frames = 0
+            while (top(source) != before.getValue(landing) && frames++ < 20) compose.mainClock.advanceTimeByFrame()
+            val firstFrame = top(passed)
+            compose.mainClock.advanceTimeBy(64)
+            val midway = top(passed)
+            compose.mainClock.advanceTimeBy(1_000)
+            return MoveMotion(before.getValue(landing), top(source), before.getValue(source), firstFrame, midway, top(passed))
+        } finally {
+            compose.mainClock.autoAdvance = true
         }
     }
 

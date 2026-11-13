@@ -7,12 +7,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollToKey
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
+import com.zaus.nullwave.core.designsystem.theme.NullWaveEffects
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.core.media.model.track.TrackId
@@ -36,6 +39,8 @@ class PlayerQueueSwipeInstrumentedTest {
     private val selections = mutableListOf<QueueEntryId>()
     private val removals = mutableListOf<QueueEntryId>()
     private var canRemove by mutableStateOf(true)
+    private var visible by mutableStateOf(true)
+    private var reduceMotion by mutableStateOf(false)
     private fun row(entry: QueueEntry) = compose.onNodeWithTag("player_queue_entry:${entry.entryId.value}")
 
     @Before fun showQueue() {
@@ -43,10 +48,74 @@ class PlayerQueueSwipeInstrumentedTest {
             current = PlaybackItemToken(PlaybackSessionId("session"), current.entryId, 0))
         val artwork = RecordingHostArtworkRenderer()
         compose.setContent {
-            NullWaveTheme {
-                PlayerQueue(queue, 0, artwork, onSelectEntry = { selections.add(it) },
+            NullWaveTheme(effects = NullWaveEffects(reduceMotion = reduceMotion)) {
+                if (visible) PlayerQueue(queue, 0, artwork, onSelectEntry = { selections.add(it) },
                     onRemoveEntry = if (canRemove) { id -> removals.add(id) } else null)
             }
+        }
+    }
+
+    private fun swipePastThreshold(entry: QueueEntry) = row(entry).performTouchInput {
+        swipe(percentOffset(.8f, .5f), percentOffset(.2f, .5f), durationMillis = 120)
+    }
+
+    @Test fun releasePastTheThresholdShredsTheRowBeforeSendingTheRemoval() {
+        compose.mainClock.autoAdvance = false
+        try {
+            swipePastThreshold(next)
+            compose.mainClock.advanceTimeBy(160)
+            compose.runOnIdle { assertEquals("The command waits for the shred", emptyList<QueueEntryId>(), removals) }
+            compose.mainClock.advanceTimeBy(600)
+            compose.runOnIdle { assertEquals(listOf(next.entryId), removals) }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+    }
+
+    @Test fun leavingMidShredStillSendsTheRemoval() {
+        compose.mainClock.autoAdvance = false
+        try {
+            swipePastThreshold(next)
+            compose.mainClock.advanceTimeBy(120)
+            compose.runOnIdle {
+                assertEquals(emptyList<QueueEntryId>(), removals)
+                visible = false
+            }
+            compose.mainClock.advanceTimeByFrame()
+            compose.runOnIdle { assertEquals(listOf(next.entryId), removals) }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+    }
+
+    @Test fun aRowTheServiceKeepsCollapsesAndThenComesBack() {
+        val height = row(next).getBoundsInRoot().height
+        compose.mainClock.autoAdvance = false
+        try {
+            swipePastThreshold(next)
+            compose.mainClock.advanceTimeBy(700)
+            compose.runOnIdle { assertEquals(listOf(next.entryId), removals) }
+            assertEquals("Collapsed while waiting for the service", 0.dp, row(next).getBoundsInRoot().height)
+            compose.mainClock.advanceTimeBy(2_500)
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        row(next).assertIsDisplayed()
+        assertEquals(height, row(next).getBoundsInRoot().height)
+        assertEquals("Restoring never sends a second command", listOf(next.entryId), removals)
+    }
+
+    @Test fun reducedMotionRemovesWithoutDelay() {
+        compose.runOnIdle { reduceMotion = true }
+        compose.waitForIdle()
+
+        compose.mainClock.autoAdvance = false
+        try {
+            swipePastThreshold(next)
+            compose.mainClock.advanceTimeByFrame()
+            compose.runOnIdle { assertEquals(listOf(next.entryId), removals) }
+        } finally {
+            compose.mainClock.autoAdvance = true
         }
     }
 
