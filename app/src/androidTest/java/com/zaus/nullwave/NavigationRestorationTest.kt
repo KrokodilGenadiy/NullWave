@@ -3,7 +3,8 @@ package com.zaus.nullwave
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.StateRestorationTester
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -19,7 +20,7 @@ class NavigationRestorationTest {
     private fun libraryText(id: Int) = InstrumentationRegistry.getInstrumentation().targetContext.getString(id)
 
     @get:Rule
-    val compose = createComposeRule()
+    val compose = createAndroidComposeRule<ComponentActivity>()
 
     @Test
     fun restoredSectionCanReturnToLibraryThroughTheMenu() {
@@ -39,9 +40,9 @@ class NavigationRestorationTest {
 
         compose.onNodeWithContentDescription(libraryText(R.string.menu_open)).performClick()
         compose.onNodeWithText(libraryText(AboutR.string.about_title)).performClick()
-        compose.onNodeWithText(libraryText(AboutR.string.about_title).uppercase()).assertIsDisplayed()
+        compose.onNodeWithText(compose.activity.screenTitle(AboutR.string.about_title)).assertIsDisplayed()
         restoration.emulateSavedInstanceStateRestore()
-        compose.onNodeWithText(libraryText(AboutR.string.about_title).uppercase()).assertIsDisplayed()
+        compose.onNodeWithText(compose.activity.screenTitle(AboutR.string.about_title)).assertIsDisplayed()
         compose.onNodeWithContentDescription(libraryText(R.string.menu_open)).performClick()
         compose.onNodeWithText(libraryText(R.string.menu_library)).performClick()
         compose.onNodeWithText(libraryText(LibraryR.string.library_title)).assertIsDisplayed()

@@ -31,12 +31,12 @@ class NavigationInstrumentedTest {
         compose.onNodeWithText(libraryText(LibraryR.string.library_title)).assertIsDisplayed()
         compose.onNodeWithContentDescription(libraryText(R.string.menu_open)).performClick()
         compose.onNodeWithText(libraryText(SettingsR.string.settings_title)).performClick()
-        compose.onNodeWithText(libraryText(SettingsR.string.settings_title).uppercase()).assertIsDisplayed()
+        compose.onNodeWithText(compose.activity.screenTitle(SettingsR.string.settings_title)).assertIsDisplayed()
         openAbout()
-        compose.onNodeWithText(libraryText(AboutR.string.about_title).uppercase()).assertIsDisplayed()
+        compose.onNodeWithText(compose.activity.screenTitle(AboutR.string.about_title)).assertIsDisplayed()
 
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText(libraryText(AboutR.string.about_title).uppercase()).assertIsDisplayed()
+        compose.onNodeWithText(compose.activity.screenTitle(AboutR.string.about_title)).assertIsDisplayed()
 
         compose.activity.assertBackLeavesActivity()
     }

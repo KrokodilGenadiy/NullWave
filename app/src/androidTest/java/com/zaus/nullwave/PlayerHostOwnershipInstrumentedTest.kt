@@ -30,11 +30,11 @@ class PlayerHostOwnershipInstrumentedTest {
 
         compose.onNodeWithContentDescription(text(R.string.menu_open)).performClick()
         compose.onNodeWithText(text(AboutR.string.about_title)).performClick()
-        compose.onNodeWithText(text(AboutR.string.about_title).uppercase()).assertIsDisplayed()
+        compose.onNodeWithText(compose.activity.screenTitle(AboutR.string.about_title)).assertIsDisplayed()
         compose.runOnIdle { assertSame(originalPlayer, existingPlayer(compose.activity)) }
 
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText(text(AboutR.string.about_title).uppercase()).assertIsDisplayed()
+        compose.onNodeWithText(compose.activity.screenTitle(AboutR.string.about_title)).assertIsDisplayed()
         compose.runOnIdle {
             assertNotSame(originalOwner, compose.activity)
             assertSame(originalPlayer, existingPlayer(compose.activity))

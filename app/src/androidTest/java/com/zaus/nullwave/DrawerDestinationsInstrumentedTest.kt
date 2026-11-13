@@ -37,7 +37,7 @@ class DrawerDestinationsInstrumentedTest {
         compose.onNodeWithText(message).assertIsDisplayed()
         compose.onNodeWithTag("library_screen").assertDoesNotExist()
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText(title.uppercase(compose.activity.resources.configuration.locales[0])).assertIsDisplayed()
+        compose.onNodeWithText(compose.activity.screenTitle(titleId)).assertIsDisplayed()
         menu.performClick()
         compose.onNode(hasText(title) and hasAnyAncestor(hasTestTag("section_drawer"))).assertIsSelected()
         compose.onNodeWithText(compose.activity.getString(R.string.menu_library)).performClick()
