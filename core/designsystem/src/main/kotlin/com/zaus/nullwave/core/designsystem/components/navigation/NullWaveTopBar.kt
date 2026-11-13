@@ -14,12 +14,14 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.zaus.nullwave.core.designsystem.R
 import com.zaus.nullwave.core.designsystem.components.control.iconButton.NullWaveIconButton
+import com.zaus.nullwave.core.designsystem.components.primitive.NullWaveDecodeText
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 
@@ -37,7 +39,9 @@ fun NullWaveTopBar(
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     require(title.isNotBlank()) { "Top bar title must not be blank" }
-    TopBarContent(title, modifier, NullWaveTheme.colors.surface, NullWaveTheme.colors.textPrimary, navigationIcon, actions)
+    val screenTitle = title.uppercase(LocalConfiguration.current.locales[0])
+    TopBarContent(screenTitle, modifier, NullWaveTheme.colors.surface, NullWaveTheme.colors.textPrimary,
+        navigationIcon, actions, decodeTitle = true)
 }
 
 /**
@@ -69,6 +73,7 @@ fun NullWaveSelectionTopBar(
             )
         },
         actions = actions,
+        decodeTitle = false,
     )
 }
 
@@ -80,6 +85,7 @@ private fun TopBarContent(
     contentColor: Color,
     navigationIcon: @Composable (() -> Unit)?,
     actions: @Composable RowScope.() -> Unit,
+    decodeTitle: Boolean,
 ) {
     CompositionLocalProvider(LocalContentColor provides contentColor) {
         Row(
@@ -90,12 +96,12 @@ private fun TopBarContent(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             navigationIcon?.invoke()
-            Text(
-                title,
-                modifier = Modifier.weight(1f).semantics { heading() },
-                color = contentColor,
-                style = NullWaveTheme.typography.h2,
-            )
+            val heading = Modifier.weight(1f).semantics(mergeDescendants = true) { heading() }
+            if (decodeTitle) {
+                NullWaveDecodeText(title, heading, color = contentColor, style = NullWaveTheme.typography.h2)
+            } else {
+                Text(title, heading, color = contentColor, style = NullWaveTheme.typography.h2)
+            }
             Row(verticalAlignment = Alignment.CenterVertically, content = actions)
         }
     }
