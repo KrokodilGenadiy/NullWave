@@ -1,5 +1,13 @@
 package com.zaus.nullwave.feature.player.presentation
 
+import com.zaus.nullwave.core.playback.api.model.PlaybackItemToken
+import com.zaus.nullwave.core.playback.api.model.PlaybackProblemId
+import com.zaus.nullwave.core.playback.api.model.PlaybackQueue
+import com.zaus.nullwave.core.playback.api.model.QueueEntryId
+import com.zaus.nullwave.core.playback.api.model.RepeatMode
+import com.zaus.nullwave.core.mvi.testing.assertHandlesEveryIntent
+import com.zaus.nullwave.core.mvi.testing.bind
+import com.zaus.nullwave.core.mvi.testing.send
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommand
 import com.zaus.nullwave.core.playback.api.model.PlaybackConnection
 import com.zaus.nullwave.core.playback.api.model.PlaybackSessionId
@@ -30,6 +38,31 @@ class PlayerLifecycleTest {
 
     @After
     fun tearDown() = fixture.tearDown()
+
+    @Test
+    fun `every Player intent has a handler`() = with(fixture) {
+        runTest(dispatcher) {
+            val session = PlaybackSessionId("player-session")
+            val entry = QueueEntryId("entry")
+            val target = PlaybackItemToken(session, entry, 0)
+            val problem = PlaybackProblemId("problem")
+            assertHandlesEveryIntent(listOf(
+                PlayerIntent.SetPlayRequested(true),
+                PlayerIntent.Next,
+                PlayerIntent.Previous,
+                PlayerIntent.SelectQueueEntry(session, entry),
+                PlayerIntent.RemoveQueueEntry(session, entry),
+                PlayerIntent.MoveQueueEntry(PlaybackQueue.create(), entry, null),
+                PlayerIntent.SeekTo(target, 1_000),
+                PlayerIntent.SetShuffle(true),
+                PlayerIntent.SetRepeat(RepeatMode.All),
+                PlayerIntent.Reconnect,
+                PlayerIntent.RetryProblem(target, problem),
+                PlayerIntent.DismissProblem(PlayerProblemKey(session, problem)),
+                PlayerIntent.DismissCommandNotice(PlayerCommandNoticeId()),
+            )) { createVm() }
+        }
+    }
 
     @Test
     fun `reading state is inert and multiple UI bindings share one pair of immediately released subscriptions`() = with(fixture) {

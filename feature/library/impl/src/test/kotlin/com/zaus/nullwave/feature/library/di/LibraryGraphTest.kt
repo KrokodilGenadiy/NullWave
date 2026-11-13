@@ -1,8 +1,8 @@
 package com.zaus.nullwave.feature.library.di
 
+import com.zaus.nullwave.core.mvi.testing.MviTestMain
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
 import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.core.playback.api.PlaybackController
@@ -23,15 +23,11 @@ import dev.zacsweers.metro.createGraphFactory
 import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactory
 import dev.zacsweers.metrox.viewmodel.ViewModelGraph
 import kotlin.reflect.KClass
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
@@ -40,17 +36,16 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LibraryGraphTest {
-    private val dispatcher = StandardTestDispatcher()
-    private val store = ViewModelStore()
+    private val mvi = MviTestMain()
+    private val dispatcher = mvi.dispatcher
+    private val store = mvi.store
 
     @Before
-    fun setUp() = Dispatchers.setMain(dispatcher)
+    fun setUp() = mvi.setUp()
 
     @After
     fun tearDown() {
-        store.clear()
-        dispatcher.scheduler.runCurrent()
-        Dispatchers.resetMain()
+        mvi.tearDown()
     }
 
     @Test

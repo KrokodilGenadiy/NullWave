@@ -1,9 +1,11 @@
 package com.zaus.nullwave.feature.library.presentation
 
+import com.zaus.nullwave.core.mvi.testing.MviTestMain
+import com.zaus.nullwave.core.mvi.testing.bind
+import com.zaus.nullwave.core.mvi.testing.send
 import com.zaus.nullwave.feature.library.testing.IdlePlaybackController
 
 import androidx.lifecycle.SavedStateHandle
-import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.ui.UiText
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.DataError
@@ -21,16 +23,12 @@ import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.feature.library.impl.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -55,10 +53,11 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
         fun tabs() = listOf(arrayOf(LibraryTab.Albums), arrayOf(LibraryTab.Artists))
     }
 
-    private val dispatcher = StandardTestDispatcher()
-    private val store = ViewModelStore()
+    private val mvi = MviTestMain()
+
+    private val dispatcher = mvi.dispatcher
+    private val store = mvi.store
     private val repository = FakeLibraryRepository()
-    private var nextKey = 0
     private val collection get() = when (tab) {
         LibraryTab.Albums -> repository.albums
         LibraryTab.Artists -> repository.artists
@@ -72,14 +71,12 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
     private val refreshError = UiText.Resource(R.string.library_refresh_failed)
 
     @Before
-    fun setUp() = Dispatchers.setMain(dispatcher)
+    fun setUp() = mvi.setUp()
 
     @After
     fun tearDown() {
         repository.releaseCleanup()
-        store.clear()
-        dispatcher.scheduler.runCurrent()
-        Dispatchers.resetMain()
+        mvi.tearDown()
     }
 
     @Test
@@ -428,19 +425,11 @@ internal class LibraryTabsViewModelTest(private val tab: LibraryTab) {
     }
 
     private fun createVm(handle: SavedStateHandle = SavedStateHandle(), locale: String = "ru"): LibraryViewModel =
-        LibraryViewModel(repository, handle, locale, IdlePlaybackController).also { store.put("tabs-${nextKey++}", it) }
+        LibraryViewModel(repository, handle, locale, IdlePlaybackController).also { mvi.own(it) }
 
     private suspend fun TestScope.selectedVm(): LibraryViewModel = createVm().also {
         send(it, LibraryIntent.TabSelected(tab))
         bind(it)
-    }
-
-    private fun TestScope.bind(vm: LibraryViewModel): Job =
-        backgroundScope.launch { vm.withUiBinding { awaitCancellation() } }.also { runCurrent() }
-
-    private suspend fun TestScope.send(vm: LibraryViewModel, intent: LibraryIntent) {
-        vm.uiApi().onIntent(intent)
-        runCurrent()
     }
 
     private fun TestScope.success(empty: Boolean = false) {

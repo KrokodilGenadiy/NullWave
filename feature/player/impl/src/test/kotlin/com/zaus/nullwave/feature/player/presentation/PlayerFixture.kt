@@ -1,5 +1,7 @@
 package com.zaus.nullwave.feature.player.presentation
 
+import com.zaus.nullwave.core.mvi.testing.MviTestMain
+import com.zaus.nullwave.core.mvi.testing.bind
 import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.core.media.model.track.TrackId
@@ -20,44 +22,27 @@ import com.zaus.nullwave.core.playback.api.model.PlaybackTransport
 import com.zaus.nullwave.core.playback.api.model.QueueEntry
 import com.zaus.nullwave.core.playback.api.model.QueueEntryId
 import com.zaus.nullwave.core.result.EmptyResult
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertTrue
 
 /** Fresh per test; ViewModelStore owns only the UI instances, while replies belong to the fake. */
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class PlayerFixture {
-    val dispatcher = StandardTestDispatcher()
+    val mvi = MviTestMain()
+    val dispatcher = mvi.dispatcher
     val playback = ControlledPlayerPlaybackController()
-    val store = ViewModelStore()
-    private var nextKey = 0
+    val store = mvi.store
     val track = MediaTrack(TrackId("primary:7"), "Night Drive", "Artist", "Album", 180_000)
 
-    fun setUp() = Dispatchers.setMain(dispatcher)
+    fun setUp() = mvi.setUp()
 
     fun tearDown() {
-        store.clear()
-        dispatcher.scheduler.runCurrent()
-        Dispatchers.resetMain()
+        mvi.tearDown()
     }
 
-    fun createVm(): PlayerViewModel = PlayerViewModel(playback).also { store.put("player-${nextKey++}", it) }
-
-    fun TestScope.bind(vm: PlayerViewModel): Job =
-        backgroundScope.launch { vm.withUiBinding { awaitCancellation() } }.also { runCurrent() }
-
-    suspend fun TestScope.send(vm: PlayerViewModel, intent: PlayerIntent) {
-        vm.uiApi().onIntent(intent)
-        runCurrent()
-    }
+    fun createVm(): PlayerViewModel = PlayerViewModel(playback).also { mvi.own(it) }
 
     fun TestScope.control(value: PlaybackConnection) {
         playback.states.value = value

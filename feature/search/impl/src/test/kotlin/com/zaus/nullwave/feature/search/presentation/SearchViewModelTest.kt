@@ -1,8 +1,11 @@
 package com.zaus.nullwave.feature.search.presentation
 
+import com.zaus.nullwave.core.mvi.testing.MviTestMain
+import com.zaus.nullwave.core.mvi.testing.assertHandlesEveryIntent
+import com.zaus.nullwave.core.mvi.testing.bind
+import com.zaus.nullwave.core.mvi.testing.send
 import com.zaus.nullwave.feature.search.testing.IdlePlaybackController
 import androidx.lifecycle.SavedStateHandle
-import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.mvi.ui.UiText
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.DataError
@@ -20,16 +23,12 @@ import com.zaus.nullwave.feature.search.impl.R
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -45,20 +44,32 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SearchViewModelTest {
-    private val dispatcher = StandardTestDispatcher()
-    private val store = ViewModelStore()
+    private val mvi = MviTestMain()
+    private val dispatcher = mvi.dispatcher
+    private val store = mvi.store
     private val repository = FakeSearchRepository()
-    private var nextKey = 0
 
     @Before
-    fun setUp() { Dispatchers.setMain(dispatcher) }
+    fun setUp() { mvi.setUp() }
 
     @After
     fun tearDown() {
         repository.releaseCleanup()
-        store.clear()
-        dispatcher.scheduler.runCurrent()
-        Dispatchers.resetMain()
+        mvi.tearDown()
+    }
+
+    @Test
+    fun `every Search intent has a handler`() = runTest(dispatcher) {
+        val track = MediaTrack(TrackId("primary:1"), "Low Orbit", null, null, 203_000)
+        assertHandlesEveryIntent(listOf(
+            SearchIntent.QueryChanged("orbit"),
+            SearchIntent.ClearQuery,
+            SearchIntent.Retry,
+            SearchIntent.PlayTrack(track.id, listOf(track)),
+            SearchIntent.DismissPlaybackError,
+            SearchIntent.LocaleChanged("en"),
+            SearchIntent.AccessChecked(true),
+        )) { createVm() }
     }
 
     @Test
@@ -546,15 +557,7 @@ class SearchViewModelTest {
     }
 
     private fun createVm(handle: SavedStateHandle = SavedStateHandle(), localeTag: String = "ru-RU"): SearchViewModel =
-        SearchViewModel(repository, IdlePlaybackController, handle, localeTag).also { store.put("search-${nextKey++}", it) }
-
-    private fun TestScope.bind(vm: SearchViewModel): Job =
-        backgroundScope.launch { vm.withUiBinding { awaitCancellation() } }.also { runCurrent() }
-
-    private suspend fun TestScope.send(vm: SearchViewModel, intent: SearchIntent) {
-        vm.uiApi().onIntent(intent)
-        runCurrent()
-    }
+        SearchViewModel(repository, IdlePlaybackController, handle, localeTag).also { mvi.own(it) }
 
     private fun TestScope.settle() {
         advanceTimeBy(250)

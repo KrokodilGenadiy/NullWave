@@ -1,7 +1,9 @@
 package com.zaus.nullwave.feature.search.presentation
 
+import com.zaus.nullwave.core.mvi.testing.MviTestMain
+import com.zaus.nullwave.core.mvi.testing.bind
+import com.zaus.nullwave.core.mvi.testing.send
 import androidx.lifecycle.SavedStateHandle
-import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommand
@@ -21,42 +23,30 @@ import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.EmptyResult
 import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchResults
 import com.zaus.nullwave.feature.library.api.model.search.LibraryTrackSearchHit
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertTrue
 
 /** Fresh per test; no inheritance or hidden runner lifecycle. Tests delegate setup/teardown explicitly. */
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class SearchPlaybackFixture {
-    val dispatcher = StandardTestDispatcher()
+    val mvi = MviTestMain()
+    val dispatcher = mvi.dispatcher
     val repository = FakeSearchRepository()
     val playback = ControlledSearchPlaybackController()
-    val store = ViewModelStore()
-    private var nextKey = 0
+    val store = mvi.store
 
-    fun setUp() = Dispatchers.setMain(dispatcher)
+    fun setUp() = mvi.setUp()
 
     fun tearDown() {
         repository.releaseCleanup()
-        store.clear()
-        dispatcher.scheduler.runCurrent()
-        Dispatchers.resetMain()
+        mvi.tearDown()
     }
 
     fun createVm(handle: SavedStateHandle = SavedStateHandle()): SearchViewModel =
-        SearchViewModel(repository, playback, handle, "en").also { store.put("playback-${nextKey++}", it) }
-
-    fun TestScope.bind(vm: SearchViewModel): Job =
-        backgroundScope.launch { vm.withUiBinding { awaitCancellation() } }.also { runCurrent() }
+        SearchViewModel(repository, playback, handle, "en").also { mvi.own(it) }
 
     suspend fun TestScope.readyVm(items: List<MediaTrack>, handle: SavedStateHandle = SavedStateHandle()): SearchViewModel =
         createVm(handle).also {
@@ -66,11 +56,6 @@ internal class SearchPlaybackFixture {
             settle()
             reply(AppResult.Success(results(items)))
         }
-
-    suspend fun TestScope.send(vm: SearchViewModel, intent: SearchIntent) {
-        vm.uiApi().onIntent(intent)
-        runCurrent()
-    }
 
     fun TestScope.settle() {
         advanceTimeBy(250)

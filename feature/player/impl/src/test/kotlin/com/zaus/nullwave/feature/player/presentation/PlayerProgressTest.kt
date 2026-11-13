@@ -1,5 +1,6 @@
 package com.zaus.nullwave.feature.player.presentation
 
+import com.zaus.nullwave.core.mvi.testing.bind
 import com.zaus.nullwave.core.playback.api.model.PlaybackConnection
 import com.zaus.nullwave.core.playback.api.model.PlaybackConnectionError
 import com.zaus.nullwave.core.playback.api.model.PlaybackPhase

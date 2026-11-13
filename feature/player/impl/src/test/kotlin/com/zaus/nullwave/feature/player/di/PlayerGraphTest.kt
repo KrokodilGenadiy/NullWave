@@ -1,5 +1,6 @@
 package com.zaus.nullwave.feature.player.di
 
+import com.zaus.nullwave.core.mvi.testing.bind
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier

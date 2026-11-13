@@ -124,6 +124,8 @@ android {
     namespace = "com.zaus.nullwave.core.mvi"
     buildFeatures.compose = true
     defaultConfig.testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    // Shared JVM test kit for feature ViewModels: testImplementation(testFixtures(project(":core:mvi"))).
+    testFixtures.enable = true
 }
 
 dependencies {
@@ -137,6 +139,8 @@ dependencies {
     api(libs.kotlinx.coroutines.core)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.compose.ui)
+    testFixturesApi(libs.kotlinx.coroutines.test)
+    testFixturesImplementation(libs.kotlin.reflect)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)

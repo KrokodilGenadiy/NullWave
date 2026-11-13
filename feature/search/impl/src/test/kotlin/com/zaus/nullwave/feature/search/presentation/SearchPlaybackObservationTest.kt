@@ -1,5 +1,7 @@
 package com.zaus.nullwave.feature.search.presentation
 
+import com.zaus.nullwave.core.mvi.testing.bind
+import com.zaus.nullwave.core.mvi.testing.send
 import androidx.lifecycle.SavedStateHandle
 import com.zaus.nullwave.core.mvi.ui.UiText
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError

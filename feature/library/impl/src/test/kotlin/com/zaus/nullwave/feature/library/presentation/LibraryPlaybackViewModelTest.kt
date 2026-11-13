@@ -1,7 +1,9 @@
 package com.zaus.nullwave.feature.library.presentation
 
+import com.zaus.nullwave.core.mvi.testing.MviTestMain
+import com.zaus.nullwave.core.mvi.testing.bind
+import com.zaus.nullwave.core.mvi.testing.send
 import androidx.lifecycle.SavedStateHandle
-import androidx.lifecycle.ViewModelStore
 import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.core.playback.api.observeCurrentTrackId
@@ -31,19 +33,13 @@ import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
 import com.zaus.nullwave.feature.library.impl.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -57,21 +53,19 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LibraryPlaybackViewModelTest {
-    private val dispatcher = StandardTestDispatcher()
+    private val mvi = MviTestMain()
+    private val dispatcher = mvi.dispatcher
     private val repository = FakeLibraryRepository()
     private val playback = ControlledLibraryPlaybackController()
-    private val store = ViewModelStore()
-    private var nextKey = 0
+    private val store = mvi.store
 
     @Before
-    fun setUp() = Dispatchers.setMain(dispatcher)
+    fun setUp() = mvi.setUp()
 
     @After
     fun tearDown() {
         repository.releaseCleanup()
-        store.clear()
-        dispatcher.scheduler.runCurrent()
-        Dispatchers.resetMain()
+        mvi.tearDown()
     }
 
     @Test
@@ -873,21 +867,13 @@ class LibraryPlaybackViewModelTest {
     }
 
     private fun createVm(handle: SavedStateHandle = SavedStateHandle()): LibraryViewModel =
-        LibraryViewModel(repository, handle, "en", playback).also { store.put("playback-${nextKey++}", it) }
-
-    private fun TestScope.bind(vm: LibraryViewModel): Job =
-        backgroundScope.launch { vm.withUiBinding { awaitCancellation() } }.also { runCurrent() }
+        LibraryViewModel(repository, handle, "en", playback).also { mvi.own(it) }
 
     private suspend fun TestScope.readyVm(items: List<MediaTrack>, handle: SavedStateHandle = SavedStateHandle()): LibraryViewModel =
         createVm(handle).also {
             bind(it)
             reply(AppResult.Success(items))
         }
-
-    private suspend fun TestScope.send(vm: LibraryViewModel, intent: LibraryIntent) {
-        vm.uiApi().onIntent(intent)
-        runCurrent()
-    }
 
     private fun TestScope.reply(result: LibraryResult) {
         repository.tracks.subscriptions.last().respond(result)
