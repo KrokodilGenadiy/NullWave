@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="nw_feature_in_development">This feature is in development.</string>
     <string name="nw_track_more">More actions for %1$s</string>
     <string name="nw_track_playing">Playing</string>
     <string name="nw_track_current">Current track</string>

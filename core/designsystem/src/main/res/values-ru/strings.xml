@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="nw_feature_in_development">Раздел в разработке.</string>
     <string name="nw_track_more">Другие действия: %1$s</string>
     <string name="nw_track_playing">Воспроизводится</string>
     <string name="nw_track_current">Текущая композиция</string>
