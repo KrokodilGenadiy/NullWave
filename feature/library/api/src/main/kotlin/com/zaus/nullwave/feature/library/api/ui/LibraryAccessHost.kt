@@ -18,5 +18,6 @@ data class LibraryAccessUi(
     val launchFailed: Boolean = false,
     val onAccess: () -> Unit = {},
     val onAskAgain: () -> Unit = {},
+    /** Latest platform check for this resume, or null while waiting for the next check. */
     val access: LibraryAccess? = null,
 )

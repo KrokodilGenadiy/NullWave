@@ -1,4 +1,12 @@
 <resources>
+    <string name="album_details_back">Назад</string>
+    <string name="album_details_play">ИГРАТЬ</string>
+    <string name="album_details_shuffle">ПЕРЕМЕШАТЬ</string>
+    <string name="album_details_missing">Альбом больше недоступен</string>
+    <string name="album_details_missing_body">Дорожки появятся здесь, если альбом вернётся в библиотеку.</string>
+    <string name="album_details_error">Не удалось прочитать альбом</string>
+    <string name="album_details_error_body">Попробуйте ещё раз загрузить альбом с устройства.</string>
+    <string name="album_details_refresh_failed">Не удалось обновить альбом. Показан последний доступный список дорожек.</string>
     <string name="library_title">БИБЛИОТЕКА</string>
     <string name="library_load_failed">Не удалось загрузить аудиотеку. Попробуйте ещё раз.</string>
     <string name="library_refresh_failed">Не удалось обновить библиотеку. Показаны предыдущие результаты.</string>

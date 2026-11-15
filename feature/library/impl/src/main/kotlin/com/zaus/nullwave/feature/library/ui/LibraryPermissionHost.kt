@@ -46,8 +46,7 @@ internal fun LibraryPermissionHost(
     var deniedResult by rememberSaveable { mutableStateOf(false) }
     var rationaleVisible by rememberSaveable { mutableStateOf(false) }
     var launchFailed by rememberSaveable { mutableStateOf(false) }
-    // Only suppress duplicate signals in this live host; never restore an OS grant from a Bundle.
-    var lastReported by remember { mutableStateOf<LibraryAccess?>(null) }
+    var lastReported by remember(lifecycle, permission) { mutableStateOf<LibraryAccess?>(null) }
     val readAccess by rememberUpdatedState {
         val granted = permission.isGranted()
         if (granted) {
@@ -70,7 +69,11 @@ internal fun LibraryPermissionHost(
     // must reconcile against this fresh snapshot instead of causing two initial refreshes.
     DisposableEffect(lifecycle, permission) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) publishAccess(readAccess(), true)
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> publishAccess(readAccess(), true)
+                Lifecycle.Event.ON_PAUSE -> lastReported = null
+                else -> Unit
+            }
         }
         // Lifecycle brings a new observer up to its current state, including ON_RESUME.
         lifecycle.addObserver(observer)

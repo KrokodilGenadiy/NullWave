@@ -14,10 +14,12 @@ import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
 import com.zaus.nullwave.feature.library.platform.AndroidAudioPermission
 import com.zaus.nullwave.feature.library.platform.AudioPermission
 
-internal class AndroidLibraryAccessHost : LibraryAccessHost {
+internal class AndroidLibraryAccessHost(
+    private val permission: @Composable () -> AudioPermission = { rememberAudioPermission() },
+) : LibraryAccessHost {
     @Composable
     override fun Content(onAccessChecked: (LibraryAccess) -> Unit, content: @Composable (LibraryAccessUi) -> Unit) {
-        LibraryPermissionHost(rememberAudioPermission(), onAccessChecked, content)
+        LibraryPermissionHost(permission(), onAccessChecked, content)
     }
 }
 

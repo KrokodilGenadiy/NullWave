@@ -1,4 +1,12 @@
 <resources>
+    <string name="album_details_back">Back</string>
+    <string name="album_details_play">PLAY</string>
+    <string name="album_details_shuffle">SHUFFLE</string>
+    <string name="album_details_missing">Album no longer available</string>
+    <string name="album_details_missing_body">Its tracks will reappear here if this album returns to your library.</string>
+    <string name="album_details_error">Could not read this album</string>
+    <string name="album_details_error_body">Try reading the album from the device again.</string>
+    <string name="album_details_refresh_failed">Could not update the album. Showing the last available tracks.</string>
     <string name="library_title">LIBRARY</string>
     <string name="library_load_failed">Could not load your audio library. Try again.</string>
     <string name="library_refresh_failed">Could not refresh your library. Showing the previous results.</string>
