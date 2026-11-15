@@ -25,7 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -109,7 +109,13 @@ internal fun AlbumDetailsScreen(
     ) { padding ->
         val content = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)
         if (details != null) {
-            LazyColumn(modifier = content, state = listState) {
+            val colors = NullWaveTheme.colors
+            val backdrop = Brush.verticalGradient(
+                colors = listOf(colors.primary.copy(alpha = .10f), colors.bg.copy(alpha = 0f)),
+                endY = with(LocalDensity.current) { 300.dp.toPx() },
+            )
+            // Paint the full viewport, including the space reserved for the transparent toolbar.
+            LazyColumn(modifier = Modifier.background(backdrop).then(content), state = listState) {
                 item("header") {
                     AlbumHeader(details, artworkLoader)
                     FlowRow(
@@ -178,8 +184,7 @@ private fun AlbumHeader(details: LibraryAlbumDetails, loader: LibraryArtworkLoad
         }
         libraryDuration(total)
     }
-    BoxWithConstraints(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(
-        NullWaveTheme.colors.primary.copy(alpha = .10f), Color.Transparent))).padding(NullWaveTheme.dimens.gutter)) {
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(NullWaveTheme.dimens.gutter)) {
         val coverSize = minOf(140.dp, maxWidth * .38f)
         Row(horizontalArrangement = Arrangement.spacedBy(NullWaveTheme.dimens.gutter), verticalAlignment = Alignment.Bottom) {
             LibraryArtwork(album.artwork, title, loader, size = coverSize)

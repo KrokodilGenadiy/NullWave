@@ -4,9 +4,11 @@ import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.result.ActivityResultRegistryOwner
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -14,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -69,6 +72,24 @@ class AlbumDetailsRootInstrumentedTest {
     }
 
     @After fun clear() { compose.runOnUiThread { store.clear() } }
+
+    @Test
+    fun albumTintFadesFromTheBackToolbarIntoTheHeader() {
+        permission.granted = true
+        show()
+        compose.onNodeWithText("Signals").assertIsDisplayed()
+        val screen = compose.onNodeWithTag("album_details")
+        val bounds = screen.fetchSemanticsNode().boundsInRoot
+        val back = compose.onNodeWithTag("album_back").fetchSemanticsNode().boundsInRoot
+        val pixels = screen.captureToImage().toPixelMap()
+        // The left gutter has no text, icon strokes or artwork at either height.
+        val x = (back.left - bounds.left).toInt()
+        val y = (back.center.y - bounds.top).toInt()
+        val toolbar = pixels[x, y]
+        val header = pixels[x, y + with(compose.density) { 56.dp.roundToPx() }]
+        assertTrue("Expected a yellow fade from toolbar ($toolbar) into header ($header)",
+            toolbar.red > header.red && toolbar.green > header.green && header.red > header.blue)
+    }
 
     @Test
     fun deniedEntryWaitsForExplicitGrantAndResumeRechecksBeforeReadingAgain() {
