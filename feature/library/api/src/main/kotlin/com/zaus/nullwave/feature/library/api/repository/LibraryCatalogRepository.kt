@@ -19,7 +19,8 @@ import kotlinx.coroutines.flow.Flow
  * Empty success means no eligible entities, never permission denial or an unsupported method.
  *
  * Albums and artists use the same published, non-trashed audio population as observeTracks.
- * Group by source identities (including volume), not labels or artwork keys. A missing entity ID
+ * Group by source identities including volume. Loose Download tracks with a folder-derived album
+ * label and no album artist can share a folder identity across provider album IDs. A missing entity ID
  * omits that membership, not the track from Songs; do not invent a named group from a display tag.
  * Normalize blank/provider-unknown names to null and keep valid identities with unknown names.
  * Counts refer to eligible members; emit no zero-track entities or duplicate IDs. Snapshots must
