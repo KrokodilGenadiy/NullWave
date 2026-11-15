@@ -28,7 +28,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.transformWhile
 
@@ -85,12 +84,7 @@ internal class AlbumDetailsViewModel(
         source(
             name = "albumDetails.playbackAccess",
             input = { monitorPlayback },
-            flow = { enabled ->
-                if (!enabled) emptyFlow() else playbackObservation.observe().filter { update ->
-                    // A queued client update may describe a problem the service has already cleared.
-                    update.denial == playbackObservation.publishedDenial()
-                }
-            },
+            flow = { enabled -> if (enabled) playbackObservation.observe() else emptyFlow() },
         ) { _, update ->
             if (update.denial == update.initialDenial || update.denial == lastPlaybackDenial) this
             else copy(body = AlbumDetailsBody.AccessRequired(AccessAction.CheckAgain), lastPlaybackDenial = update.denial)

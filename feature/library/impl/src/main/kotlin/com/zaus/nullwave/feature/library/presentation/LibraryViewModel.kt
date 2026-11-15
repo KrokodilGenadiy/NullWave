@@ -92,11 +92,14 @@ internal class LibraryViewModel(
             refresh(catalog) { startReadingSelected() }
         }
         on<LibraryIntent.AccessChecked> { intent ->
-            if (intent.access is LibraryAccess.Required) cancel(playSong)
-            refresh(catalog) {
-                when (val access = intent.access) {
-                    LibraryAccess.Granted -> startReadingSelected()
-                    is LibraryAccess.Required -> requireAccess(access.action).copy(playbackNotice = null)
+            when (val access = intent.access) {
+                LibraryAccess.Granted -> {
+                    val denialAtCheck = playbackObservation.publishedDenial()
+                    refresh(catalog) { startReadingSelected().copy(lastPlaybackDenial = denialAtCheck) }
+                }
+                is LibraryAccess.Required -> {
+                    cancel(playSong)
+                    refresh(catalog) { requireAccess(access.action).copy(playbackNotice = null) }
                 }
             }
         }

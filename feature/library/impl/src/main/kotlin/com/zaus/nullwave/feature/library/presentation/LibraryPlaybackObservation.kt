@@ -37,9 +37,9 @@ internal class LibraryPlaybackObservation(private val controller: PlaybackContro
     fun observe(): Flow<LibraryPlaybackAccessUpdate> = flow {
         val baseline = initialDenial.await()
         emitAll(controller.observeState().mapNotNull { connection ->
-            (connection as? PlaybackConnection.Connected)?.snapshot?.accessDenial()?.let {
-                LibraryPlaybackAccessUpdate(it, baseline)
-            }
+            val denial = (connection as? PlaybackConnection.Connected)?.snapshot?.accessDenial() ?: return@mapNotNull null
+            // A delayed client snapshot may describe a problem the service already cleared or replaced.
+            if (denial == publishedDenial()) LibraryPlaybackAccessUpdate(denial, baseline) else null
         })
     }
 }

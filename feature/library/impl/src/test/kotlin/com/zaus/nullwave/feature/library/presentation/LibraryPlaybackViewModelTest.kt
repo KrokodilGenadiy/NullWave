@@ -29,6 +29,9 @@ import com.zaus.nullwave.core.result.EmptyResult
 import com.zaus.nullwave.feature.library.api.access.AccessAction
 import com.zaus.nullwave.feature.library.api.access.LibraryAccess
 import com.zaus.nullwave.feature.library.api.model.SortDirection
+import com.zaus.nullwave.feature.library.api.model.album.AlbumArtistCredit
+import com.zaus.nullwave.feature.library.api.model.album.AlbumId
+import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
 import com.zaus.nullwave.feature.library.impl.R
 import kotlinx.coroutines.CancellationException
@@ -864,6 +867,52 @@ class LibraryPlaybackViewModelTest {
         }
 
         assertTrue(generateSequence<Throwable>(thrown) { it.cause }.any { it === original })
+    }
+
+    @Test
+    fun `Back to Albums keeps the list when playback replays a denial published before the grant`() = runTest(dispatcher) {
+        val reconnect = CompletableDeferred<Unit>()
+        val vm = returnToAlbumsBeforePlaybackReconnects(reconnect)
+        val displayed = vm.snapshot.value.state.albums
+
+        reconnect.complete(Unit)
+        runCurrent()
+
+        assertSame(displayed, vm.snapshot.value.state.albums)
+    }
+
+    @Test
+    fun `Back to Albums hides the list when the first reconnected denial was published after the grant`() = runTest(dispatcher) {
+        val reconnect = CompletableDeferred<Unit>()
+        val vm = returnToAlbumsBeforePlaybackReconnects(reconnect)
+        playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "after-grant")
+
+        reconnect.complete(Unit)
+        runCurrent()
+
+        assertEquals(LibraryBody.AccessRequired(AccessAction.CheckAgain), vm.snapshot.value.state.albums)
+    }
+
+    private suspend fun TestScope.returnToAlbumsBeforePlaybackReconnects(reconnect: CompletableDeferred<Unit>): LibraryViewModel {
+        val vm = createVm()
+        val binding = bind(vm)
+        reply(AppResult.Success(songs))
+        send(vm, LibraryIntent.PlaySong(beta.id, songs))
+        respond(AppResult.Success(Unit))
+        val albums = listOf(LibraryAlbum(AlbumId("primary:8"), "Signals", AlbumArtistCredit.Unknown, 2))
+        repository.albums.initialResult = AppResult.Success(albums)
+        send(vm, LibraryIntent.TabSelected(LibraryTab.Albums))
+        binding.cancel()
+        advanceTimeBy(5_000)
+        runCurrent()
+        assertEquals(0, playback.activeStateCollectors)
+
+        playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "before-grant")
+        playback.beforeStateCollection = { reconnect.await() }
+        send(vm, LibraryIntent.AccessChecked(LibraryAccess.Granted))
+        bind(vm)
+        assertEquals(LibraryBody.Ready(albums), vm.snapshot.value.state.albums)
+        return vm
     }
 
     private fun createVm(handle: SavedStateHandle = SavedStateHandle()): LibraryViewModel =

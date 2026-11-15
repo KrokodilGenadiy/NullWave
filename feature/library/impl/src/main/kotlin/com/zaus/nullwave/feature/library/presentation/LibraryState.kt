@@ -24,7 +24,7 @@ internal data class LibraryState(
     val playbackNotice: LibraryPlaybackNotice? = null,
     /** Access-only observation starts with the first accepted play attempt, before acknowledgement. */
     val monitorPlayback: Boolean = false,
-    /** A handled access denial cannot close a freshly checked catalog again on rebind. */
+    /** Denial already handled or present at the most recent grant, identified by session and problem ID. */
     val lastPlaybackDenial: LibraryPlaybackProblemKey? = null,
     /** Track of the current queue entry, kept through reconnection; display only, never persisted. */
     val playingTrackId: TrackId? = null,
