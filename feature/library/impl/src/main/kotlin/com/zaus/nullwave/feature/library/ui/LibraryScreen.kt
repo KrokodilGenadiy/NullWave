@@ -43,10 +43,12 @@ import com.zaus.nullwave.core.designsystem.icon.NullWaveIcon
 import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.designsystem.modifier.NullWaveBorderStyle
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
+import com.zaus.nullwave.core.mvi.ui.UiText
 import com.zaus.nullwave.core.mvi.ui.asString
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
 import com.zaus.nullwave.feature.library.api.access.AccessAction
+import com.zaus.nullwave.feature.library.api.model.album.AlbumId
 import com.zaus.nullwave.feature.library.api.ui.LibraryAccessUi
 import com.zaus.nullwave.feature.library.presentation.LibraryBody
 import com.zaus.nullwave.feature.library.presentation.LibraryIntent
@@ -63,6 +65,7 @@ internal fun LibraryScreen(
     accessUi: LibraryAccessUi = LibraryAccessUi(),
     artworkLoader: LibraryArtworkLoader? = null,
     onSearchClick: () -> Unit = {},
+    onAlbumClick: (AlbumId) -> Unit = {},
 ) {
     // Keep each position alive while another tab or a Loading/Failed branch is composed.
     // Feeding a temporary one-item loading grid into these states would clamp their positions.
@@ -86,16 +89,7 @@ internal fun LibraryScreen(
         modifier = Modifier.fillMaxSize().testTag("library_screen"),
         snackbarHost = {
             state.playbackError?.let { message ->
-                NullWaveInlineMessage(
-                    message = message.asString(),
-                    modifier = Modifier.padding(spacing.md).testTag("library_playback_error")
-                        .semantics { liveRegion = LiveRegionMode.Polite },
-                    variant = NullWaveMessageVariant.Error,
-                    action = NullWaveMessageAction(
-                        label = stringResource(R.string.library_playback_dismiss),
-                        onClick = { onIntent(LibraryIntent.DismissPlaybackError) },
-                    ),
-                )
+                LibraryPlaybackMessage(message) { onIntent(LibraryIntent.DismissPlaybackError) }
             }
         },
         topBar = {
@@ -126,7 +120,7 @@ internal fun LibraryScreen(
         },
     ) { padding ->
         if (ready != null) {
-            LibraryReadyContent(state, onIntent, { filtersVisible = true }, artworkLoader, padding, listState)
+            LibraryReadyContent(state, onIntent, { filtersVisible = true }, artworkLoader, padding, listState, onAlbumClick)
             return@NullWaveScaffold
         }
         LazyColumn(
@@ -166,7 +160,18 @@ internal fun LibraryScreen(
 }
 
 @Composable
-private fun LibraryAccessContent(action: AccessAction, accessUi: LibraryAccessUi) {
+internal fun LibraryPlaybackMessage(message: UiText, onDismiss: () -> Unit) {
+    NullWaveInlineMessage(
+        message = message.asString(),
+        modifier = Modifier.padding(NullWaveTheme.spacing.md).testTag("library_playback_error")
+            .semantics { liveRegion = LiveRegionMode.Polite },
+        variant = NullWaveMessageVariant.Error,
+        action = NullWaveMessageAction(stringResource(R.string.library_playback_dismiss), onDismiss),
+    )
+}
+
+@Composable
+internal fun LibraryAccessContent(action: AccessAction, accessUi: LibraryAccessUi) {
     Column(Modifier.testTag("library_access")) {
         if (accessUi.launchFailed) NullWaveInlineMessage(stringResource(R.string.library_access_launch_failed),
             Modifier.padding(NullWaveTheme.spacing.md).semantics { liveRegion = LiveRegionMode.Polite },

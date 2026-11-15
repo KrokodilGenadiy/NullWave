@@ -339,7 +339,7 @@ class LibraryRootInstrumentedTest {
                 CompositionLocalProvider(LocalActivityResultRegistryOwner provides registryOwner,
                     LocalLifecycleOwner provides owner, LocalConfiguration provides configuration.value) {
                     NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
-                        LibraryRoot({}, artworkLoader = null, viewModel = viewModel, permission = permission)
+                        LibraryRoot({}, artworkLoader = null, viewModel = viewModel, accessHost = AndroidLibraryAccessHost { permission })
                     }
                 }
             }
@@ -361,12 +361,12 @@ class LibraryRootInstrumentedTest {
     }
 }
 
-private class ScreenOwner : LifecycleOwner {
+internal class ScreenOwner : LifecycleOwner {
     val registry = LifecycleRegistry(this).apply { currentState = Lifecycle.State.RESUMED }
     override val lifecycle: Lifecycle get() = registry
 }
 
-private class FakeAudioPermission : AudioPermission {
+internal class FakeAudioPermission : AudioPermission {
     override val name = "android.permission.READ_MEDIA_AUDIO"
     var granted = false
     var rationale = false
@@ -374,7 +374,7 @@ private class FakeAudioPermission : AudioPermission {
     override fun shouldExplain() = rationale
 }
 
-private class RecordingRegistry : ActivityResultRegistry() {
+internal class RecordingRegistry : ActivityResultRegistry() {
     data class Request(val code: Int, val input: Any?)
     val requests = mutableListOf<Request>()
     var failLaunch = false

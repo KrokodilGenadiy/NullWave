@@ -59,14 +59,14 @@ class SearchScreenInstrumentedTest {
     }
 
     @Test
-    fun tracksCanPlayAndHideFilenamesWhileAlbumsAndArtistsRemainInformational() {
+    fun tracksCanPlayAndHideFilenamesAlbumsOpenAndArtistsRemainInformational() {
         state.value = SearchState("en", "orbit", body = SearchBody.Ready(searchResults()))
         show()
         trackAction("track:0").assertIsDisplayed().assertHasClickAction()
         compose.onNodeWithText("orbit_0.flac", substring = true).assertDoesNotExist()
         compose.onNodeWithTag("search_results").performScrollToNode(hasTestTag("search_album:album:1"))
         compose.onNodeWithText("Matching artist: Guest Orbit").assertIsDisplayed()
-        compose.onNodeWithTag("search_album:album:1").assertHasNoClickAction()
+        compose.onNodeWithTag("search_album:album:1").assertHasClickAction()
         compose.onNodeWithTag("search_results").performScrollToNode(hasTestTag("search_artist:artist:1"))
         compose.onNodeWithTag("search_artist:artist:1").assertIsDisplayed().assertHasNoClickAction()
     }

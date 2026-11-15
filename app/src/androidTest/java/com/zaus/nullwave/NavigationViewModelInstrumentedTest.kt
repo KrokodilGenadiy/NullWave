@@ -102,7 +102,7 @@ class NavigationViewModelInstrumentedTest {
                 val vm = metroViewModel<RestorationVm>()
                 val ui = vm.collectMviUiWithLifecycle()
                 SideEffect { detail = vm; detailIntents = ui.onIntent }
-                ProbeScreen("detail", ui.state, ui.onIntent, "Back") { navigateBack() }
+                ProbeScreen("detail", ui.state, ui.onIntent, "Back") { navigateBack(SearchKey) }
             }
         })
         compose.setContent {

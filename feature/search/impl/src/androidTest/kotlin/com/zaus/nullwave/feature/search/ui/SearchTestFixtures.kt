@@ -105,8 +105,14 @@ internal class RecordingSearchRepository : LibrarySearchRepository {
 }
 
 @Composable
-internal fun SearchTestTheme(content: @Composable () -> Unit) {
-    val configuration = Configuration(LocalConfiguration.current).apply { setLocale(Locale.ENGLISH) }
+internal fun SearchTestTheme(softwareKeyboardOnly: Boolean = false, content: @Composable () -> Unit) {
+    val configuration = Configuration(LocalConfiguration.current).apply {
+        setLocale(Locale.ENGLISH)
+        if (softwareKeyboardOnly) {
+            keyboard = Configuration.KEYBOARD_NOKEYS
+            hardKeyboardHidden = Configuration.HARDKEYBOARDHIDDEN_YES
+        }
+    }
     val context = LocalContext.current
     val localized = remember(context, configuration) { context.createConfigurationContext(configuration) }
     CompositionLocalProvider(LocalContext provides localized, LocalConfiguration provides configuration) {

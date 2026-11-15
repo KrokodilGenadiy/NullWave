@@ -52,10 +52,11 @@ class SearchRecreationTest {
         fixture.access.access = LibraryAccess.Granted
         fixture.repository.result.value = AppResult.Success(searchResults(60))
         val activity = launch()
-        compose.onNodeWithTag("search_input").performTextReplacement("  Orbit  ")
+        enterQueryWithIme(activity, "  Orbit  ")
         awaitResults(activity)
         // Dismiss the real IME before comparing viewport geometry across Activity recreation.
         compose.onNodeWithTag("search_input").performImeAction()
+        awaitIme(activity, visible = false)
         compose.onNodeWithTag("search_results").performScrollToNode(hasTestTag("search_track:track:40"))
         val before = compose.onNodeWithTag("search_track:track:40").fetchSemanticsNode().boundsInRoot.top
         lateinit var previous: SearchTestActivity
@@ -190,7 +191,7 @@ class SearchRecreationTest {
     }
 
     private fun awaitResults(activity: ActivityScenario<SearchTestActivity>) {
-        compose.waitUntil {
+        compose.waitUntil(timeoutMillis = 5_000) {
             var ready = false
             activity.onActivity { ready = it.model.snapshot.value.state.body is SearchBody.Ready }
             ready
@@ -212,7 +213,8 @@ class SearchTestActivity : ComponentActivity() {
         model = ViewModelProvider(this, viewModelFactory {
             initializer { SearchViewModel(fixture.repository, IdlePlaybackController, createSavedStateHandle(), "en") }
         })[SearchViewModel::class.java]
-        setContent { SearchTestTheme { SearchRoot({}, fixture.access, viewModel = model) } }
+        // These scenarios exercise touch-only editing. Some AVDs also report a physical QWERTY keyboard.
+        setContent { SearchTestTheme(softwareKeyboardOnly = true) { SearchRoot({}, fixture.access, viewModel = model) } }
     }
     companion object { internal var fixture: SearchActivityFixture? = null }
 }

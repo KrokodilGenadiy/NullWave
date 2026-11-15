@@ -47,10 +47,11 @@ internal fun NullWaveNavigation(
         entryProvider = provider,
     )
     key(section) {
+        val displayedKey = stack.last()
         NavDisplay(
             entries = entries.drop(sectionIndex),
             modifier = Modifier.fillMaxSize(),
-            onBack = { with(navigation) { navigateBack() } },
+            onBack = { with(navigation) { navigateBack(displayedKey) } },
         )
     }
 }

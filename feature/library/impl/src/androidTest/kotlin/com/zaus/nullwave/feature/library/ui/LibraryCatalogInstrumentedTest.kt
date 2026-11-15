@@ -12,6 +12,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasNoClickAction
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
@@ -77,14 +78,14 @@ class LibraryCatalogInstrumentedTest {
     }
 
     @Test
-    fun albumsShowUnknownAndCompilationCreditsWithoutFakeClickActions() {
+    fun albumButtonsShowUnknownAndCompilationCredits() {
         show(catalog(LibraryTab.Albums).copy(albums = LibraryBody.Ready(listOf(
             album(1).copy(title = null, artistCredit = AlbumArtistCredit.Unknown),
             album(2).copy(artistCredit = AlbumArtistCredit.Various),
         ))))
         compose.onNodeWithTag("library_album:album:1")
-            .assertHasNoClickAction()
-            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Role))
+            .assertHasClickAction()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
             .assertTextContains(text(R.string.library_unknown_album))
             .assertTextContains(text(R.string.library_unknown_artist))
         compose.onNodeWithTag("library_summary").assertTextContains(resources.getQuantityString(R.plurals.library_album_count, 2, 2))
@@ -213,7 +214,7 @@ class LibraryCatalogInstrumentedTest {
         show(catalog(LibraryTab.Albums), fontScale = 2f, direction = LayoutDirection.Rtl)
         compose.onNodeWithTag("library_album:album:1").assertWidthIsAtLeast(250.dp)
         compose.onNodeWithTag("library_list").performScrollToNode(hasTestTag("library_album:album:40"))
-        compose.onNodeWithTag("library_album:album:40").assertIsDisplayed().assertHasNoClickAction()
+        compose.onNodeWithTag("library_album:album:40").assertIsDisplayed().assertHasClickAction()
     }
 
     private fun show(initial: LibraryState = catalog(), fontScale: Float = 1f,

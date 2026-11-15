@@ -14,8 +14,10 @@ fun navigateTo(key: NavKey) {
     if (nav.backStack.lastOrNull() != key) nav.backStack.add(key)
 }
 
-/** In-app Back must keep the root; system Back at the root belongs to the Activity. */
+/** A callback from an outgoing screen can only pop its own destination. The Activity owns Back at the root. */
 context(nav: NavigationScope)
-fun navigateBack() {
-    if (nav.backStack.size > 1) nav.backStack.removeAt(nav.backStack.lastIndex)
+fun navigateBack(from: NavKey) {
+    if (nav.backStack.size > 1 && nav.backStack.last() == from) {
+        nav.backStack.removeAt(nav.backStack.lastIndex)
+    }
 }

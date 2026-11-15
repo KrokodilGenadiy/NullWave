@@ -33,6 +33,7 @@ import com.zaus.nullwave.core.media.model.ArtworkRef
 import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.core.designsystem.R as DesignR
 import com.zaus.nullwave.feature.library.api.ui.LibraryArtworkRenderer
+import com.zaus.nullwave.feature.library.api.model.album.AlbumId
 import com.zaus.nullwave.feature.library.api.ui.libraryAlbumCredit
 import com.zaus.nullwave.feature.library.api.ui.libraryDuration
 import com.zaus.nullwave.feature.library.api.ui.libraryMonogram
@@ -51,6 +52,7 @@ internal fun SearchResults(
     artwork: LibraryArtworkRenderer?,
     insets: PaddingValues,
     listState: LazyListState,
+    onAlbumClick: (AlbumId) -> Unit,
 ) {
     val gutter = NullWaveTheme.dimens.gutter
     val spacing = NullWaveTheme.spacing
@@ -92,6 +94,7 @@ internal fun SearchResults(
                 val credit = libraryAlbumCredit(album.artistCredit, stringResource(R.string.search_unknown_artist),
                     stringResource(R.string.search_various_artists))
                 NullWaveMediaListItem(title,
+                    onClick = { onAlbumClick(album.id) },
                     modifier = Modifier.padding(horizontal = gutter, vertical = spacing.xxs).testTag("search_album:${album.id.value}"),
                     supportingText = stringResource(R.string.search_metadata, credit,
                         pluralStringResource(R.plurals.search_tracks, album.trackCount, album.trackCount)),

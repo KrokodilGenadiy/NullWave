@@ -47,6 +47,7 @@ import com.zaus.nullwave.core.designsystem.icon.NullWaveIcons
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.mvi.ui.asString
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
+import com.zaus.nullwave.feature.library.api.model.album.AlbumId
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
 import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
 import com.zaus.nullwave.feature.library.impl.R
@@ -66,6 +67,7 @@ internal fun LibraryReadyContent(
     artworkLoader: LibraryArtworkLoader?,
     insets: PaddingValues,
     listState: LazyGridState,
+    onAlbumClick: (AlbumId) -> Unit,
 ) {
     val ready = state.selectedBody as? LibraryBody.Ready<*> ?: return
     val spacing = NullWaveTheme.spacing
@@ -120,7 +122,7 @@ internal fun LibraryReadyContent(
                 val albums = state.albums
                 if (albums is LibraryBody.Ready) items(albums.items,
                     key = { "album:${it.id.value}" }, contentType = { "album" }) { album ->
-                    LibraryAlbumCard(album, artworkLoader)
+                    LibraryAlbumCard(album, artworkLoader) { onAlbumClick(album.id) }
                 }
             }
             LibraryTab.Artists -> {
@@ -162,12 +164,13 @@ private fun librarySummary(state: LibraryState, count: Int): String = when (stat
 }
 
 @Composable
-private fun LibraryAlbumCard(album: LibraryAlbum, loader: LibraryArtworkLoader?) {
+private fun LibraryAlbumCard(album: LibraryAlbum, loader: LibraryArtworkLoader?, onClick: () -> Unit) {
     val title = album.title ?: stringResource(R.string.library_unknown_album)
     val credit = libraryAlbumCredit(album.artistCredit, stringResource(R.string.library_unknown_artist),
         stringResource(R.string.library_various_artists))
     NullWaveMediaGridCard(
         title = title,
+        onClick = onClick,
         supportingText = credit,
         modifier = Modifier.testTag("library_album:${album.id.value}"),
         artwork = {

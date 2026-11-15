@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -41,6 +42,7 @@ import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
 import com.zaus.nullwave.core.mvi.ui.asString
 import com.zaus.nullwave.feature.library.api.access.AccessAction
 import com.zaus.nullwave.feature.library.api.access.LibraryAccess
+import com.zaus.nullwave.feature.library.api.model.album.AlbumId
 import com.zaus.nullwave.feature.library.api.ui.LibraryAccessUi
 import com.zaus.nullwave.feature.library.api.ui.LibraryArtworkRenderer
 import com.zaus.nullwave.feature.search.impl.R
@@ -57,10 +59,12 @@ internal fun SearchScreen(
     onBack: () -> Unit,
     accessUi: LibraryAccessUi = LibraryAccessUi(),
     artwork: LibraryArtworkRenderer? = null,
+    onAlbumClick: (AlbumId) -> Unit = {},
 ) {
     val resultsScroll = rememberSearchScrollState(state.query?.text, state.localeTag)
     val inputFocus = rememberSearchInputFocus()
     val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
     val spacing = NullWaveTheme.spacing
     NullWaveScaffold(
         modifier = Modifier.fillMaxSize().testTag("search_screen"),
@@ -125,7 +129,12 @@ internal fun SearchScreen(
     ) { padding ->
         val body = state.body
         if (body is SearchBody.Ready) {
-            SearchResults(body, state.rawQuery, state.playingTrackId, onIntent, artwork, padding, resultsScroll)
+            SearchResults(body, state.rawQuery, state.playingTrackId, onIntent, artwork, padding, resultsScroll) { id ->
+                focusManager.clearFocus()
+                inputFocus.restoreEditing = false
+                keyboard?.hide()
+                onAlbumClick(id)
+            }
         } else LazyColumn(Modifier.fillMaxSize().consumeWindowInsets(padding), contentPadding = padding) {
             item("state") {
                 when (body) {

@@ -7,6 +7,7 @@ import androidx.lifecycle.Lifecycle
 import com.zaus.nullwave.core.mvi.ui.collectMviUiWithLifecycle
 import com.zaus.nullwave.core.mvi.ui.rememberMviUiApi
 import com.zaus.nullwave.feature.library.api.access.LibraryAccess
+import com.zaus.nullwave.feature.library.api.model.album.AlbumId
 import com.zaus.nullwave.feature.library.api.ui.LibraryAccessHost
 import com.zaus.nullwave.feature.library.api.ui.LibraryArtworkRenderer
 import com.zaus.nullwave.feature.search.presentation.SearchIntent
@@ -19,6 +20,7 @@ internal fun SearchRoot(
     accessHost: LibraryAccessHost,
     artwork: LibraryArtworkRenderer? = null,
     viewModel: SearchViewModel = metroViewModel(),
+    onAlbumClick: (AlbumId) -> Unit = {},
 ) {
     val localeTag = LocalConfiguration.current.locales[0].toLanguageTag()
     val uiApi = rememberMviUiApi(viewModel)
@@ -27,6 +29,6 @@ internal fun SearchRoot(
     accessHost.Content({ uiApi.onIntent(SearchIntent.AccessChecked(it == LibraryAccess.Granted)) }) { accessUi ->
         val ui = viewModel.collectMviUiWithLifecycle(minActiveState = Lifecycle.State.RESUMED)
         LaunchedEffect(viewModel, localeTag) { ui.onIntent(SearchIntent.LocaleChanged(localeTag)) }
-        SearchScreen(ui.state, ui.onIntent, onBack, accessUi, artwork)
+        SearchScreen(ui.state, ui.onIntent, onBack, accessUi, artwork, onAlbumClick)
     }
 }

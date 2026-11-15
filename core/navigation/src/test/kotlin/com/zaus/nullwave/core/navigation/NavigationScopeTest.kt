@@ -26,8 +26,8 @@ class NavigationScopeTest {
     fun backReturnsToRootAndCannotRemoveIt() {
         with(scope()) {
             navigateTo(Details)
-            navigateBack()
-            navigateBack()
+            navigateBack(Details)
+            navigateBack(Root)
             assertEquals(listOf(Root), backStack.toList())
         }
     }

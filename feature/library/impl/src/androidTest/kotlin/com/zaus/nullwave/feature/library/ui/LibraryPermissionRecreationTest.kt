@@ -188,7 +188,7 @@ class LibraryPermissionTestActivity : ComponentActivity() {
                 NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
                     val holder = rememberSaveableStateHolder()
                     if (showRoot) holder.SaveableStateProvider("library") {
-                        LibraryRoot({}, artworkLoader = null, viewModel = model, permission = testFixture)
+                        LibraryRoot({}, artworkLoader = null, viewModel = model, accessHost = AndroidLibraryAccessHost { testFixture })
                     }
                 }
             }

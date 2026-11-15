@@ -218,7 +218,7 @@ class LibraryCatalogTestActivity : ComponentActivity() {
                     LocalLayoutDirection provides LayoutDirection.Ltr,
                 ) {
                     NullWaveTheme(effects = NullWaveEffects(reduceMotion = true)) {
-                        LibraryRoot({}, artworkLoader = null, viewModel = model, permission = testFixture)
+                        LibraryRoot({}, artworkLoader = null, viewModel = model, accessHost = AndroidLibraryAccessHost { testFixture })
                     }
                 }
             }
