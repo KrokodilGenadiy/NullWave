@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButton
 import com.zaus.nullwave.core.designsystem.components.control.button.NullWaveButtonVariant
@@ -128,10 +129,10 @@ internal fun AlbumDetailsScreen(
                             variant = NullWaveButtonVariant.Secondary, borderStyle = NullWaveBorderStyle.ClippedCorners,
                         )
                     }
+                    NullWaveDivider(color = colors.surfaceRaised)
                 }
                 itemsIndexed(details.tracks, key = { _, track -> track.id.value }, contentType = { _, _ -> "track" }) { index, track ->
                     AlbumTrackRow(index + 1, track) { onPlay(details, AlbumPlaybackStart.At(index)) }
-                    NullWaveDivider()
                 }
             }
         } else {
@@ -162,7 +163,8 @@ private fun AlbumTrackRow(number: Int, track: MediaTrack, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(NullWaveTheme.spacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(number.toString(), Modifier.widthIn(min = 22.dp), style = NullWaveTheme.typography.mono, color = colors.textSecondary)
+        Text(number.toString(), Modifier.widthIn(min = 22.dp), style = NullWaveTheme.typography.mono,
+            color = colors.textSecondary, textAlign = TextAlign.End)
         Text(track.title, Modifier.weight(1f), style = NullWaveTheme.typography.body, color = colors.textPrimary)
         libraryDuration(track.durationMs)?.let {
             Text(it, style = NullWaveTheme.typography.mono, color = colors.textSecondary)
