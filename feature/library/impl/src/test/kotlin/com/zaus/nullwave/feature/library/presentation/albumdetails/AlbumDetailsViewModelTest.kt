@@ -30,10 +30,12 @@ import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumDetails
 import com.zaus.nullwave.feature.library.api.repository.LibraryAlbumDetailsRepository
 import com.zaus.nullwave.feature.library.presentation.ControlledLibraryPlaybackController
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -285,20 +287,70 @@ class AlbumDetailsViewModelTest {
     }
 
     @Test
+    fun `replaying a denial published while unbound leaves the restored album open`() = runTest(mvi.dispatcher) {
+        val resumePlayback = CompletableDeferred<Unit>()
+        val vm = restoreAlbumBeforePlaybackReconnects(resumePlayback)
+
+        resumePlayback.complete(Unit)
+        runCurrent()
+
+        assertEquals(AlbumDetailsBody.Ready(updated), vm.body)
+        assertEquals(null, vm.snapshot.value.state.playbackError)
+        reply(AppResult.Failure(DataError.NotFound))
+        assertSame(AlbumDetailsBody.NotFound, vm.body)
+        assertEquals(2, reads.size)
+    }
+
+    @Test
+    fun `a denial published after the grant closes the album even as the first reconnected snapshot`() = runTest(mvi.dispatcher) {
+        val resumePlayback = CompletableDeferred<Unit>()
+        val vm = restoreAlbumBeforePlaybackReconnects(resumePlayback)
+
+        publishEngineDenial("after-grant")
+        resumePlayback.complete(Unit)
+        runCurrent()
+
+        assertEquals(AlbumDetailsBody.AccessRequired(AccessAction.CheckAgain), vm.body)
+        assertTrue(reads.last().results.trySend(AppResult.Success(updated)).isFailure)
+        assertEquals(null, vm.snapshot.value.state.playbackError)
+    }
+
+    @Test
+    fun `buffered denial cleared by the service before the recheck cannot hide the album`() = runTest(mvi.dispatcher) {
+        val deliverDenial = CompletableDeferred<Unit>()
+        val captured = CompletableDeferred<Unit>()
+        playback.stateUpdates = playback.states.onEach { connection ->
+            if ((connection as? PlaybackConnection.Connected)?.snapshot?.transport?.problem != null) {
+                captured.complete(Unit)
+                deliverDenial.await()
+            }
+        }
+        val vm = openAlbum()
+        reply(AppResult.Success(first))
+        send(vm, AlbumDetailsIntent.Play(first, AlbumPlaybackStart.At(0)))
+        publishEngineDenial("buffered")
+        runCurrent()
+        assertTrue(captured.isCompleted)
+        reply(AppResult.Failure(DataError.AccessDenied))
+        val failed = checkNotNull(playback.publishedSnapshot)
+        playback.states.value = PlaybackConnection.Connected(PlaybackSnapshot.create(
+            sessionId = failed.sessionId, revision = failed.revision + 1, queue = failed.queue,
+        ))
+        send(vm, grant)
+        reply(AppResult.Success(updated))
+        deliverDenial.complete(Unit)
+        runCurrent()
+        assertEquals(AlbumDetailsBody.Ready(updated), vm.body)
+    }
+
+    @Test
     fun `new engine denial closes the album read before acknowledgement and rebind waits for grant`() = runTest(mvi.dispatcher) {
         val vm = createVm()
         val binding = bind(vm)
         send(vm, grant)
         reply(AppResult.Success(first))
         send(vm, AlbumDetailsIntent.Play(first, AlbumPlaybackStart.At(0)))
-        val session = (playback.states.value as PlaybackConnection.Connected).snapshot.sessionId
-        val entry = QueueEntry(QueueEntryId("playing"), first.tracks.single())
-        val token = PlaybackItemToken(session, entry.entryId, 0)
-        playback.states.value = PlaybackConnection.Connected(PlaybackSnapshot.create(
-            sessionId = session,
-            queue = PlaybackQueue.create(entries = listOf(entry), current = token),
-            transport = PlaybackTransport(problem = PlaybackProblem(PlaybackProblemId("denied"), PlaybackProblemCode.AccessDenied, token)),
-        ))
+        publishEngineDenial("denied")
         runCurrent()
         assertEquals(AlbumDetailsBody.AccessRequired(AccessAction.CheckAgain), vm.body)
         assertTrue(reads.single().results.trySend(AppResult.Success(updated)).isFailure)
@@ -317,6 +369,39 @@ class AlbumDetailsViewModelTest {
 
     private val AlbumDetailsViewModel.body get() = snapshot.value.state.body
     private fun createVm() = mvi.own(AlbumDetailsViewModel(albumId, repository, "en", playback))
+
+    private suspend fun TestScope.restoreAlbumBeforePlaybackReconnects(resumePlayback: CompletableDeferred<Unit>): AlbumDetailsViewModel {
+        val vm = createVm()
+        val binding = bind(vm)
+        send(vm, grant)
+        reply(AppResult.Success(first))
+        send(vm, AlbumDetailsIntent.Play(first, AlbumPlaybackStart.At(0)))
+        reply(AppResult.Failure(DataError.AccessDenied))
+        assertEquals(AlbumDetailsBody.AccessRequired(AccessAction.CheckAgain), vm.body)
+        binding.cancel()
+        runCurrent()
+        assertEquals(0, playback.activeStateCollectors)
+
+        publishEngineDenial("before-grant")
+        playback.beforeStateCollection = { resumePlayback.await() }
+        send(vm, grant)
+        bind(vm)
+        reply(AppResult.Success(updated))
+        assertEquals(AlbumDetailsBody.Ready(updated), vm.body)
+        return vm
+    }
+
+    private fun publishEngineDenial(id: String) {
+        val previous = (playback.states.value as PlaybackConnection.Connected).snapshot
+        val entry = QueueEntry(QueueEntryId("playing"), first.tracks.single())
+        val token = PlaybackItemToken(previous.sessionId, entry.entryId, 0)
+        playback.states.value = PlaybackConnection.Connected(PlaybackSnapshot.create(
+            sessionId = previous.sessionId,
+            revision = previous.revision + 1,
+            queue = PlaybackQueue.create(entries = listOf(entry), current = token),
+            transport = PlaybackTransport(problem = PlaybackProblem(PlaybackProblemId(id), PlaybackProblemCode.AccessDenied, token)),
+        ))
+    }
 
     private suspend fun TestScope.openAlbum() = createVm().also { vm ->
         bind(vm)

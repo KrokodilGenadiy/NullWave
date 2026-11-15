@@ -28,6 +28,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.transformWhile
 
@@ -84,7 +85,12 @@ internal class AlbumDetailsViewModel(
         source(
             name = "albumDetails.playbackAccess",
             input = { monitorPlayback },
-            flow = { enabled -> if (enabled) playbackObservation.observe() else emptyFlow() },
+            flow = { enabled ->
+                if (!enabled) emptyFlow() else playbackObservation.observe().filter { update ->
+                    // A queued client update may describe a problem the service has already cleared.
+                    update.denial == playbackObservation.publishedDenial()
+                }
+            },
         ) { _, update ->
             if (update.denial == update.initialDenial || update.denial == lastPlaybackDenial) this
             else copy(body = AlbumDetailsBody.AccessRequired(AccessAction.CheckAgain), lastPlaybackDenial = update.denial)
@@ -108,7 +114,15 @@ internal class AlbumDetailsViewModel(
                 LibraryAccess.Granted -> {
                     // A Play sent before access was lost can still have a pending service reply.
                     if (state.body is AlbumDetailsBody.AccessRequired) cancel(play)
-                    refresh(album) { copy(platformGranted = true, body = AlbumDetailsBody.Loading(body.details)) }
+                    // The service can already have published a denial while the screen was unbound.
+                    val existingDenial = playbackObservation.publishedDenial()
+                    refresh(album) {
+                        copy(
+                            platformGranted = true,
+                            body = AlbumDetailsBody.Loading(body.details),
+                            lastPlaybackDenial = existingDenial,
+                        )
+                    }
                 }
                 is LibraryAccess.Required -> {
                     cancel(play)

@@ -27,6 +27,8 @@ internal data class LibraryPlaybackAccessUpdate(
 internal class LibraryPlaybackObservation(private val controller: PlaybackController) {
     private val initialDenial = CompletableDeferred<LibraryPlaybackProblemKey?>()
 
+    fun publishedDenial(): LibraryPlaybackProblemKey? = controller.publishedSnapshot?.accessDenial()
+
     suspend fun execute(request: PlaybackQueueRequest): EmptyResult<PlaybackCommandError> =
         controller.execute(PlaybackCommand.ReplaceQueue(request)) { snapshot ->
             initialDenial.complete(snapshot?.accessDenial())

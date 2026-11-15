@@ -25,6 +25,7 @@ internal class ControlledLibraryPlaybackController : PlaybackController {
         PlaybackSnapshot.create(PlaybackSessionId("library-test-session")),
     ))
     var beforeStateCollection: suspend (Int) -> Unit = {}
+    var stateUpdates: Flow<PlaybackConnection> = states
     var beforeCommandDispatch: suspend () -> Unit = {}
     var connectionFailure: AppResult.Failure<PlaybackCommandError>? = null
     var stateObservations = 0
@@ -43,7 +44,7 @@ internal class ControlledLibraryPlaybackController : PlaybackController {
             activeStateCollectors++
             try {
                 beforeStateCollection(observation)
-                emitAll(states)
+                emitAll(stateUpdates)
             }
             finally { activeStateCollectors-- }
         }
