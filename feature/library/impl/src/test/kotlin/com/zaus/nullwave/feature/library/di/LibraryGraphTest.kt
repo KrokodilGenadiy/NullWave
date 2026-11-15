@@ -1,13 +1,18 @@
 package com.zaus.nullwave.feature.library.di
 
 import com.zaus.nullwave.core.mvi.testing.MviTestMain
+import com.zaus.nullwave.core.mvi.testing.bind
+import com.zaus.nullwave.core.mvi.testing.send
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
+import com.zaus.nullwave.feature.library.api.access.LibraryAccess
+import com.zaus.nullwave.feature.library.api.model.album.AlbumId
 import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.core.playback.api.PlaybackController
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackSort
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
+import com.zaus.nullwave.feature.library.api.repository.LibraryAlbumDetailsRepository
 import com.zaus.nullwave.feature.library.data.repository.MediaStoreLibraryRepository
 import com.zaus.nullwave.feature.library.data.source.FakeMediaStoreAudioSource
 import com.zaus.nullwave.feature.library.data.source.audioRow
@@ -15,6 +20,9 @@ import com.zaus.nullwave.feature.library.presentation.LibraryBody
 import com.zaus.nullwave.feature.library.presentation.LibraryIntent
 import com.zaus.nullwave.feature.library.presentation.LibraryTab
 import com.zaus.nullwave.feature.library.presentation.LibraryViewModel
+import com.zaus.nullwave.feature.library.presentation.albumdetails.AlbumDetailsBody
+import com.zaus.nullwave.feature.library.presentation.albumdetails.AlbumDetailsIntent
+import com.zaus.nullwave.feature.library.presentation.albumdetails.AlbumDetailsViewModel
 import com.zaus.nullwave.feature.library.testing.IdlePlaybackController
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.DependencyGraph
@@ -52,7 +60,7 @@ class LibraryGraphTest {
     fun `generated graph creates entry owned Library ViewModels with the repository and saved state`() = runTest(dispatcher) {
         val source = FakeMediaStoreAudioSource().apply { read = { listOf(audioRow()) } }
         val repository = MediaStoreLibraryRepository(source, dispatcher)
-        val graph = createGraphFactory<LibraryTestGraph.Factory>().create(repository, "ru")
+        val graph = createGraphFactory<LibraryTestGraph.Factory>().create(repository, repository, "ru")
         val factory = graph.assistedFactories.getValue(LibraryViewModel::class).invoke() as LibraryViewModel.Factory
         val first = factory.create(SavedStateHandle(mapOf("library.sort" to "Artist")))
         val second = factory.create(SavedStateHandle())
@@ -79,6 +87,25 @@ class LibraryGraphTest {
         runCurrent()
         assertEquals(0, source.activeObservers)
     }
+
+    @Test
+    fun `assisted factory observes the album of each navigation entry`() = runTest(dispatcher) {
+        val source = FakeMediaStoreAudioSource().apply {
+            read = { listOf(audioRow().copy(albumId = 7), audioRow(id = 2).copy(albumId = 8)) }
+        }
+        val repository = MediaStoreLibraryRepository(source, dispatcher)
+        val graph = createGraphFactory<LibraryTestGraph.Factory>().create(repository, repository, "ru")
+        val factory = graph.metroViewModelFactory.createManuallyAssistedFactory(AlbumDetailsViewModel.Factory::class)()
+        for (id in listOf(AlbumId("external_primary:7"), AlbumId("external_primary:8"))) {
+            val vm = mvi.own(factory.create(id))
+            assertEquals("ru", vm.snapshot.value.state.localeTag)
+            bind(vm)
+            send(vm, AlbumDetailsIntent.AccessChecked(LibraryAccess.Granted))
+            val body = vm.snapshot.value.state.body as AlbumDetailsBody.Ready
+            assertEquals(id, body.details.album.id)
+        }
+        assertEquals(2, source.activeObservers)
+    }
 }
 
 @DependencyGraph(
@@ -95,6 +122,7 @@ internal interface LibraryTestGraph : ViewModelGraph {
     fun interface Factory {
         fun create(
             @Provides repository: LibraryCatalogRepository,
+            @Provides albumDetails: LibraryAlbumDetailsRepository,
             @Provides @LibraryInitialLocale locale: String,
         ): LibraryTestGraph
     }
