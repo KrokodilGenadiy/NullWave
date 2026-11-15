@@ -4,10 +4,12 @@ import android.database.MatrixCursor
 import android.database.sqlite.SQLiteDiskIOException
 import android.os.OperationCanceledException
 import android.provider.MediaStore
+import android.provider.MediaStore.Audio.Media
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.DataError
+import com.zaus.nullwave.feature.library.api.model.album.AlbumId
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.data.repository.MediaStoreLibraryRepository
 import java.io.IOException
@@ -28,6 +30,38 @@ import org.junit.Test
 /** Uses Android Cursor/CancellationSignal without reading, modifying or requesting access to media. */
 @RunWith(AndroidJUnit4::class)
 class MediaStoreAudioQueryInstrumentedTest {
+    @Test
+    fun ordinaryAlbumQueryBindsVolumeAndProviderIdAndReadsPackedTrackOnAndroidTen() = runBlocking {
+        val rows = queryCatalogRows(AlbumId("card:37"), 29, Dispatchers.IO) { columns, selection, args, _ ->
+            assertEquals("(${Media.IS_PENDING} = 0) AND ${Media.VOLUME_NAME} = ? AND ${Media.ALBUM_ID} = ?", selection)
+            assertEquals(listOf("card", "37"), args?.toList())
+            MatrixCursor(columns).apply {
+                newRow().add(Media._ID, 1L).add(Media.TRACK, 2010)
+                newRow().add(Media._ID, 2L)
+            }
+        }
+        assertEquals(listOf(2010L, null), rows.map { it.trackNumber })
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 30)
+    fun downloadQueryReadsEligibleRowsOnOneVolumeWithGroupingAndOrderingColumns() = runBlocking {
+        val rows = queryCatalogRows(AlbumId("external_primary:folder/Download"), 30, Dispatchers.IO) { columns, selection, args, _ ->
+            assertEquals("(${Media.IS_PENDING} = 0 AND ${Media.IS_TRASHED} = 0) AND ${Media.VOLUME_NAME} = ?", selection)
+            assertEquals(listOf("external_primary"), args?.toList())
+            MatrixCursor(columns).apply {
+                for (index in 1..9) {
+                    newRow().add(Media._ID, index).add(Media.VOLUME_NAME, "external_primary")
+                        .add(Media.ALBUM_ID, if (index == 1) 37 else 52).add(Media.ALBUM, "Download")
+                        .add(Media.RELATIVE_PATH, "Download/").add(Media.ALBUM_ARTIST, null).add(Media.TRACK, 1000 + index)
+                }
+            }
+        }
+        assertEquals(listOf(37L, 52L), rows.map { it.albumId }.distinct())
+        assertEquals((1001L..1009L).toList(), rows.map { it.trackNumber })
+        assertTrue(rows.all { it.relativePath == "Download/" && it.albumArtist == null })
+    }
+
     @Test
     fun readsLongAndNullableColumnsAndClosesCursor() = runBlocking {
         val cursor = MatrixCursor(audioProjection).apply {
@@ -53,13 +87,30 @@ class MediaStoreAudioQueryInstrumentedTest {
 
     @Test
     @SdkSuppress(minSdkVersion = 30)
-    fun readsMediaStoreGenerationWhenTheCatalogRequestsIt() = runBlocking {
-        val cursor = MatrixCursor(audioProjection + MediaStore.MediaColumns.GENERATION_MODIFIED).apply {
+    fun catalogReadsGenerationFolderAndAlbumArtistFromTheirColumns() = runBlocking {
+        val cursor = MatrixCursor(catalogProjection(30)).apply {
             newRow().add(MediaStore.MediaColumns._ID, 23L)
                 .add(MediaStore.MediaColumns.GENERATION_MODIFIED, 5_000_000_007L)
+                .add(MediaStore.MediaColumns.RELATIVE_PATH, "Download/")
+                .add(MediaStore.MediaColumns.ALBUM_ARTIST, "Album credit")
         }
         val row = queryAudioRows(Dispatchers.IO) { cursor }.single()
         assertEquals(5_000_000_007L, row.generationModified)
+        assertEquals("Download/", row.relativePath)
+        assertEquals("Album credit", row.albumArtist)
+        assertTrue(cursor.isClosed)
+    }
+
+    @Test
+    fun androidTenCatalogReadsWithoutAnAlbumArtistColumn() = runBlocking {
+        val projection = catalogProjection(29)
+        assertFalse("album_artist" in projection)
+        val cursor = MatrixCursor(projection).apply {
+            newRow().add(MediaStore.MediaColumns._ID, 23L)
+        }
+        val row = queryAudioRows(Dispatchers.IO) { cursor }.single()
+        assertEquals(null, row.relativePath)
+        assertEquals(null, row.albumArtist)
         assertTrue(cursor.isClosed)
     }
 
@@ -113,7 +164,7 @@ class MediaStoreAudioQueryInstrumentedTest {
             val source = object : MediaStoreAudioSource {
                 override fun hasReadAccess() = true
                 override fun observeChanges(onChanged: () -> Unit) = AutoCloseable { }
-                override suspend fun readRows(): List<MediaStoreAudioRow> = queryAudioRows(Dispatchers.IO) { throw problem }
+                override suspend fun readRows(albumId: AlbumId?): List<MediaStoreAudioRow> = queryAudioRows(Dispatchers.IO) { throw problem }
             }
             val result = MediaStoreLibraryRepository(source, Dispatchers.IO)
                 .observeTracks(LibraryTrackQuery("en")).first() as AppResult.Failure

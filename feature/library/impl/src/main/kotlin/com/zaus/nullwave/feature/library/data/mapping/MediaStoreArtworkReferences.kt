@@ -18,7 +18,7 @@ internal suspend fun List<MediaStoreAudioRow>.artworkReferences(): Map<String, A
     }.toMap()
 }
 
-/** Reuses an already grouped album when building Albums; Songs groups only for its artwork map. */
+/** Revision of a physical MediaStore album, shared with the targeted playback query. */
 internal suspend fun List<MediaStoreAudioRow>.albumArtwork(key: String): ArtworkRef {
     val context = currentCoroutineContext()
     val digest = MessageDigest.getInstance("SHA-256")

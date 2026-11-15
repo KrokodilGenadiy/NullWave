@@ -22,17 +22,21 @@ internal fun MediaStoreAudioRow.validateAudioIdentityAndGetVolume(): String {
 
 /** Missing membership omits only that group; malformed audio identity is still a provider failure. */
 internal suspend fun List<MediaStoreAudioRow>.catalogGroups(
-    entityId: (MediaStoreAudioRow) -> Long?,
+    keyOnVolume: MediaStoreAudioRow.() -> String?,
 ): Map<String, List<MediaStoreAudioRow>> {
     val context = currentCoroutineContext()
     val groups = linkedMapOf<String, MutableList<MediaStoreAudioRow>>()
     for (row in this) {
         context.ensureActive()
-        val volume = row.validateAudioIdentityAndGetVolume()
-        val id = entityId(row)?.takeIf { it >= 0 } ?: continue
-        groups.getOrPut("$volume:$id") { mutableListOf() }.add(row)
+        val id = row.catalogKey(keyOnVolume) ?: continue
+        groups.getOrPut(id) { mutableListOf() }.add(row)
     }
     return groups
+}
+
+internal inline fun MediaStoreAudioRow.catalogKey(keyOnVolume: MediaStoreAudioRow.() -> String?): String? {
+    val volume = validateAudioIdentityAndGetVolume()
+    return keyOnVolume()?.let { "$volume:$it" }
 }
 
 /** Prefer a known label from the lowest track ID, independent of cursor order and UI locale. */

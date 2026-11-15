@@ -25,6 +25,12 @@ internal fun audioSelection(sdk: Int): String = if (sdk >= 30) {
     "${Media.IS_PENDING} = 0"
 }
 
+internal fun catalogProjection(sdk: Int): Array<String> = if (sdk >= 30) {
+    audioProjection + arrayOf(Media.GENERATION_MODIFIED, Media.RELATIVE_PATH, Media.ALBUM_ARTIST)
+} else {
+    audioProjection
+}
+
 /** Await cancellation signals the blocking provider before coroutineScope joins its worker. */
 internal suspend fun queryAudioRows(
     io: CoroutineDispatcher,
@@ -70,6 +76,11 @@ private fun Cursor.readRows(cancellation: CancellationSignal): List<MediaStoreAu
     val modified = getColumnIndexOrThrow(Media.DATE_MODIFIED)
     val artistId = getColumnIndexOrThrow(Media.ARTIST_ID)
     val generation = getColumnIndex(Media.GENERATION_MODIFIED)
+    val relativePath = getColumnIndex(Media.RELATIVE_PATH)
+    val albumArtist = getColumnIndex(Media.ALBUM_ARTIST)
+    // Download grouping needs both columns: without ALBUM_ARTIST (Android 10) every row would look
+    // like it has no album artist, so the folder is left unread and rows keep their provider album.
+    val track = getColumnIndex(Media.TRACK)
     return buildList {
         while (true) {
             cancellation.throwIfCanceled()
@@ -89,6 +100,9 @@ private fun Cursor.readRows(cancellation: CancellationSignal): List<MediaStoreAu
                 dateModifiedSeconds = if (isNull(modified)) null else getLong(modified),
                 artistId = if (isNull(artistId)) null else getLong(artistId),
                 generationModified = if (generation >= 0 && !isNull(generation)) getLong(generation) else null,
+                relativePath = if (relativePath >= 0 && albumArtist >= 0) getString(relativePath) else null,
+                albumArtist = if (albumArtist >= 0) getString(albumArtist) else null,
+                trackNumber = if (track >= 0 && !isNull(track)) getLong(track) else null,
             ))
         }
     }

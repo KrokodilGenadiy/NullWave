@@ -1,5 +1,7 @@
 package com.zaus.nullwave.feature.library.data.source
 
+import com.zaus.nullwave.feature.library.api.model.album.AlbumId
+
 /** Fake of the platform seam; repository flow/error/mapping code stays real in these tests. */
 internal class FakeMediaStoreAudioSource : MediaStoreAudioSource {
     var granted = true
@@ -31,7 +33,7 @@ internal class FakeMediaStoreAudioSource : MediaStoreAudioSource {
         }
     }
 
-    override suspend fun readRows(): List<MediaStoreAudioRow> {
+    override suspend fun readRows(albumId: AlbumId?): List<MediaStoreAudioRow> {
         check(activeObservers > 0) { "Reading before observing would miss changes" }
         reads++
         return read()

@@ -5,6 +5,7 @@ import com.zaus.nullwave.core.di.dispatchers.IoDispatcher
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchQuery
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
+import com.zaus.nullwave.feature.library.api.repository.LibraryAlbumDetailsRepository
 import com.zaus.nullwave.feature.library.api.repository.LibraryRepository
 import com.zaus.nullwave.feature.library.api.repository.LibrarySearchRepository
 import com.zaus.nullwave.feature.library.data.source.audioRow
@@ -28,7 +29,7 @@ import org.junit.Test
 /** Real production repository bindings; only the Android source and dispatcher are replaced. */
 class LibraryRepositoryGraphTest {
     @Test
-    fun `catalog tracks and search alias one lazy scoped implementation per graph`() = runTest {
+    fun `catalog tracks search and album details share one lazy scoped implementation per graph`() = runTest {
         val source = FakeMediaStoreAudioSource().apply { read = { listOf(audioRow(title = "Needle")) } }
         val dispatcher = StandardTestDispatcher(testScheduler)
         val factory = createGraphFactory<LibraryRepositoryTestGraph.Factory>()
@@ -36,6 +37,7 @@ class LibraryRepositoryGraphTest {
         val second = factory.create(source, dispatcher)
         assertSame(first.catalog, first.tracks)
         assertSame(first.catalog, first.search)
+        assertSame(first.catalog, first.albumDetails)
         assertSame(first.search, first.search)
         assertNotSame(first.search, second.search)
         assertEquals(0, source.reads)
@@ -61,6 +63,7 @@ internal interface LibraryRepositoryTestGraph {
     fun waveformSync(): WaveformCatalogSync = WaveformCatalogSync {}
 
     val catalog: LibraryCatalogRepository
+    val albumDetails: LibraryAlbumDetailsRepository
     val tracks: LibraryRepository
     val search: LibrarySearchRepository
 

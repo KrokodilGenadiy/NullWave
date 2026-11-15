@@ -1,5 +1,6 @@
 package com.zaus.nullwave.feature.library.data.mapping
 
+import com.zaus.nullwave.core.media.model.ArtworkRef
 import com.zaus.nullwave.feature.library.api.model.album.AlbumArtistCredit
 import com.zaus.nullwave.feature.library.api.model.album.AlbumId
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
@@ -9,19 +10,33 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
 internal suspend fun List<MediaStoreAudioRow>.toAlbums(query: LibraryAlbumQuery): List<LibraryAlbum> {
-    val groups = catalogGroups { it.albumId }
+    val groups = catalogGroups(MediaStoreAudioRow::albumKeyOnVolume)
+    val artwork = artworkReferences()
     return groups.map { (id, members) ->
-        members.toAlbum(id)
+        members.toAlbum(id, artwork)
     }.sortedCatalog(query.localeTag, query.direction, LibraryAlbum::title) { it.id.value }
 }
 
-/** Receives one nonempty group from catalogGroups, before any search filtering. */
-internal suspend fun List<MediaStoreAudioRow>.toAlbum(id: String): LibraryAlbum = LibraryAlbum(
+/** Only loose audio in the public Download folder shares this catalog identity. */
+internal fun MediaStoreAudioRow.albumKeyOnVolume(): String? {
+    val providerId = albumId?.takeIf { it >= 0 } ?: return null
+    if (relativePath?.trimEnd('/') == "Download" &&
+        album.metadataOrNull().equals("Download", ignoreCase = true) &&
+        albumArtist.metadataOrNull() == null
+    ) return "folder/Download"
+    return providerId.toString()
+}
+
+/** Pick a stable member's provider thumbnail, even when the group spans several provider albums. */
+internal suspend fun List<MediaStoreAudioRow>.toAlbum(
+    id: String,
+    artwork: Map<String, ArtworkRef>,
+): LibraryAlbum = LibraryAlbum(
     id = AlbumId(id),
     title = catalogLabel { it.album },
     artistCredit = artistCredit(),
     trackCount = size,
-    artwork = albumArtwork(id),
+    artwork = artwork[minBy { it.id }.artworkKey()],
 )
 
 private suspend fun List<MediaStoreAudioRow>.artistCredit(): AlbumArtistCredit {

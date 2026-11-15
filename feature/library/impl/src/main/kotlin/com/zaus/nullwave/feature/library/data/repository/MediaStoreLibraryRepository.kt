@@ -6,7 +6,9 @@ import android.database.sqlite.SQLiteDiskIOException
 import android.os.OperationCanceledException
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.DataError
+import com.zaus.nullwave.feature.library.api.model.album.AlbumId
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
+import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumDetails
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumQuery
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
@@ -15,8 +17,10 @@ import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchQuery
 import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchResults
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
+import com.zaus.nullwave.feature.library.api.repository.LibraryAlbumDetailsRepository
 import com.zaus.nullwave.feature.library.api.repository.LibrarySearchRepository
 import com.zaus.nullwave.feature.library.data.mapping.toAlbums
+import com.zaus.nullwave.feature.library.data.mapping.toAlbumDetails
 import com.zaus.nullwave.feature.library.data.mapping.toArtists
 import com.zaus.nullwave.feature.library.data.mapping.toTracks
 import com.zaus.nullwave.feature.library.data.search.toSearchResults
@@ -32,17 +36,30 @@ import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 
 internal class MediaStoreLibraryRepository(
     private val source: MediaStoreAudioSource,
     private val io: CoroutineDispatcher,
     private val waveformSync: WaveformCatalogSync = WaveformCatalogSync {},
-) : LibraryCatalogRepository, LibrarySearchRepository {
+) : LibraryCatalogRepository, LibrarySearchRepository, LibraryAlbumDetailsRepository {
     override fun observeTracks(query: LibraryTrackQuery): Flow<AppResult<List<MediaTrack>, DataError>> =
         observe { it.toTracks(query) }
 
     override fun observeAlbums(query: LibraryAlbumQuery): Flow<AppResult<List<LibraryAlbum>, DataError>> =
         observe { it.toAlbums(query) }
+
+    override fun observeAlbumDetails(albumId: AlbumId, localeTag: String): Flow<AppResult<LibraryAlbumDetails, DataError>> {
+        require(localeTag.isNotBlank()) { "A locale tag is required for album sorting." }
+        return observe(prepareWaveforms = false, albumId = albumId) { it.toAlbumDetails(albumId, localeTag) }
+            .map { result ->
+                when (result) {
+                    is AppResult.Failure -> result
+                    is AppResult.Success -> result.value?.let { AppResult.Success(it) }
+                        ?: AppResult.Failure(DataError.NotFound)
+                }
+            }
+    }
 
     override fun observeArtists(query: LibraryArtistQuery): Flow<AppResult<List<LibraryArtist>, DataError>> =
         observe { it.toArtists(query) }
@@ -52,6 +69,7 @@ internal class MediaStoreLibraryRepository(
 
     private fun <T> observe(
         prepareWaveforms: Boolean = true,
+        albumId: AlbumId? = null,
         transform: suspend (List<MediaStoreAudioRow>) -> T,
     ): Flow<AppResult<T, DataError>> = flow {
         val changes = Channel<Unit>(Channel.CONFLATED)
@@ -64,7 +82,7 @@ internal class MediaStoreLibraryRepository(
                     for (ignored in changes) {
                         var catalogRows: List<MediaStoreAudioRow>? = null
                         val result = readResult {
-                            val rows = source.readRows()
+                            val rows = source.readRows(albumId)
                             transform(rows).also { if (prepareWaveforms) catalogRows = rows }
                         }
                         // Access may have been revoked while the provider was reading or sorting.

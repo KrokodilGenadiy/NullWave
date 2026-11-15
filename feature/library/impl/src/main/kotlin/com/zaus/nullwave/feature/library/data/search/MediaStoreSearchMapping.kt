@@ -6,7 +6,10 @@ import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchQuery
 import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchResults
 import com.zaus.nullwave.feature.library.api.model.search.LibraryTrackSearchHit
 import com.zaus.nullwave.feature.library.api.model.search.normalizeLibrarySearchText
+import com.zaus.nullwave.feature.library.data.mapping.albumKeyOnVolume
 import com.zaus.nullwave.feature.library.data.mapping.artworkKey
+import com.zaus.nullwave.feature.library.data.mapping.artworkReferences
+import com.zaus.nullwave.feature.library.data.mapping.artistKeyOnVolume
 import com.zaus.nullwave.feature.library.data.mapping.catalogGroups
 import com.zaus.nullwave.feature.library.data.mapping.metadataOrNull
 import com.zaus.nullwave.feature.library.data.mapping.toAlbum
@@ -34,13 +37,14 @@ internal suspend fun List<MediaStoreAudioRow>.toSearchResults(query: LibrarySear
         if (row.displayName?.contains('/') == true) throw IOException("MediaStore display name contains a path")
     }
 
-    val albumGroups = catalogGroups { it.albumId }
+    val albumGroups = catalogGroups(MediaStoreAudioRow::albumKeyOnVolume)
+    val artwork = artworkReferences()
     val albums = albumGroups.mapValues { (id, members) ->
-        members.toAlbum(id)
+        members.toAlbum(id, artwork)
     }
     val trackHits = mapNotNull { row ->
         context.ensureActive()
-        val track = row.toTrack(albums[row.artworkKey()]?.artwork)
+        val track = row.toTrack(artwork[row.artworkKey()])
         val fileName = row.displayName.metadataOrNull()
         val primary = normalizeLibrarySearchText(track.title)
         val match = matcher.matchPrimary(primary)
@@ -77,7 +81,7 @@ internal suspend fun List<MediaStoreAudioRow>.toSearchResults(query: LibrarySear
         RankedHit(LibraryAlbumSearchHit(album, names), match.rank ?: SearchMatchRank.Supporting)
     }
 
-    val artistHits = catalogGroups { it.artistId }.mapNotNull { (id, members) ->
+    val artistHits = catalogGroups(MediaStoreAudioRow::artistKeyOnVolume).mapNotNull { (id, members) ->
         val artist = members.toArtist(id)
         val rank = matcher.matchPrimary(artist.name?.let(::normalizeLibrarySearchText)).rank ?: return@mapNotNull null
         RankedHit(artist, rank)

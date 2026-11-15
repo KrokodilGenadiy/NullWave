@@ -1,6 +1,7 @@
 package com.zaus.nullwave.feature.library.di
 
 import com.zaus.nullwave.core.di.dispatchers.IoDispatcher
+import com.zaus.nullwave.feature.library.api.repository.LibraryAlbumDetailsRepository
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
 import com.zaus.nullwave.feature.library.api.repository.LibraryRepository
 import com.zaus.nullwave.feature.library.api.repository.LibrarySearchRepository
@@ -14,7 +15,7 @@ import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.CoroutineDispatcher
 
-/** One scoped implementation, three API capabilities; subscriptions still belong to collectors. */
+/** One scoped implementation; subscriptions still belong to collectors. */
 @BindingContainer
 @ContributesTo(AppScope::class)
 object LibraryRepositoryBindings {
@@ -28,6 +29,9 @@ object LibraryRepositoryBindings {
 
     @Provides
     private fun catalog(repository: MediaStoreLibraryRepository): LibraryCatalogRepository = repository
+
+    @Provides
+    private fun albumDetails(repository: MediaStoreLibraryRepository): LibraryAlbumDetailsRepository = repository
 
     @Provides
     private fun tracks(repository: MediaStoreLibraryRepository): LibraryRepository = repository

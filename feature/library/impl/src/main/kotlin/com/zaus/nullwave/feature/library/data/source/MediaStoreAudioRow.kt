@@ -15,4 +15,7 @@ internal data class MediaStoreAudioRow(
     val dateModifiedSeconds: Long? = null,
     val artistId: Long? = null,
     val generationModified: Long? = null,
+    val relativePath: String? = null,
+    val albumArtist: String? = null,
+    val trackNumber: Long? = null,
 )
