@@ -62,6 +62,9 @@ class AlbumDetailsViewModelTest {
     }
     private val first = details("First")
     private val updated = details("Updated")
+    private val playDenied = AppResult.Failure(
+        PlaybackCommandError.SourceFailure(first.tracks.single().id, PlaybackSourceError.AccessDenied),
+    )
 
     @Before fun setUp() = mvi.setUp()
     @After fun tearDown() = mvi.tearDown()
@@ -217,9 +220,7 @@ class AlbumDetailsViewModelTest {
         assertTrue(playback.calls.isEmpty())
         reply(AppResult.Success(first))
         send(vm, play)
-        playback.calls.single().reply.complete(AppResult.Failure(
-            PlaybackCommandError.SourceFailure(first.tracks.single().id, PlaybackSourceError.AccessDenied),
-        ))
+        playback.calls.single().reply.complete(playDenied)
         runCurrent()
         assertEquals(AlbumDetailsBody.AccessRequired(AccessAction.CheckAgain), vm.body)
         assertTrue(vm.snapshot.value.state.playbackError != null)
@@ -239,6 +240,48 @@ class AlbumDetailsViewModelTest {
         reply(AppResult.Failure(DataError.NotFound))
         send(vm, play)
         assertEquals(2, playback.calls.size)
+    }
+
+    @Test
+    fun `late Play denial after access is restored leaves the refreshed album open`() = runTest(mvi.dispatcher) {
+        val vm = openAlbum()
+        reply(AppResult.Success(first))
+        send(vm, AlbumDetailsIntent.Play(first, AlbumPlaybackStart.At(0)))
+        val oldPlay = playback.calls.single()
+
+        reply(AppResult.Failure(DataError.AccessDenied))
+        assertEquals(AlbumDetailsBody.AccessRequired(AccessAction.CheckAgain), vm.body)
+        send(vm, grant)
+        reply(AppResult.Success(updated))
+
+        assertTrue(oldPlay.reply.complete(playDenied))
+        runCurrent()
+        assertEquals(AlbumDetailsBody.Ready(updated), vm.body)
+        assertEquals(null, vm.snapshot.value.state.playbackError)
+        reply(AppResult.Failure(DataError.NotFound))
+        assertSame(AlbumDetailsBody.NotFound, vm.body)
+        assertEquals(2, reads.size)
+    }
+
+    @Test
+    fun `denial from a new Play closes the restored album even after a routine grant`() = runTest(mvi.dispatcher) {
+        val vm = openAlbum()
+        reply(AppResult.Success(first))
+        reply(AppResult.Failure(DataError.AccessDenied))
+        send(vm, grant)
+        reply(AppResult.Success(updated))
+        send(vm, AlbumDetailsIntent.Play(updated, AlbumPlaybackStart.At(0)))
+        val newPlay = playback.calls.single()
+
+        send(vm, grant)
+        reply(AppResult.Success(updated))
+        assertEquals(AlbumDetailsBody.Ready(updated), vm.body)
+        assertTrue(newPlay.reply.complete(playDenied))
+        runCurrent()
+
+        assertEquals(AlbumDetailsBody.AccessRequired(AccessAction.CheckAgain), vm.body)
+        assertTrue(vm.snapshot.value.state.playbackError != null)
+        assertTrue(reads.last().results.trySend(AppResult.Success(updated)).isFailure)
     }
 
     @Test

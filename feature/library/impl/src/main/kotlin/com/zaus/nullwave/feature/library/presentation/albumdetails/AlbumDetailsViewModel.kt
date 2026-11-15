@@ -105,8 +105,10 @@ internal class AlbumDetailsViewModel(
         on<AlbumDetailsIntent.DismissPlaybackError> { reduce { copy(playbackError = null) } }
         on<AlbumDetailsIntent.AccessChecked> { intent ->
             when (val access = intent.access) {
-                LibraryAccess.Granted -> refresh(album) {
-                    copy(platformGranted = true, body = AlbumDetailsBody.Loading(body.details))
+                LibraryAccess.Granted -> {
+                    // A Play sent before access was lost can still have a pending service reply.
+                    if (state.body is AlbumDetailsBody.AccessRequired) cancel(play)
+                    refresh(album) { copy(platformGranted = true, body = AlbumDetailsBody.Loading(body.details)) }
                 }
                 is LibraryAccess.Required -> {
                     cancel(play)
