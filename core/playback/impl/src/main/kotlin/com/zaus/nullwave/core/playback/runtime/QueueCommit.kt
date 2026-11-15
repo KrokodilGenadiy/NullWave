@@ -1,5 +1,6 @@
 package com.zaus.nullwave.core.playback.runtime
 
+import com.zaus.nullwave.core.playback.api.command.PlaybackQueueOrder
 import com.zaus.nullwave.core.playback.api.model.PlaybackItemToken
 import com.zaus.nullwave.core.playback.api.model.QueueEntry
 import com.zaus.nullwave.core.playback.preparation.PreparedQueue
@@ -8,11 +9,16 @@ import com.zaus.nullwave.core.playback.preparation.PreparedQueue
 @ConsistentCopyVisibility
 internal data class QueueCommit private constructor(
     val prepared: PreparedQueue,
+    val order: PlaybackQueueOrder,
     val entries: List<QueueEntry>,
     val current: PlaybackItemToken,
 ) {
     companion object {
-        fun create(prepared: PreparedQueue, identities: PlaybackIdentities): QueueCommit {
+        fun create(
+            prepared: PreparedQueue,
+            identities: PlaybackIdentities,
+            order: PlaybackQueueOrder = prepared.request.order,
+        ): QueueCommit {
             val entries = prepared.items.map { QueueEntry(identities.newEntryId(), it.track) }
             check(entries.map { it.entryId }.toSet().size == entries.size) {
                 "Playback identities must be unique for every queue occurrence."
@@ -23,6 +29,7 @@ internal data class QueueCommit private constructor(
             }
             return QueueCommit(
                 prepared,
+                order,
                 protectedEntries,
                 identities.activate(entries[prepared.request.startIndex].entryId),
             )

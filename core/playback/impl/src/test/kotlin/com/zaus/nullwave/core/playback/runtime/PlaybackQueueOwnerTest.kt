@@ -4,6 +4,7 @@ import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommand
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError
+import com.zaus.nullwave.core.playback.api.command.PlaybackQueueOrder
 import com.zaus.nullwave.core.playback.api.command.PlaybackQueueRequest
 import com.zaus.nullwave.core.playback.api.model.PlaybackProblemId
 import com.zaus.nullwave.core.playback.api.model.QueueEntryId
@@ -154,6 +155,29 @@ class PlaybackQueueOwnerTest {
         runCurrent()
         assertSuccess(replacement.await())
         assertEquals(listOf(RepeatMode.All to true), fixture.target.installModes)
+        assertEquals(PlaybackQueueOrder.KeepShuffleMode, fixture.target.commits.single().order)
+        fixture.close()
+    }
+
+    @Test
+    fun `only successful shuffle changes override the current album request`() = runTest {
+        val fixture = Fixture(this)
+        val release = CompletableDeferred<Unit>()
+        fixture.resolver.read = { id -> release.await(); AppResult.Success(resolved(id)) }
+        val album = PlaybackCommand.ReplaceQueue(PlaybackQueueRequest.create(
+            listOf(trackId("first"), trackId("second")), startIndex = 1, order = PlaybackQueueOrder.InOrder,
+        ))
+        val replacement = fixture.submit(album)
+        runCurrent()
+        assertSuccess(fixture.owner.execute(PlaybackCommand.SetShuffle(true)))
+        fixture.target.commandResult = AppResult.Failure(PlaybackCommandError.CommandUnavailable)
+        assertFailure(fixture.owner.execute(PlaybackCommand.SetShuffle(false)), PlaybackCommandError.CommandUnavailable)
+        release.complete(Unit)
+        assertSuccess(replacement.await())
+        assertEquals(PlaybackQueueOrder.Shuffled, fixture.target.commits.single().order)
+
+        assertSuccess(fixture.owner.execute(album))
+        assertEquals(PlaybackQueueOrder.InOrder, fixture.target.commits.last().order)
         fixture.close()
     }
 

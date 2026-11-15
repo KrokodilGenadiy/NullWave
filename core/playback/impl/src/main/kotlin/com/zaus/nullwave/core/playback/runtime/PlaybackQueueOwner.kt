@@ -2,6 +2,7 @@ package com.zaus.nullwave.core.playback.runtime
 
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommand
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError
+import com.zaus.nullwave.core.playback.api.command.PlaybackQueueOrder
 import com.zaus.nullwave.core.playback.preparation.QueuePreparer
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.EmptyResult
@@ -56,7 +57,11 @@ internal class PlaybackQueueOwner(
                     if (command !is PlaybackCommand.SetRepeat && command !is PlaybackCommand.SetShuffle) {
                         invalidate(PlaybackCommandError.Superseded)
                     }
-                    CompletableDeferred(runTarget(command) { target.execute(command) })
+                    val result = runTarget(command) { target.execute(command) }
+                    if (command is PlaybackCommand.SetShuffle && result is AppResult.Success) {
+                        pending?.applyShuffle(command.enabled)
+                    }
+                    CompletableDeferred(result)
                 }
             }
         }
@@ -86,7 +91,7 @@ internal class PlaybackQueueOwner(
 
     private fun accept(command: PlaybackCommand.ReplaceQueue): CompletableDeferred<EmptyResult<PlaybackCommandError>> {
         invalidate(PlaybackCommandError.Superseded)
-        val accepted = Pending(lifetime)
+        val accepted = Pending(lifetime, command.request.order)
         val work = scope.launch(start = CoroutineStart.LAZY) {
             try {
                 val result = preparer.prepare(command.request)
@@ -95,7 +100,7 @@ internal class PlaybackQueueOwner(
                     try {
                         val outcome = when (result) {
                             is AppResult.Success -> {
-                                val commit = QueueCommit.create(result.value, identities)
+                                val commit = QueueCommit.create(result.value, identities, accepted.order)
                                 // Payload construction can take time; service lifetime may end meanwhile.
                                 if (closed || !lifetime.isActive || pending !== accepted) return@withLock
                                 rememberFailure(command, target.install(commit))
@@ -163,8 +168,15 @@ internal class PlaybackQueueOwner(
         previous.work.cancel()
     }
 
-    private class Pending(parent: Job) {
+    private class Pending(parent: Job, var order: PlaybackQueueOrder) {
         val reply = CompletableDeferred<EmptyResult<PlaybackCommandError>>(parent = parent)
         lateinit var work: Job
+
+        fun applyShuffle(enabled: Boolean) {
+            // KeepShuffleMode already follows the live player. Explicit orders are owned by this replacement.
+            if (order != PlaybackQueueOrder.KeepShuffleMode) {
+                order = if (enabled) PlaybackQueueOrder.Shuffled else PlaybackQueueOrder.InOrder
+            }
+        }
     }
 }

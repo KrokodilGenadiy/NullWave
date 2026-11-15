@@ -12,6 +12,7 @@ import com.zaus.nullwave.core.playback.api.PlaybackClock
 import com.zaus.nullwave.core.playback.api.command.PlaybackCapability
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommand
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError
+import com.zaus.nullwave.core.playback.api.command.PlaybackQueueOrder
 import com.zaus.nullwave.core.playback.api.model.PlaybackItemToken
 import com.zaus.nullwave.core.playback.api.model.PlaybackPhase
 import com.zaus.nullwave.core.playback.api.model.PlaybackProblem
@@ -73,6 +74,12 @@ internal class Media3QueueCommitTarget(
             return unavailable()
         }
         check(commit.current.sessionId == identities.sessionId) { "Queue belongs to a different service session." }
+        val request = commit.prepared.request
+        val disableShuffle = commit.order == PlaybackQueueOrder.InOrder && player.shuffleModeEnabled
+        val shufflePlayer = if (commit.order == PlaybackQueueOrder.Shuffled) {
+            player as? ExoPlayer ?: return unavailable()
+        } else null
+        if ((disableShuffle || shufflePlayer != null) && !supports(Player.COMMAND_SET_SHUFFLE_MODE)) return unavailable()
         val items = commit.prepared.items.mapIndexed { index, resolved ->
             val entry = commit.entries[index]
             MediaItem.Builder()
@@ -94,11 +101,16 @@ internal class Media3QueueCommitTarget(
         return mutate {
             player.playWhenReady = false
             player.setMediaItems(
-                items, commit.prepared.request.startIndex,
-                commit.prepared.request.startPositionMs.coerceAtMost(MAX_MEDIA3_POSITION_MS),
+                items, request.startIndex, request.startPositionMs.coerceAtMost(MAX_MEDIA3_POSITION_MS),
             )
+            if (shufflePlayer != null) {
+                shufflePlayer.setShuffleOrder(shuffledOrderStartingAt(items.size, request.startIndex))
+                shufflePlayer.shuffleModeEnabled = true
+            } else if (disableShuffle) {
+                player.shuffleModeEnabled = false
+            }
             player.prepare()
-            player.playWhenReady = commit.prepared.request.playRequested
+            player.playWhenReady = request.playRequested
         }
     }
 
@@ -236,6 +248,16 @@ internal class Media3QueueCommitTarget(
         val baseIndices = queue.entries.withIndex().associate { (index, entry) -> entry.entryId to index }
         val order = IntArray(desired.playOrder.size) { baseIndices.getValue(desired.playOrder[it]) }
         return mutate { exoPlayer.setShuffleOrder(DefaultShuffleOrder(order, Random.nextLong())) }
+    }
+
+    private fun shuffledOrderStartingAt(size: Int, startIndex: Int): DefaultShuffleOrder {
+        val order = IntArray(size) { it }
+        order.shuffle()
+        // Swap the selected occurrence into the first slot; the remaining slots stay random.
+        val selectedSlot = order.indexOf(startIndex)
+        order[selectedSlot] = order[0]
+        order[0] = startIndex
+        return DefaultShuffleOrder(order, Random.nextLong())
     }
 
     private fun previous(): EmptyResult<PlaybackCommandError> {
