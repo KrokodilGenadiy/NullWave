@@ -34,6 +34,9 @@ internal class ControlledSearchPlaybackController : PlaybackController {
     var progressObservations = 0
         private set
 
+    override val publishedSnapshot: PlaybackSnapshot?
+        get() = (states.value as? PlaybackConnection.Connected)?.snapshot
+
     override fun observeState(): Flow<PlaybackConnection> {
         val observation = ++stateObservations
         return flow {
@@ -59,7 +62,7 @@ internal class ControlledSearchPlaybackController : PlaybackController {
     ): EmptyResult<PlaybackCommandError> {
         beforeCommandDispatch()
         connectionFailure?.let { return it }
-        beforeDispatch((states.value as? PlaybackConnection.Connected)?.snapshot)
+        beforeDispatch(publishedSnapshot)
         val call = Call(command).also(calls::add)
         try {
             return call.reply.await()

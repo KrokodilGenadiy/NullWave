@@ -32,6 +32,9 @@ internal class ControlledPlayerPlaybackController : PlaybackController {
     var activeProgressCollectors = 0
         private set
 
+    override val publishedSnapshot: PlaybackSnapshot?
+        get() = (states.value as? PlaybackConnection.Connected)?.snapshot
+
     override fun observeState(): Flow<PlaybackConnection> = flow {
         val observation = ++stateObservations
         activeStateCollectors++
@@ -54,7 +57,7 @@ internal class ControlledPlayerPlaybackController : PlaybackController {
         command: PlaybackCommand,
         beforeDispatch: (PlaybackSnapshot?) -> Unit,
     ): EmptyResult<PlaybackCommandError> {
-        beforeDispatch((states.value as? PlaybackConnection.Connected)?.snapshot)
+        beforeDispatch(publishedSnapshot)
         val call = Call(command).also(calls::add)
         try { return call.reply.await() }
         catch (failure: CancellationException) {

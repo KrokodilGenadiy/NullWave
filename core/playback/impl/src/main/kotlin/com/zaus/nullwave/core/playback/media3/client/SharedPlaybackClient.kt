@@ -73,6 +73,9 @@ internal class SharedPlaybackClient(
     private var stateObserver: Job? = null
     private var progressObserver: Job? = null
 
+    override val publishedSnapshot: PlaybackSnapshot?
+        get() = registry.snapshot.value
+
     override fun observeState(): Flow<PlaybackConnection> = flow {
         // flowOn may enter an already-cancelled producer before its first emission.
         currentCoroutineContext().ensureActive()
@@ -140,7 +143,7 @@ internal class SharedPlaybackClient(
             if (!isCurrent(connection)) return@withContext AppResult.Failure(PlaybackCommandError.ConnectionUnavailable)
             registry.clearConnectionError()
             if (!isCurrent(connection)) return@withContext AppResult.Failure(PlaybackCommandError.ConnectionUnavailable)
-            beforeDispatch(registry.snapshot.value)
+            beforeDispatch(publishedSnapshot)
             // A synchronous callback can cancel its caller or replace/disconnect the service.
             currentCoroutineContext().ensureActive()
             if (!isCurrent(connection)) return@withContext AppResult.Failure(PlaybackCommandError.ConnectionUnavailable)

@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.flowOf
 
 /** Catalog fixtures never connect to the service or start device audio. */
 internal object IdlePlaybackController : PlaybackController {
+    override val publishedSnapshot: PlaybackSnapshot? = null
+
     override fun observeState(): Flow<PlaybackConnection> = flowOf(PlaybackConnection.Disconnected)
     override fun observeProgress(): Flow<PlaybackProgress?> = flowOf(null)
     override suspend fun reconnect(): EmptyResult<PlaybackConnectionError> = AppResult.Success(Unit)

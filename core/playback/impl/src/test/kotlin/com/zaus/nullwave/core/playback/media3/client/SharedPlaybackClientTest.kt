@@ -54,6 +54,21 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class SharedPlaybackClientTest {
     @Test
+    fun `published snapshot follows the attached service without a connection or progress lease`() = runTest {
+        withFixture {
+            assertEquals(snapshot(), client.publishedSnapshot)
+            publish(PlaybackPhase.Ready, playRequested = false)
+            assertEquals(snapshot(), client.publishedSnapshot)
+            registry.detach(session)
+            assertNull(client.publishedSnapshot)
+            val replacement = replaceService(PlaybackSessionId("replacement"))
+            assertSame(replacement, client.publishedSnapshot)
+            assertEquals(0, connector.calls)
+            assertEquals(0, samples)
+        }
+    }
+
+    @Test
     fun `expected connector rejection preserves its cause and permits a fresh command`() = runTest {
         withFixture {
             val original = SecurityException("Session rejected connection")

@@ -24,6 +24,9 @@ internal class RecordingSearchPlaybackController : PlaybackController {
     private val recorded = CopyOnWriteArrayList<Call>()
     val calls: List<Call> get() = recorded.toList()
 
+    override val publishedSnapshot: PlaybackSnapshot?
+        get() = (states.value as? PlaybackConnection.Connected)?.snapshot
+
     override fun observeState(): Flow<PlaybackConnection> = states
     override fun observeProgress(): Flow<PlaybackProgress?> = flowOf(null)
 
@@ -33,7 +36,7 @@ internal class RecordingSearchPlaybackController : PlaybackController {
         command: PlaybackCommand,
         beforeDispatch: (PlaybackSnapshot?) -> Unit,
     ): EmptyResult<PlaybackCommandError> {
-        beforeDispatch((states.value as? PlaybackConnection.Connected)?.snapshot)
+        beforeDispatch(publishedSnapshot)
         val call = Call(command).also(recorded::add)
         return call.reply.await()
     }

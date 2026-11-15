@@ -232,6 +232,9 @@ internal class RecordingHostPlaybackController : PlaybackController {
     var commandGate: CompletableDeferred<Unit>? = null
     var reconnects = 0
 
+    override val publishedSnapshot: PlaybackSnapshot?
+        get() = (connection.value as? PlaybackConnection.Connected)?.snapshot
+
     override fun observeState(): Flow<PlaybackConnection> = flow {
         stateStarts.incrementAndGet()
         maxActiveStates.accumulateAndGet(activeStates.incrementAndGet(), ::maxOf)
@@ -248,7 +251,7 @@ internal class RecordingHostPlaybackController : PlaybackController {
         command: PlaybackCommand,
         beforeDispatch: (PlaybackSnapshot?) -> Unit,
     ): EmptyResult<PlaybackCommandError> {
-        beforeDispatch((connection.value as? PlaybackConnection.Connected)?.snapshot)
+        beforeDispatch(publishedSnapshot)
         commands.add(command)
         commandGate?.await()
         return commandReply

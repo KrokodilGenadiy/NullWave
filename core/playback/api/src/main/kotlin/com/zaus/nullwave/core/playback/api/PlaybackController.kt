@@ -15,6 +15,13 @@ import kotlinx.coroutines.flow.Flow
  * rollback, and no client is allowed to release the service's player through this API.
  */
 interface PlaybackController {
+    /**
+     * Latest snapshot published by the attached service, or null before publication and after detach.
+     * Reading this takes no connection lease and starts no service. Use it to compare an observed
+     * event with the state at a particular instant, including while UI collection is stopped.
+     */
+    val publishedSnapshot: PlaybackSnapshot?
+
     /** Latest control snapshots. Collectors share a connection; losing it does not prove audio stopped. */
     fun observeState(): Flow<PlaybackConnection>
 
