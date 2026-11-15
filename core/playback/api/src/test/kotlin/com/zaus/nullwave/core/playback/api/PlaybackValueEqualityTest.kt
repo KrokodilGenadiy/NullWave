@@ -2,6 +2,7 @@ package com.zaus.nullwave.core.playback.api
 
 import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.core.playback.api.command.PlaybackCapability
+import com.zaus.nullwave.core.playback.api.command.PlaybackQueueOrder
 import com.zaus.nullwave.core.playback.api.command.PlaybackQueueRequest
 import com.zaus.nullwave.core.playback.api.model.PlaybackQueue
 import com.zaus.nullwave.core.playback.api.model.PlaybackSnapshot
@@ -44,5 +45,7 @@ class PlaybackValueEqualityTest {
         assertNotEquals(first, PlaybackQueueRequest.create(ids, startIndex = 1))
         assertNotEquals(first, PlaybackQueueRequest.create(ids, startIndex = 0, startPositionMs = 1))
         assertNotEquals(first, PlaybackQueueRequest.create(ids, startIndex = 0, playRequested = false))
+        assertEquals(PlaybackQueueOrder.KeepShuffleMode, first.order)
+        assertNotEquals(first, PlaybackQueueRequest.create(ids, startIndex = 0, order = PlaybackQueueOrder.Shuffled))
     }
 }

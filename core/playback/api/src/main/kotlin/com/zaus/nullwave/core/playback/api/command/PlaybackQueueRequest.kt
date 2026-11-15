@@ -3,6 +3,9 @@ package com.zaus.nullwave.core.playback.api.command
 import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.core.playback.api.internal.snapshotList
 
+/** Traversal to install with the base playlist. Shuffled traversal begins at the requested index. */
+enum class PlaybackQueueOrder { KeepShuffleMode, InOrder, Shuffled }
+
 /**
  * Captures the caller's order and start selection. Repeated track identities are intentional.
  * Use [create] to capture a protected collection snapshot; the constructor and generated copy are private.
@@ -13,6 +16,7 @@ data class PlaybackQueueRequest private constructor(
     val startIndex: Int,
     val startPositionMs: Long,
     val playRequested: Boolean,
+    val order: PlaybackQueueOrder,
 ) {
     init {
         require(trackIds.isNotEmpty()) { "Use StopAndClear to clear playback, not an empty replacement." }
@@ -26,11 +30,13 @@ data class PlaybackQueueRequest private constructor(
             startIndex: Int,
             startPositionMs: Long = 0,
             playRequested: Boolean = true,
+            order: PlaybackQueueOrder = PlaybackQueueOrder.KeepShuffleMode,
         ): PlaybackQueueRequest = PlaybackQueueRequest(
             trackIds = trackIds.snapshotList(),
             startIndex = startIndex,
             startPositionMs = startPositionMs,
             playRequested = playRequested,
+            order = order,
         )
     }
 }
