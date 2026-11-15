@@ -16,7 +16,7 @@ internal data class SearchState(
     val playbackNotice: SearchPlaybackNotice? = null,
     /** Access-only observation starts with the first admitted play intent, before acknowledgement. */
     val monitorPlayback: Boolean = false,
-    /** A handled access denial cannot close freshly checked results again on rebind. */
+    /** Denial already handled or present at the most recent grant, identified by session and problem ID. */
     val lastPlaybackDenial: SearchPlaybackProblemKey? = null,
     val playingTrackId: TrackId? = null,
 ) : UiState {

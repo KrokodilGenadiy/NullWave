@@ -99,10 +99,12 @@ internal class SearchViewModel(
             reduce { withInput(localeTag = intent.localeTag) }
         }
         on<SearchIntent.AccessChecked> { intent ->
-            if (!intent.granted) cancel(playTrack)
-            // Fresh access checks re-read even an unchanged query; null input still performs no I/O.
-            refresh(results) {
-                withAccess(intent.granted).let { if (intent.granted) it else it.copy(playbackNotice = null) }
+            if (intent.granted) {
+                val denialAtCheck = playbackObservation.publishedDenial()
+                refresh(results) { withAccess(true).copy(lastPlaybackDenial = denialAtCheck) }
+            } else {
+                cancel(playTrack)
+                refresh(results) { withAccess(false).copy(playbackNotice = null) }
             }
         }
         on<SearchIntent.Retry> {

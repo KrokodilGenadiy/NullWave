@@ -27,6 +27,8 @@ internal data class SearchPlaybackAccessUpdate(
 internal class SearchPlaybackObservation(private val controller: PlaybackController) {
     private val initialDenial = CompletableDeferred<SearchPlaybackProblemKey?>()
 
+    fun publishedDenial(): SearchPlaybackProblemKey? = controller.publishedSnapshot?.accessDenial()
+
     suspend fun execute(request: PlaybackQueueRequest): EmptyResult<PlaybackCommandError> =
         controller.execute(PlaybackCommand.ReplaceQueue(request)) { snapshot ->
             initialDenial.complete(snapshot?.accessDenial())
@@ -35,9 +37,9 @@ internal class SearchPlaybackObservation(private val controller: PlaybackControl
     fun observe(): Flow<SearchPlaybackAccessUpdate> = flow {
         val baseline = initialDenial.await()
         emitAll(controller.observeState().mapNotNull { connection ->
-            (connection as? PlaybackConnection.Connected)?.snapshot?.accessDenial()?.let {
-                SearchPlaybackAccessUpdate(it, baseline)
-            }
+            val denial = (connection as? PlaybackConnection.Connected)?.snapshot?.accessDenial() ?: return@mapNotNull null
+            // A delayed client snapshot may describe a problem the service already cleared or replaced.
+            if (denial == publishedDenial()) SearchPlaybackAccessUpdate(denial, baseline) else null
         })
     }
 }

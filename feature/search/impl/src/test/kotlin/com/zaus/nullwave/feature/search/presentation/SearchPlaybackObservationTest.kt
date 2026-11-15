@@ -16,6 +16,8 @@ import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.feature.search.impl.R
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -526,6 +528,86 @@ class SearchPlaybackObservationTest {
             assertEquals(1, playback.calls.size)
             assertEquals(1, playback.activeStateCollectors)
         }
+    }
+
+    @Test
+    fun `Back to Search keeps the results when playback replays a denial published before the grant`() = with(fixture) {
+        runTest(dispatcher) {
+            val reconnect = CompletableDeferred<Unit>()
+            val vm = returnToSearchBeforePlaybackReconnects(reconnect)
+            val displayed = ready(vm)
+
+            reconnect.complete(Unit)
+            runCurrent()
+
+            assertSame(displayed, vm.snapshot.value.state.body)
+        }
+    }
+
+    @Test
+    fun `Back to Search hides the results when the first reconnected denial was published after the grant`() = with(fixture) {
+        runTest(dispatcher) {
+            val reconnect = CompletableDeferred<Unit>()
+            val vm = returnToSearchBeforePlaybackReconnects(reconnect)
+            playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "after-grant")
+
+            reconnect.complete(Unit)
+            runCurrent()
+
+            assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
+        }
+    }
+
+    @Test
+    fun `a delayed denial cleared by the service before the grant leaves Search results visible`() = with(fixture) {
+        runTest(dispatcher) {
+            val captured = CompletableDeferred<Unit>()
+            val deliver = CompletableDeferred<Unit>()
+            playback.stateUpdates = playback.states.onEach { connection ->
+                if ((connection as? PlaybackConnection.Connected)?.snapshot?.transport?.problem != null) {
+                    captured.complete(Unit)
+                    deliver.await()
+                }
+            }
+            val vm = readyVm(songs)
+            send(vm, SearchIntent.PlayTrack(beta.id, songs))
+            playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "cleared")
+            runCurrent()
+            assertTrue(captured.isCompleted)
+            playback.states.value = healthySnapshot()
+            send(vm, SearchIntent.AccessChecked(true))
+            settle()
+            reply(AppResult.Success(results(songs)))
+            val displayed = ready(vm)
+
+            deliver.complete(Unit)
+            runCurrent()
+
+            assertSame(displayed, vm.snapshot.value.state.body)
+        }
+    }
+
+    private suspend fun TestScope.returnToSearchBeforePlaybackReconnects(reconnect: CompletableDeferred<Unit>) = with(fixture) {
+        val vm = createVm()
+        val binding = bind(vm)
+        send(vm, SearchIntent.AccessChecked(true))
+        send(vm, SearchIntent.QueryChanged("m4a"))
+        settle()
+        reply(AppResult.Success(results(songs)))
+        send(vm, SearchIntent.PlayTrack(beta.id, songs))
+        respond(AppResult.Success(Unit))
+        binding.cancel()
+        runCurrent()
+        assertEquals(0, playback.activeStateCollectors)
+
+        playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "before-grant")
+        playback.beforeStateCollection = { reconnect.await() }
+        send(vm, SearchIntent.AccessChecked(true))
+        bind(vm)
+        settle()
+        reply(AppResult.Success(results(songs)))
+        assertEquals(SearchBody.Ready(results(songs)), vm.snapshot.value.state.body)
+        vm
     }
 
     @Test

@@ -25,6 +25,7 @@ internal class ControlledSearchPlaybackController : PlaybackController {
         PlaybackSnapshot.create(PlaybackSessionId("search-test-session")),
     ))
     var beforeStateCollection: suspend (Int) -> Unit = {}
+    var stateUpdates: Flow<PlaybackConnection> = states
     var beforeCommandDispatch: suspend () -> Unit = {}
     var connectionFailure: AppResult.Failure<PlaybackCommandError>? = null
     var stateObservations = 0
@@ -43,7 +44,7 @@ internal class ControlledSearchPlaybackController : PlaybackController {
             activeStateCollectors++
             try {
                 beforeStateCollection(observation)
-                emitAll(states)
+                emitAll(stateUpdates)
             }
             finally { activeStateCollectors-- }
         }
