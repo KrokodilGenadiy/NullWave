@@ -94,8 +94,10 @@ internal class SearchViewModel(
         }
         on<SearchIntent.AccessChecked> { intent ->
             if (intent.granted) {
-                // A Play sent before access was lost can still have a pending service reply.
-                if (state.body == SearchBody.AccessRequired) cancel(playTrack.operation)
+                // Clearing the query after a denial shows Idle but keeps access Required.
+                if (state.body == SearchBody.AccessRequired || state.access == SearchAccess.Required) {
+                    cancel(playTrack.operation)
+                }
                 val denialAtCheck = playTrack.publishedDenial()
                 refresh(results) { withAccess(true).copy(playbackLaunch = playbackLaunch.accessGranted(denialAtCheck)) }
             } else {

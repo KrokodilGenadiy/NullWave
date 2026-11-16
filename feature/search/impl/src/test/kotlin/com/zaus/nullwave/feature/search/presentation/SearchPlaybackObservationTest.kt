@@ -634,6 +634,31 @@ class SearchPlaybackObservationTest {
     }
 
     @Test
+    fun `late Play denial after clearing the query and restoring access leaves new results visible`() = with(fixture) {
+        runTest(dispatcher) {
+            val vm = readyVm(songs)
+            send(vm, SearchIntent.PlayTrack(beta.id, songs))
+            val oldPlay = playback.calls.single()
+            reply(AppResult.Failure(DataError.AccessDenied))
+            assertSame(SearchBody.AccessRequired, vm.snapshot.value.state.body)
+
+            send(vm, SearchIntent.ClearQuery)
+            assertSame(SearchBody.Idle, vm.snapshot.value.state.body)
+            send(vm, SearchIntent.AccessChecked(true))
+            send(vm, SearchIntent.QueryChanged(alpha.title))
+            settle()
+            val newResults = results(listOf(alpha))
+            reply(AppResult.Success(newResults))
+            assertEquals(SearchBody.Ready(newResults), vm.snapshot.value.state.body)
+
+            assertTrue(oldPlay.reply.complete(playDenied()))
+            runCurrent()
+            assertEquals(SearchBody.Ready(newResults), vm.snapshot.value.state.body)
+            assertNull(vm.snapshot.value.state.playbackError)
+        }
+    }
+
+    @Test
     fun `denial from a new Play closes the restored results even after a routine grant`() = with(fixture) {
         runTest(dispatcher) {
             val vm = readyVm(songs)
