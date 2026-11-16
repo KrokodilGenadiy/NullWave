@@ -10,9 +10,11 @@ import com.zaus.nullwave.core.playback.api.model.PlaybackConnectionError
 import com.zaus.nullwave.core.playback.api.model.PlaybackProblemCode
 import com.zaus.nullwave.core.playback.api.model.PlaybackProblemId
 import com.zaus.nullwave.core.playback.api.model.PlaybackSessionId
+import com.zaus.nullwave.feature.player.api.launch.PlaybackProblemKey
 import com.zaus.nullwave.core.playback.api.model.PlaybackSnapshot
 import com.zaus.nullwave.core.playback.api.source.PlaybackSourceError
 import com.zaus.nullwave.core.result.AppResult
+import com.zaus.nullwave.core.result.DataError
 import com.zaus.nullwave.feature.search.impl.R
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -48,9 +50,9 @@ class SearchPlaybackObservationTest {
             playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "before-first-tap")
             runCurrent()
 
-            assertFalse(vm.snapshot.value.state.monitorPlayback)
+            assertFalse(vm.snapshot.value.state.playbackLaunch.monitoring)
             assertNull(vm.snapshot.value.state.playbackError)
-            assertNull(vm.snapshot.value.state.lastPlaybackDenial)
+            assertNull(vm.snapshot.value.state.playbackLaunch.handledDenial)
             assertEquals(beta.id, vm.snapshot.value.state.playingTrackId)
             assertEquals(SearchBody.Ready(results(songs)), vm.snapshot.value.state.body)
             assertEquals(1, playback.stateObservations)
@@ -91,7 +93,7 @@ class SearchPlaybackObservationTest {
             send(vm, SearchIntent.PlayTrack(beta.id, songs))
             playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "before-first-ack")
             runCurrent()
-            assertTrue(vm.snapshot.value.state.monitorPlayback)
+            assertTrue(vm.snapshot.value.state.playbackLaunch.monitoring)
             assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
             assertNull(vm.snapshot.value.state.playbackError)
             assertEquals(2, playback.stateObservations)
@@ -101,7 +103,7 @@ class SearchPlaybackObservationTest {
             assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
             assertNull(vm.snapshot.value.state.playbackError)
             assertEquals(2, playback.stateObservations)
-            assertEquals(PlaybackProblemId("before-first-ack"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
+            assertEquals(PlaybackProblemId("before-first-ack"), vm.snapshot.value.state.playbackLaunch.handledDenial?.problemId)
         }
     }
 
@@ -116,16 +118,16 @@ class SearchPlaybackObservationTest {
             send(vm, SearchIntent.PlayTrack(alpha.id, songs))
             assertTrue(installed.waiterCancelled)
             respond(AppResult.Failure(PlaybackCommandError.SourceFailure(alpha.id, PlaybackSourceError.NotFound)))
-            val notice = vm.snapshot.value.state.playbackNotice
+            val notice = vm.snapshot.value.state.playbackLaunch.notice
             installed.reply.complete(AppResult.Success(Unit))
             runCurrent()
             playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "installed-with-cancelled-ack")
             runCurrent()
 
             assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
-            assertSame(notice, vm.snapshot.value.state.playbackNotice)
+            assertSame(notice, vm.snapshot.value.state.playbackLaunch.notice)
             assertEquals(UiText.Resource(R.string.search_playback_not_found), vm.snapshot.value.state.playbackError)
-            assertEquals(PlaybackProblemId("installed-with-cancelled-ack"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
+            assertEquals(PlaybackProblemId("installed-with-cancelled-ack"), vm.snapshot.value.state.playbackLaunch.handledDenial?.problemId)
             assertEquals(2, playback.activeStateCollectors)
             assertEquals(0, playback.progressObservations)
         }
@@ -141,14 +143,14 @@ class SearchPlaybackObservationTest {
             val catalog = vm.snapshot.value.state.body
             playback.states.value = problemSnapshot(PlaybackProblemCode.DecoderFailure, "old-during-preparation")
             runCurrent()
-            assertNull(vm.snapshot.value.state.playbackNotice)
+            assertNull(vm.snapshot.value.state.playbackLaunch.notice)
             assertSame(catalog, vm.snapshot.value.state.body)
             playback.states.value = healthySnapshot(entryId = "new-alpha", track = alpha, activation = 1)
             runCurrent()
             respond(AppResult.Success(Unit))
 
-            assertNull(vm.snapshot.value.state.playbackNotice)
-            assertNull(vm.snapshot.value.state.lastPlaybackDenial)
+            assertNull(vm.snapshot.value.state.playbackLaunch.notice)
+            assertNull(vm.snapshot.value.state.playbackLaunch.handledDenial)
             assertSame(catalog, vm.snapshot.value.state.body)
         }
     }
@@ -159,13 +161,13 @@ class SearchPlaybackObservationTest {
             val vm = readyVm(songs)
             send(vm, SearchIntent.PlayTrack(alpha.id, songs))
             respond(AppResult.Failure(PlaybackCommandError.SourceFailure(alpha.id, PlaybackSourceError.Io)))
-            val notice = vm.snapshot.value.state.playbackNotice
-            assertEquals(SearchPlaybackNotice(UiText.Resource(R.string.search_playback_read_failed)), notice)
+            val notice = vm.snapshot.value.state.playbackLaunch.notice
+            assertEquals(UiText.Resource(R.string.search_playback_read_failed), notice)
 
             playback.states.value = healthySnapshot(entryId = "still-playing-beta", activation = 3)
             runCurrent()
 
-            assertSame(notice, vm.snapshot.value.state.playbackNotice)
+            assertSame(notice, vm.snapshot.value.state.playbackLaunch.notice)
             assertEquals(UiText.Resource(R.string.search_playback_read_failed), vm.snapshot.value.state.playbackError)
         }
     }
@@ -176,7 +178,7 @@ class SearchPlaybackObservationTest {
             val vm = readyVm(songs)
             send(vm, SearchIntent.PlayTrack(beta.id, songs))
             respond(AppResult.Failure(PlaybackCommandError.ConnectionUnavailable))
-            val notice = vm.snapshot.value.state.playbackNotice
+            val notice = vm.snapshot.value.state.playbackLaunch.notice
             assertNotNull(notice)
             val replacements = listOf(
                 healthySnapshot(activation = 1),
@@ -188,8 +190,8 @@ class SearchPlaybackObservationTest {
             for (replacement in replacements) {
                 playback.states.value = replacement
                 runCurrent()
-                assertSame(notice, vm.snapshot.value.state.playbackNotice)
-                assertNull(vm.snapshot.value.state.lastPlaybackDenial)
+                assertSame(notice, vm.snapshot.value.state.playbackLaunch.notice)
+                assertNull(vm.snapshot.value.state.playbackLaunch.handledDenial)
             }
         }
     }
@@ -208,7 +210,7 @@ class SearchPlaybackObservationTest {
             playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "preexisting-denial", revision = 1)
             runCurrent()
             assertSame(catalog, vm.snapshot.value.state.body)
-            assertNull(vm.snapshot.value.state.lastPlaybackDenial)
+            assertNull(vm.snapshot.value.state.playbackLaunch.handledDenial)
             playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "new-denial", activation = 1)
             runCurrent()
 
@@ -283,8 +285,8 @@ class SearchPlaybackObservationTest {
             playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "reused-id", sessionId = "second-service")
             runCurrent()
             assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
-            assertEquals(SearchPlaybackProblemKey(PlaybackSessionId("second-service"), PlaybackProblemId("reused-id")),
-                vm.snapshot.value.state.lastPlaybackDenial)
+            assertEquals(PlaybackProblemKey(PlaybackSessionId("second-service"), PlaybackProblemId("reused-id")),
+                vm.snapshot.value.state.playbackLaunch.handledDenial)
             send(vm, SearchIntent.AccessChecked(true))
             settle()
             reply(AppResult.Success(results(songs)))
@@ -297,7 +299,7 @@ class SearchPlaybackObservationTest {
 
             assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
             assertNull(vm.snapshot.value.state.playbackError)
-            assertEquals(PlaybackSessionId("third-service"), vm.snapshot.value.state.lastPlaybackDenial?.sessionId)
+            assertEquals(PlaybackSessionId("third-service"), vm.snapshot.value.state.playbackLaunch.handledDenial?.sessionId)
         }
     }
 
@@ -313,19 +315,19 @@ class SearchPlaybackObservationTest {
             for (code in failures) {
                 playback.states.value = problemSnapshot(code, "before-command:$code")
                 runCurrent()
-                assertNull(vm.snapshot.value.state.playbackNotice)
-                assertNull(vm.snapshot.value.state.lastPlaybackDenial)
+                assertNull(vm.snapshot.value.state.playbackLaunch.notice)
+                assertNull(vm.snapshot.value.state.playbackLaunch.handledDenial)
                 assertSame(catalog, vm.snapshot.value.state.body)
             }
             send(vm, SearchIntent.PlayTrack(alpha.id, songs))
             respond(AppResult.Failure(PlaybackCommandError.SourceFailure(alpha.id, PlaybackSourceError.Io)))
-            val notice = vm.snapshot.value.state.playbackNotice
+            val notice = vm.snapshot.value.state.playbackLaunch.notice
             assertNotNull(notice)
             for (code in failures) {
                 playback.states.value = problemSnapshot(code, "after-command:$code")
                 runCurrent()
-                assertSame(notice, vm.snapshot.value.state.playbackNotice)
-                assertNull(vm.snapshot.value.state.lastPlaybackDenial)
+                assertSame(notice, vm.snapshot.value.state.playbackLaunch.notice)
+                assertNull(vm.snapshot.value.state.playbackLaunch.handledDenial)
                 assertSame(catalog, vm.snapshot.value.state.body)
             }
             assertEquals(2, playback.calls.size)
@@ -356,14 +358,14 @@ class SearchPlaybackObservationTest {
                 runCurrent()
                 assertSame(checkedCatalog, vm.snapshot.value.state.body)
                 assertNull(vm.snapshot.value.state.playbackError)
-                assertEquals(PlaybackProblemId("first"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
+                assertEquals(PlaybackProblemId("first"), vm.snapshot.value.state.playbackLaunch.handledDenial?.problemId)
             }
             playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "second", revision = 2)
             runCurrent()
 
             assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
             assertNull(vm.snapshot.value.state.playbackError)
-            assertEquals(PlaybackProblemId("second"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
+            assertEquals(PlaybackProblemId("second"), vm.snapshot.value.state.playbackLaunch.handledDenial?.problemId)
         }
     }
 
@@ -373,14 +375,14 @@ class SearchPlaybackObservationTest {
             val vm = readyVm(songs)
             send(vm, SearchIntent.PlayTrack(beta.id, songs))
             respond(AppResult.Failure(PlaybackCommandError.SourceFailure(beta.id, PlaybackSourceError.Io)))
-            val notice = vm.snapshot.value.state.playbackNotice
+            val notice = vm.snapshot.value.state.playbackLaunch.notice
             assertNotNull(notice)
             send(vm, SearchIntent.AccessChecked(true))
             settle()
             reply(AppResult.Success(results(songs)))
 
-            assertSame(notice, vm.snapshot.value.state.playbackNotice)
-            assertNull(vm.snapshot.value.state.lastPlaybackDenial)
+            assertSame(notice, vm.snapshot.value.state.playbackLaunch.notice)
+            assertNull(vm.snapshot.value.state.playbackLaunch.handledDenial)
             assertEquals(1, playback.calls.size)
         }
     }
@@ -440,14 +442,14 @@ class SearchPlaybackObservationTest {
             playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "denied-after-clear")
             runCurrent()
             assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
-            assertNull(vm.snapshot.value.state.playbackNotice)
+            assertNull(vm.snapshot.value.state.playbackLaunch.notice)
             send(vm, SearchIntent.QueryChanged("another"))
             settle()
 
             assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
             assertEquals(SearchAccess.Required, vm.snapshot.value.state.access)
             assertEquals(reads, repository.calls.size)
-            assertNull(vm.snapshot.value.state.playbackNotice)
+            assertNull(vm.snapshot.value.state.playbackLaunch.notice)
             send(vm, SearchIntent.AccessChecked(true))
             settle()
             reply(AppResult.Success(results(songs)))
@@ -491,7 +493,7 @@ class SearchPlaybackObservationTest {
             assertEquals(SearchBody.Ready(results(songs)), vm.snapshot.value.state.body)
             assertNull(vm.snapshot.value.state.playbackError)
             assertEquals(1, playback.calls.size)
-            assertEquals(PlaybackProblemId("while-unbound"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
+            assertEquals(PlaybackProblemId("while-unbound"), vm.snapshot.value.state.playbackLaunch.handledDenial?.problemId)
             store.clear()
             runCurrent()
             assertEquals(0, playback.activeStateCollectors)
@@ -508,9 +510,9 @@ class SearchPlaybackObservationTest {
             respond(AppResult.Failure(PlaybackCommandError.SourceFailure(beta.id, PlaybackSourceError.Io)))
             playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "not-persisted")
             runCurrent()
-            assertTrue(vm.snapshot.value.state.monitorPlayback)
+            assertTrue(vm.snapshot.value.state.playbackLaunch.monitoring)
             assertNotNull(vm.snapshot.value.state.playbackError)
-            assertNotNull(vm.snapshot.value.state.lastPlaybackDenial)
+            assertNotNull(vm.snapshot.value.state.playbackLaunch.handledDenial)
             val restoredHandle = SavedStateHandle(handle.keys().associateWith { handle.get<Any?>(it) })
             store.clear()
             runCurrent()
@@ -521,9 +523,9 @@ class SearchPlaybackObservationTest {
 
             assertEquals("  M4A  ", restored.snapshot.value.state.rawQuery)
             assertEquals(SearchAccess.Unchecked, restored.snapshot.value.state.access)
-            assertFalse(restored.snapshot.value.state.monitorPlayback)
+            assertFalse(restored.snapshot.value.state.playbackLaunch.monitoring)
             assertEquals(alpha.id, restored.snapshot.value.state.playingTrackId)
-            assertNull(restored.snapshot.value.state.lastPlaybackDenial)
+            assertNull(restored.snapshot.value.state.playbackLaunch.handledDenial)
             assertNull(restored.snapshot.value.state.playbackError)
             assertEquals(1, playback.calls.size)
             assertEquals(1, playback.activeStateCollectors)
@@ -611,6 +613,51 @@ class SearchPlaybackObservationTest {
     }
 
     @Test
+    fun `late Play denial after access is restored leaves the refreshed results open`() = with(fixture) {
+        runTest(dispatcher) {
+            val vm = readyVm(songs)
+            send(vm, SearchIntent.PlayTrack(beta.id, songs))
+            val oldPlay = playback.calls.single()
+            reply(AppResult.Failure(DataError.AccessDenied))
+            assertSame(SearchBody.AccessRequired, vm.snapshot.value.state.body)
+
+            send(vm, SearchIntent.AccessChecked(true))
+            settle()
+            reply(AppResult.Success(results(songs)))
+            assertTrue(oldPlay.waiterCancelled)
+            oldPlay.reply.complete(playDenied())
+            runCurrent()
+
+            assertEquals(SearchBody.Ready(results(songs)), vm.snapshot.value.state.body)
+            assertNull(vm.snapshot.value.state.playbackError)
+        }
+    }
+
+    @Test
+    fun `denial from a new Play closes the restored results even after a routine grant`() = with(fixture) {
+        runTest(dispatcher) {
+            val vm = readyVm(songs)
+            reply(AppResult.Failure(DataError.AccessDenied))
+            send(vm, SearchIntent.AccessChecked(true))
+            settle()
+            reply(AppResult.Success(results(songs)))
+            send(vm, SearchIntent.PlayTrack(beta.id, songs))
+
+            send(vm, SearchIntent.AccessChecked(true))
+            settle()
+            reply(AppResult.Success(results(songs)))
+            assertEquals(SearchBody.Ready(results(songs)), vm.snapshot.value.state.body)
+            respond(playDenied())
+
+            assertSame(SearchBody.AccessRequired, vm.snapshot.value.state.body)
+            assertEquals(UiText.Resource(R.string.search_playback_access_denied), vm.snapshot.value.state.playbackError)
+        }
+    }
+
+    private fun SearchPlaybackFixture.playDenied() =
+        AppResult.Failure(PlaybackCommandError.SourceFailure(beta.id, PlaybackSourceError.AccessDenied))
+
+    @Test
     fun `delayed state collection compares against dispatch baseline instead of missing a new denial`() = with(fixture) {
         runTest(dispatcher) {
             val vm = readyVm(songs)
@@ -628,7 +675,7 @@ class SearchPlaybackObservationTest {
 
             assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
             assertNull(vm.snapshot.value.state.playbackError)
-            assertEquals(PlaybackProblemId("before-collection"), vm.snapshot.value.state.lastPlaybackDenial?.problemId)
+            assertEquals(PlaybackProblemId("before-collection"), vm.snapshot.value.state.playbackLaunch.handledDenial?.problemId)
             respond(AppResult.Success(Unit))
             assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
         }

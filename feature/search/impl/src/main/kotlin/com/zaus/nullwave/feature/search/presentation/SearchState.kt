@@ -5,6 +5,7 @@ import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.core.mvi.ui.UiText
 import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchQuery
 import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchResults
+import com.zaus.nullwave.feature.player.api.launch.PlaybackLaunchState
 
 internal data class SearchState(
     val localeTag: String,
@@ -12,15 +13,11 @@ internal data class SearchState(
     /** Last platform check/input gate, not authorization that bypasses repository access checks. */
     val access: SearchAccess = SearchAccess.Unchecked,
     val body: SearchBody = SearchBody.Idle,
-    /** Playback failures do not replace the query/results and are never persisted. */
-    val playbackNotice: SearchPlaybackNotice? = null,
-    /** Access-only observation starts with the first admitted play intent, before acknowledgement. */
-    val monitorPlayback: Boolean = false,
-    /** Denial already handled or present at the most recent grant, identified by session and problem ID. */
-    val lastPlaybackDenial: SearchPlaybackProblemKey? = null,
+    /** Track starts from this screen: failures do not replace the query/results and are never persisted. */
+    val playbackLaunch: PlaybackLaunchState = PlaybackLaunchState(),
     val playingTrackId: TrackId? = null,
 ) : UiState {
-    val playbackError: UiText? get() = playbackNotice?.message
+    val playbackError: UiText? get() = playbackLaunch.notice
 
     val query: LibrarySearchQuery? = LibrarySearchQuery.fromInput(rawQuery, localeTag)
 

@@ -26,7 +26,7 @@ import com.zaus.nullwave.feature.library.api.ui.LibraryAccessUi
 import com.zaus.nullwave.feature.search.impl.R
 import com.zaus.nullwave.feature.search.presentation.SearchBody
 import com.zaus.nullwave.feature.search.presentation.SearchIntent
-import com.zaus.nullwave.feature.search.presentation.SearchPlaybackNotice
+import com.zaus.nullwave.feature.player.api.launch.PlaybackLaunchState
 import com.zaus.nullwave.feature.search.presentation.SearchRefresh
 import com.zaus.nullwave.feature.search.presentation.SearchState
 import org.junit.Assert.assertEquals
@@ -97,7 +97,7 @@ class SearchScreenInstrumentedTest {
         compose.onNodeWithTag("search_results").performScrollToIndex(41)
         val anchor = compose.onNodeWithTag("search_track:track:40").fetchSemanticsNode().boundsInRoot.top
         compose.runOnIdle {
-            state.value = state.value.copy(playbackNotice = SearchPlaybackNotice(
+            state.value = state.value.copy(playbackLaunch = PlaybackLaunchState(notice =
                 UiText.Resource(R.string.search_playback_not_found),
             ))
         }
@@ -221,7 +221,7 @@ class SearchScreenInstrumentedTest {
                     is SearchIntent.QueryChanged -> state.value = state.value.copy(rawQuery = intent.value,
                         body = if (intent.value.isBlank()) SearchBody.Idle else state.value.body)
                     SearchIntent.ClearQuery -> state.value = SearchState("en")
-                    SearchIntent.DismissPlaybackError -> state.value = state.value.copy(playbackNotice = null)
+                    SearchIntent.DismissPlaybackError -> state.value = state.value.copy(playbackLaunch = state.value.playbackLaunch.dismissed())
                     else -> Unit
                 }
             }, { back++ }, access)

@@ -25,6 +25,7 @@ dependencies {
     androidTestImplementation(libs.kotlinx.coroutines.test)
     implementation(project(":feature:search:api"))
     implementation(project(":feature:library:api"))
+    implementation(project(":feature:player:api"))
     implementation(project(":core:di"))
     implementation(project(":core:navigation"))
     implementation(project(":core:designsystem"))

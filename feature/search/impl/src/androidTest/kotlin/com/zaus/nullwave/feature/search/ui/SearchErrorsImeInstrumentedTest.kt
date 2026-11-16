@@ -27,7 +27,7 @@ import com.zaus.nullwave.core.mvi.ui.UiText
 import com.zaus.nullwave.feature.search.impl.R
 import com.zaus.nullwave.feature.search.presentation.SearchBody
 import com.zaus.nullwave.feature.search.presentation.SearchIntent
-import com.zaus.nullwave.feature.search.presentation.SearchPlaybackNotice
+import com.zaus.nullwave.feature.player.api.launch.PlaybackLaunchState
 import com.zaus.nullwave.feature.search.presentation.SearchRefresh
 import com.zaus.nullwave.feature.search.presentation.SearchState
 import org.junit.Assert.assertEquals
@@ -54,7 +54,7 @@ class SearchErrorsImeInstrumentedTest {
         compose.runOnIdle {
             state.value = state.value.copy(
                 body = SearchBody.Ready(searchResults(), SearchRefresh.Failed(UiText.Resource(R.string.search_refresh_failed))),
-                playbackNotice = SearchPlaybackNotice(UiText.Resource(R.string.search_playback_connection_failed)),
+                playbackLaunch = PlaybackLaunchState(notice = UiText.Resource(R.string.search_playback_connection_failed)),
             )
         }
 
@@ -89,7 +89,7 @@ class SearchErrorsImeInstrumentedTest {
         state.value = when (intent) {
             is SearchIntent.QueryChanged -> state.value.copy(rawQuery = intent.value)
             SearchIntent.Retry -> state.value.copy(body = (state.value.body as SearchBody.Ready).copy(refresh = SearchRefresh.Running))
-            SearchIntent.DismissPlaybackError -> state.value.copy(playbackNotice = null)
+            SearchIntent.DismissPlaybackError -> state.value.copy(playbackLaunch = state.value.playbackLaunch.dismissed())
             else -> state.value
         }
     }

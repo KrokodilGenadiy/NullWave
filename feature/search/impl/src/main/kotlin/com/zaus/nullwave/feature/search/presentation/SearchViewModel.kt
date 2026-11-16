@@ -7,10 +7,9 @@ import com.zaus.nullwave.core.mvi.BaseMviViewModel
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
 import com.zaus.nullwave.core.playback.api.PlaybackController
 import com.zaus.nullwave.core.playback.api.observeCurrentTrackId
-import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError
 import com.zaus.nullwave.core.playback.api.command.PlaybackQueueRequest
-import com.zaus.nullwave.core.result.EmptyResult
 import com.zaus.nullwave.feature.library.api.repository.LibrarySearchRepository
+import com.zaus.nullwave.feature.player.api.launch.playbackLaunch
 import com.zaus.nullwave.feature.search.di.SearchInitialLocale
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Assisted
@@ -22,7 +21,6 @@ import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactoryKey
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlin.time.Duration.Companion.milliseconds
 
 /** Presentation only. Root owns platform checks; the repository remains main-safe and cold. */
@@ -38,8 +36,6 @@ internal class SearchViewModel(
     // Search is ephemeral: leaving the UI cancels pending debounce and observations immediately.
     sourceStopTimeoutMillis = 0,
 ) {
-    private val playbackObservation = SearchPlaybackObservation(playbackController)
-
     @AssistedFactory
     @ViewModelAssistedFactoryKey(SearchViewModel::class)
     @ContributesIntoMap(AppScope::class)
@@ -66,16 +62,14 @@ internal class SearchViewModel(
             if (body == SearchBody.AccessRequired) this else applyResult(result)
         }
 
-        val playTrack = latest<PlaybackQueueRequest, EmptyResult<PlaybackCommandError>>("search.playTrack") {
-            execute(playbackObservation::execute)
-            onAccepted { copy(playbackNotice = null, monitorPlayback = true) }
-            onResult { _, result -> withPlaybackResult(result) }
-        }
-        source(
-            name = "search.playbackAccess",
-            input = { monitorPlayback },
-            flow = { enabled -> if (enabled) playbackObservation.observe() else emptyFlow() },
-        ) { _, update -> withPlaybackAccess(update) }
+        val playTrack = playbackLaunch(
+            name = "search.playTrack",
+            controller = playbackController,
+            launchState = { playbackLaunch },
+            withLaunchState = { copy(playbackLaunch = it) },
+            closeAccess = { copy(body = SearchBody.AccessRequired) },
+            message = { it.toSearchPlaybackMessage() },
+        )
         source(
             name = "search.nowPlaying",
             flow = playbackController::observeCurrentTrackId,
@@ -85,9 +79,9 @@ internal class SearchViewModel(
             if (state.body !is SearchBody.Ready) return@on
             val selected = intent.displayedTracks.indexOfFirst { it.id == intent.trackId }
             if (selected < 0) return@on
-            submit(playTrack, PlaybackQueueRequest.create(intent.displayedTracks.map { it.id }, selected))
+            submit(playTrack.operation, PlaybackQueueRequest.create(intent.displayedTracks.map { it.id }, selected))
         }
-        on<SearchIntent.DismissPlaybackError> { reduce { copy(playbackNotice = null) } }
+        on<SearchIntent.DismissPlaybackError> { reduce { copy(playbackLaunch = playbackLaunch.dismissed()) } }
 
         on<SearchIntent.QueryChanged> { intent ->
             reduce { withInput(rawQuery = intent.value) }
@@ -100,11 +94,13 @@ internal class SearchViewModel(
         }
         on<SearchIntent.AccessChecked> { intent ->
             if (intent.granted) {
-                val denialAtCheck = playbackObservation.publishedDenial()
-                refresh(results) { withAccess(true).copy(lastPlaybackDenial = denialAtCheck) }
+                // A Play sent before access was lost can still have a pending service reply.
+                if (state.body == SearchBody.AccessRequired) cancel(playTrack.operation)
+                val denialAtCheck = playTrack.publishedDenial()
+                refresh(results) { withAccess(true).copy(playbackLaunch = playbackLaunch.accessGranted(denialAtCheck)) }
             } else {
-                cancel(playTrack)
-                refresh(results) { withAccess(false).copy(playbackNotice = null) }
+                cancel(playTrack.operation)
+                refresh(results) { withAccess(false).copy(playbackLaunch = playbackLaunch.dismissed()) }
             }
         }
         on<SearchIntent.Retry> {
