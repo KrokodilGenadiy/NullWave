@@ -9,7 +9,6 @@ import com.zaus.nullwave.core.mvi.dsl.MviDefinition
 import com.zaus.nullwave.core.playback.api.PlaybackController
 import com.zaus.nullwave.core.playback.api.observeCurrentTrackId
 import com.zaus.nullwave.core.playback.api.command.PlaybackQueueRequest
-import com.zaus.nullwave.feature.library.api.access.AccessAction
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.di.LibraryInitialLocale
@@ -57,7 +56,7 @@ internal class LibraryViewModel(
             controller = playback,
             launchState = { playbackLaunch },
             withLaunchState = { copy(playbackLaunch = it) },
-            closeAccess = { requireAccess(AccessAction.CheckAgain) },
+            closeAccess = { requireAccess() },
             message = { it.toLibraryPlaybackMessage() },
         )
         source(

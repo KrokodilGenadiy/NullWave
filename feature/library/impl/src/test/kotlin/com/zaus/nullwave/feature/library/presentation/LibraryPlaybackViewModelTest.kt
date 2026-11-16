@@ -895,6 +895,24 @@ class LibraryPlaybackViewModelTest {
     }
 
     @Test
+    fun `an engine denial preserves the permission action supplied by Android for every Library tab`() = runTest(dispatcher) {
+        val vm = readyVm(songs)
+        send(vm, LibraryIntent.PlaySong(beta.id, songs))
+        respond(AppResult.Success(Unit))
+        send(vm, LibraryIntent.AccessChecked(LibraryAccess.Required(AccessAction.SettingsSuggested)))
+
+        playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "after-settings-suggested")
+        runCurrent()
+
+        val state = vm.snapshot.value.state
+        assertEquals(PlaybackProblemId("after-settings-suggested"), state.playbackLaunch.handledDenial?.problemId)
+        val expected = LibraryBody.AccessRequired(AccessAction.SettingsSuggested)
+        assertEquals(expected, state.body)
+        assertEquals(expected, state.albums)
+        assertEquals(expected, state.artists)
+    }
+
+    @Test
     fun `late Play denial after access is restored leaves the refreshed catalog open`() = runTest(dispatcher) {
         val vm = readyVm(songs)
         send(vm, LibraryIntent.PlaySong(beta.id, songs))

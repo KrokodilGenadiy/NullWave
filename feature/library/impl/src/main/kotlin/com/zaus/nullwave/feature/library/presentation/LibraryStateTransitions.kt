@@ -27,7 +27,9 @@ internal fun LibraryState.startReadingSelected(): LibraryState = when (selectedT
 }
 
 /** Audio access is shared across the catalog; no protected snapshot survives revocation. */
-internal fun LibraryState.requireAccess(action: AccessAction): LibraryState {
+internal fun LibraryState.requireAccess(
+    action: AccessAction = (selectedBody as? LibraryBody.AccessRequired)?.action ?: AccessAction.CheckAgain,
+): LibraryState {
     val gate = LibraryBody.AccessRequired(action)
     return copy(body = gate, albums = gate, artists = gate)
 }
@@ -41,9 +43,7 @@ internal fun LibraryState.applyResult(
         is LibraryCatalogSnapshot.Artists -> copy(artists = LibraryBody.Ready(snapshot.items))
     }
     is AppResult.Failure -> when (result.error) {
-        DataError.AccessDenied -> requireAccess(
-            (selectedBody as? LibraryBody.AccessRequired)?.action ?: AccessAction.CheckAgain,
-        )
+        DataError.AccessDenied -> requireAccess()
         DataError.Io -> when (selectedTab) {
             LibraryTab.Songs -> copy(body = body.readFailed())
             LibraryTab.Albums -> copy(albums = albums.readFailed())
