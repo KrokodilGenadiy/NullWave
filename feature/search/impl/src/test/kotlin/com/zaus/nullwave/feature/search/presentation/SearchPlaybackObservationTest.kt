@@ -547,6 +547,36 @@ class SearchPlaybackObservationTest {
     }
 
     @Test
+    fun `Back keeps refreshed results when a Play denied while Search was unbound replies late`() = with(fixture) {
+        runTest(dispatcher) {
+            val vm = createVm()
+            val binding = bind(vm)
+            send(vm, SearchIntent.AccessChecked(true))
+            send(vm, SearchIntent.QueryChanged("m4a"))
+            settle()
+            reply(AppResult.Success(results(songs)))
+            send(vm, SearchIntent.PlayTrack(beta.id, songs))
+            val oldPlay = playback.calls.single()
+            binding.cancel()
+            runCurrent()
+            assertEquals(0, playback.activeStateCollectors)
+
+            playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "before-back")
+            send(vm, SearchIntent.AccessChecked(true))
+            bind(vm)
+            settle()
+            reply(AppResult.Success(results(songs)))
+            val refreshed = ready(vm)
+
+            assertTrue(oldPlay.reply.complete(playDenied()))
+            runCurrent()
+
+            assertSame(refreshed, vm.snapshot.value.state.body)
+            assertNull(vm.snapshot.value.state.playbackError)
+        }
+    }
+
+    @Test
     fun `Back to Search hides the results when the first reconnected denial was published after the grant`() = with(fixture) {
         runTest(dispatcher) {
             val reconnect = CompletableDeferred<Unit>()
@@ -662,7 +692,10 @@ class SearchPlaybackObservationTest {
     fun `denial from a new Play closes the restored results even after a routine grant`() = with(fixture) {
         runTest(dispatcher) {
             val vm = readyVm(songs)
-            reply(AppResult.Failure(DataError.AccessDenied))
+            send(vm, SearchIntent.PlayTrack(alpha.id, songs))
+            playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "before-new-play")
+            runCurrent()
+            assertSame(SearchBody.AccessRequired, vm.snapshot.value.state.body)
             send(vm, SearchIntent.AccessChecked(true))
             settle()
             reply(AppResult.Success(results(songs)))

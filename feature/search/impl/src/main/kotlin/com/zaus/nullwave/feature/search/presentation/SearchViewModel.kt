@@ -9,6 +9,7 @@ import com.zaus.nullwave.core.playback.api.PlaybackController
 import com.zaus.nullwave.core.playback.api.observeCurrentTrackId
 import com.zaus.nullwave.core.playback.api.command.PlaybackQueueRequest
 import com.zaus.nullwave.feature.library.api.repository.LibrarySearchRepository
+import com.zaus.nullwave.feature.player.api.launch.PlaybackProblemKey
 import com.zaus.nullwave.feature.player.api.launch.playbackLaunch
 import com.zaus.nullwave.feature.search.di.SearchInitialLocale
 import dev.zacsweers.metro.AppScope
@@ -75,10 +76,12 @@ internal class SearchViewModel(
             flow = playbackController::observeCurrentTrackId,
         ) { trackId -> copy(playingTrackId = trackId) }
 
+        var denialAtLastPlay: PlaybackProblemKey? = null
         on<SearchIntent.PlayTrack> { intent ->
             if (state.body !is SearchBody.Ready) return@on
             val selected = intent.displayedTracks.indexOfFirst { it.id == intent.trackId }
             if (selected < 0) return@on
+            denialAtLastPlay = playTrack.publishedDenial()
             submit(playTrack.operation, PlaybackQueueRequest.create(intent.displayedTracks.map { it.id }, selected))
         }
         on<SearchIntent.DismissPlaybackError> { reduce { copy(playbackLaunch = playbackLaunch.dismissed()) } }
@@ -94,11 +97,12 @@ internal class SearchViewModel(
         }
         on<SearchIntent.AccessChecked> { intent ->
             if (intent.granted) {
-                // Clearing the query after a denial shows Idle but keeps access Required.
-                if (state.body == SearchBody.AccessRequired || state.access == SearchAccess.Required) {
+                val denialAtCheck = playTrack.publishedDenial()
+                // On Back the service may have reported a denial while Search had no collector.
+                val deniedSincePlay = denialAtCheck != null && denialAtCheck != denialAtLastPlay
+                if (state.body == SearchBody.AccessRequired || state.access == SearchAccess.Required || deniedSincePlay) {
                     cancel(playTrack.operation)
                 }
-                val denialAtCheck = playTrack.publishedDenial()
                 refresh(results) { withAccess(true).copy(playbackLaunch = playbackLaunch.accessGranted(denialAtCheck)) }
             } else {
                 cancel(playTrack.operation)
