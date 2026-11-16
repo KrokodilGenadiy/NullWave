@@ -12,6 +12,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -113,11 +114,15 @@ class SearchRootInstrumentedTest {
     @Test
     fun stoppedSettingsResultWaitsForResumeAndKeepsTheQuery() {
         show("  Orbit  ")
+        compose.onNodeWithTag("search_access").assertIsDisplayed()
         compose.runOnIdle {
             owner.registry.currentState = Lifecycle.State.CREATED
             access.reply(LibraryAccess.Granted)
         }
-        compose.runOnIdle { assertTrue(repository.calls.isEmpty()) }
+        compose.runOnIdle {
+            assertEquals(SearchAccess.Required, vm.snapshot.value.state.access)
+            assertTrue(repository.calls.isEmpty())
+        }
         compose.runOnIdle { owner.registry.currentState = Lifecycle.State.RESUMED }
         awaitTrack()
         compose.runOnIdle {
@@ -157,7 +162,6 @@ class SearchRootInstrumentedTest {
         compose.runOnIdle { assertEquals(1, repository.calls.size) }
         compose.onNodeWithText("Check access").performClick()
         compose.runOnIdle { access.reply(LibraryAccess.Granted) }
-        compose.waitUntil { repository.calls.size == 2 }
         awaitTrack()
         compose.runOnIdle { assertEquals(2, repository.calls.size) }
     }
@@ -171,10 +175,13 @@ class SearchRootInstrumentedTest {
         compose.onNodeWithTag("search_refresh_error").assertIsDisplayed()
         compose.onNodeWithTag("search_track:track:0").assertIsDisplayed()
         compose.onNodeWithText("Retry").performClick()
-        compose.waitUntil { repository.calls.size == 2 }
-        compose.runOnIdle { repository.result.value = AppResult.Success(searchResults()) }
+        compose.runOnIdle { repository.result.value = AppResult.Success(emptyResults()) }
+        awaitVisible("search_no_matches")
         compose.onNodeWithTag("search_refresh_error").assertDoesNotExist()
-        compose.runOnIdle { assertEquals(1, repository.active) }
+        compose.runOnIdle {
+            assertEquals(2, repository.calls.size)
+            assertEquals(1, repository.active)
+        }
     }
 
     @Test
@@ -269,8 +276,11 @@ class SearchRootInstrumentedTest {
     }
 
     private fun input(text: String) { compose.onNodeWithTag("search_input").performTextReplacement(text) }
-    private fun awaitTrack() {
-        compose.waitUntil { vm.snapshot.value.state.body is SearchBody.Ready }
-        compose.onNodeWithTag("search_track:track:0").assertIsDisplayed()
+    private fun awaitTrack() = awaitVisible("search_track:track:0")
+
+    private fun awaitVisible(tag: String) {
+        compose.waitUntil(conditionDescription = "Search displays $tag", timeoutMillis = 10_000) {
+            compose.onNodeWithTag(tag).isDisplayed()
+        }
     }
 }
