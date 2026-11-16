@@ -3,20 +3,17 @@ package com.zaus.nullwave.feature.library.presentation.albumdetails
 import com.zaus.nullwave.core.mvi.BaseMviViewModel
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
 import com.zaus.nullwave.core.playback.api.PlaybackController
-import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError
 import com.zaus.nullwave.core.playback.api.command.PlaybackQueueOrder
 import com.zaus.nullwave.core.playback.api.command.PlaybackQueueRequest
-import com.zaus.nullwave.core.playback.api.source.PlaybackSourceError
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.core.result.DataError
-import com.zaus.nullwave.core.result.EmptyResult
 import com.zaus.nullwave.feature.library.api.access.AccessAction
 import com.zaus.nullwave.feature.library.api.access.LibraryAccess
 import com.zaus.nullwave.feature.library.api.model.album.AlbumId
 import com.zaus.nullwave.feature.library.api.repository.LibraryAlbumDetailsRepository
 import com.zaus.nullwave.feature.library.di.LibraryInitialLocale
-import com.zaus.nullwave.feature.library.presentation.LibraryPlaybackObservation
 import com.zaus.nullwave.feature.library.presentation.toLibraryPlaybackMessage
+import com.zaus.nullwave.feature.player.api.launch.playbackLaunch
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Assisted
 import dev.zacsweers.metro.AssistedFactory
@@ -36,13 +33,11 @@ internal class AlbumDetailsViewModel(
     @Assisted private val albumId: AlbumId,
     private val repository: LibraryAlbumDetailsRepository,
     @LibraryInitialLocale initialLocaleTag: String,
-    playback: PlaybackController,
+    private val playback: PlaybackController,
 ) : BaseMviViewModel<AlbumDetailsState, AlbumDetailsIntent, Nothing>(
     initialState = AlbumDetailsState(initialLocaleTag),
     sourceStopTimeoutMillis = 0,
 ) {
-    private val playbackObservation = LibraryPlaybackObservation(playback)
-
     @AssistedFactory
     @ManualViewModelAssistedFactoryKey(Factory::class)
     @ContributesIntoMap(AppScope::class)
@@ -68,27 +63,14 @@ internal class AlbumDetailsViewModel(
             }
         }
 
-        val play = latest<PlaybackQueueRequest, EmptyResult<PlaybackCommandError>>("albumDetails.play") {
-            execute(playbackObservation::execute)
-            onAccepted { copy(playbackError = null, monitorPlayback = true) }
-            onResult { _, result ->
-                val error = (result as? AppResult.Failure)?.error ?: return@onResult this
-                val message = error.toLibraryPlaybackMessage() ?: return@onResult this
-                val denied = error is PlaybackCommandError.SourceFailure && error.error == PlaybackSourceError.AccessDenied
-                copy(
-                    playbackError = message,
-                    body = if (denied) AlbumDetailsBody.AccessRequired(AccessAction.CheckAgain) else body,
-                )
-            }
-        }
-        source(
-            name = "albumDetails.playbackAccess",
-            input = { monitorPlayback },
-            flow = { enabled -> if (enabled) playbackObservation.observe() else emptyFlow() },
-        ) { _, update ->
-            if (update.denial == update.initialDenial || update.denial == lastPlaybackDenial) this
-            else copy(body = AlbumDetailsBody.AccessRequired(AccessAction.CheckAgain), lastPlaybackDenial = update.denial)
-        }
+        val play = playbackLaunch(
+            name = "albumDetails.play",
+            controller = playback,
+            launchState = { playbackLaunch },
+            withLaunchState = { copy(playbackLaunch = it) },
+            closeAccess = { copy(body = AlbumDetailsBody.AccessRequired(AccessAction.CheckAgain)) },
+            message = { it.toLibraryPlaybackMessage() },
+        )
         on<AlbumDetailsIntent.Play> { intent ->
             if (state.body.details == null || intent.displayed.album.id != albumId) return@on
             val ids = intent.displayed.tracks.map { it.id }
@@ -100,27 +82,33 @@ internal class AlbumDetailsViewModel(
                 AlbumPlaybackStart.Shuffle ->
                     PlaybackQueueRequest.create(ids, ids.indices.random(), order = PlaybackQueueOrder.Shuffled)
             }
-            submit(play, request)
+            submit(play.operation, request)
         }
-        on<AlbumDetailsIntent.DismissPlaybackError> { reduce { copy(playbackError = null) } }
+        on<AlbumDetailsIntent.DismissPlaybackError> { reduce { copy(playbackLaunch = playbackLaunch.dismissed()) } }
         on<AlbumDetailsIntent.AccessChecked> { intent ->
             when (val access = intent.access) {
                 LibraryAccess.Granted -> {
                     // A Play sent before access was lost can still have a pending service reply.
-                    if (state.body is AlbumDetailsBody.AccessRequired) cancel(play)
+                    if (state.body is AlbumDetailsBody.AccessRequired) cancel(play.operation)
                     // The service can already have published a denial while the screen was unbound.
-                    val existingDenial = playbackObservation.publishedDenial()
+                    val existingDenial = play.publishedDenial()
                     refresh(album) {
                         copy(
                             platformGranted = true,
                             body = AlbumDetailsBody.Loading(body.details),
-                            lastPlaybackDenial = existingDenial,
+                            playbackLaunch = playbackLaunch.accessGranted(existingDenial),
                         )
                     }
                 }
                 is LibraryAccess.Required -> {
-                    cancel(play)
-                    reduce { copy(platformGranted = false, body = AlbumDetailsBody.AccessRequired(access.action), playbackError = null) }
+                    cancel(play.operation)
+                    reduce {
+                        copy(
+                            platformGranted = false,
+                            body = AlbumDetailsBody.AccessRequired(access.action),
+                            playbackLaunch = playbackLaunch.dismissed(),
+                        )
+                    }
                 }
             }
         }

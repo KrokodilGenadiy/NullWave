@@ -26,7 +26,7 @@ import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.api.access.AccessAction
 import com.zaus.nullwave.feature.library.presentation.LibraryBody
 import com.zaus.nullwave.feature.library.presentation.LibraryIntent
-import com.zaus.nullwave.feature.library.presentation.LibraryPlaybackNotice
+import com.zaus.nullwave.feature.player.api.launch.PlaybackLaunchState
 import com.zaus.nullwave.feature.library.presentation.LibraryState
 import com.zaus.nullwave.feature.library.presentation.RefreshState
 import kotlinx.coroutines.delay
@@ -79,7 +79,7 @@ private fun LibraryPlaybackErrorPreview() {
             state = LibraryState(
                 query = LibraryTrackQuery("en"),
                 body = LibraryBody.Ready(previewTracks),
-                playbackNotice = message?.let(::LibraryPlaybackNotice),
+                playbackLaunch = PlaybackLaunchState(notice = message),
             ),
             onIntent = { if (it == LibraryIntent.DismissPlaybackError) message = null },
             menuButton = previewMenuButton,

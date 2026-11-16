@@ -8,9 +8,8 @@ import com.zaus.nullwave.core.mvi.BaseMviViewModel
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
 import com.zaus.nullwave.core.playback.api.PlaybackController
 import com.zaus.nullwave.core.playback.api.observeCurrentTrackId
-import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError
 import com.zaus.nullwave.core.playback.api.command.PlaybackQueueRequest
-import com.zaus.nullwave.core.result.EmptyResult
+import com.zaus.nullwave.feature.library.api.access.AccessAction
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
 import com.zaus.nullwave.feature.library.di.LibraryInitialLocale
@@ -21,7 +20,7 @@ import dev.zacsweers.metro.AssistedInject
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactory
 import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactoryKey
-import kotlinx.coroutines.flow.emptyFlow
+import com.zaus.nullwave.feature.player.api.launch.playbackLaunch
 
 /** Entry-owned presentation logic. Platform access requests belong to LibraryRoot. */
 @AssistedInject
@@ -34,8 +33,6 @@ internal class LibraryViewModel(
     initialState = LibraryState(LibraryTrackQuery(initialLocaleTag)),
     savedState = librarySavedState(savedStateHandle),
 ) {
-    private val playbackObservation = LibraryPlaybackObservation(playback)
-
     @AssistedFactory
     @ViewModelAssistedFactoryKey(LibraryViewModel::class)
     @ContributesIntoMap(AppScope::class)
@@ -55,16 +52,14 @@ internal class LibraryViewModel(
             if (selectedBody is LibraryBody.AccessRequired) this else applyResult(result)
         }
 
-        val playSong = latest<PlaybackQueueRequest, EmptyResult<PlaybackCommandError>>("library.playSong") {
-            execute(playbackObservation::execute)
-            onAccepted { copy(playbackNotice = null, monitorPlayback = true) }
-            onResult { _, result -> withPlaybackResult(result) }
-        }
-        source(
-            name = "library.playbackAccess",
-            input = { monitorPlayback },
-            flow = { enabled -> if (enabled) playbackObservation.observe() else emptyFlow() },
-        ) { _, update -> withPlaybackAccess(update) }
+        val playSong = playbackLaunch(
+            name = "library.playSong",
+            controller = playback,
+            launchState = { playbackLaunch },
+            withLaunchState = { copy(playbackLaunch = it) },
+            closeAccess = { requireAccess(AccessAction.CheckAgain) },
+            message = { it.toLibraryPlaybackMessage() },
+        )
         source(
             name = "library.nowPlaying",
             flow = playback::observeCurrentTrackId,
@@ -75,9 +70,9 @@ internal class LibraryViewModel(
             val selected = intent.displayedSongs.indexOfFirst { it.id == intent.trackId }
             if (selected < 0) return@on
             val request = PlaybackQueueRequest.create(intent.displayedSongs.map { it.id }, selected)
-            submit(playSong, request)
+            submit(playSong.operation, request)
         }
-        on<LibraryIntent.DismissPlaybackError> { reduce { copy(playbackNotice = null) } }
+        on<LibraryIntent.DismissPlaybackError> { reduce { copy(playbackLaunch = playbackLaunch.dismissed()) } }
 
         on<LibraryIntent.Refresh> {
             val ready = state.selectedBody as? LibraryBody.Ready<*> ?: return@on
@@ -94,12 +89,14 @@ internal class LibraryViewModel(
         on<LibraryIntent.AccessChecked> { intent ->
             when (val access = intent.access) {
                 LibraryAccess.Granted -> {
-                    val denialAtCheck = playbackObservation.publishedDenial()
-                    refresh(catalog) { startReadingSelected().copy(lastPlaybackDenial = denialAtCheck) }
+                    // A Play sent before access was lost can still have a pending service reply.
+                    if (state.body is LibraryBody.AccessRequired) cancel(playSong.operation)
+                    val denialAtCheck = playSong.publishedDenial()
+                    refresh(catalog) { copy(playbackLaunch = playbackLaunch.accessGranted(denialAtCheck)).startReadingSelected() }
                 }
                 is LibraryAccess.Required -> {
-                    cancel(playSong)
-                    refresh(catalog) { requireAccess(access.action).copy(playbackNotice = null) }
+                    cancel(playSong.operation)
+                    refresh(catalog) { copy(playbackLaunch = playbackLaunch.dismissed()).requireAccess(access.action) }
                 }
             }
         }

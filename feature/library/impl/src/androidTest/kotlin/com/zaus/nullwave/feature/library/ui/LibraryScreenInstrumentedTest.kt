@@ -49,7 +49,7 @@ import com.zaus.nullwave.core.designsystem.R as DesignR
 import com.zaus.nullwave.feature.library.api.access.AccessAction
 import com.zaus.nullwave.feature.library.presentation.LibraryBody
 import com.zaus.nullwave.feature.library.presentation.LibraryIntent
-import com.zaus.nullwave.feature.library.presentation.LibraryPlaybackNotice
+import com.zaus.nullwave.feature.player.api.launch.PlaybackLaunchState
 import com.zaus.nullwave.feature.library.presentation.LibraryState
 import com.zaus.nullwave.feature.library.presentation.RefreshState
 import org.junit.Assert.assertEquals
@@ -263,7 +263,7 @@ private class LibraryScreenRobot(private val compose: ComposeContentTestRule) {
                             intents += it
                             if (it is LibraryIntent.SortChanged) state.value = state.value.copy(
                                 query = state.value.query.copy(sort = it.sort, direction = it.direction))
-                            if (it == LibraryIntent.DismissPlaybackError) state.value = state.value.copy(playbackNotice = null)
+                            if (it == LibraryIntent.DismissPlaybackError) state.value = state.value.copy(playbackLaunch = state.value.playbackLaunch.dismissed())
                         }, menuButton = { detail ->
                             NullWaveIconButton(NullWaveIcons.Menu, "Menu", { requestedMenuDetails += detail },
                                 modifier = Modifier.testTag("test_menu"))
@@ -280,7 +280,7 @@ private class LibraryScreenRobot(private val compose: ComposeContentTestRule) {
         state.value = state.value.copy(playingTrackId = id)
     }
     fun updatePlaybackError(error: UiText) = apply {
-        compose.runOnIdle { state.value = state.value.copy(playbackNotice = LibraryPlaybackNotice(error)) }
+        compose.runOnIdle { state.value = state.value.copy(playbackLaunch = PlaybackLaunchState(notice = error)) }
     }
     fun visible(tag: String) = apply { compose.onNodeWithTag(tag).assertIsDisplayed() }
     fun absent(tag: String) = apply { compose.onNodeWithTag(tag).assertDoesNotExist() }

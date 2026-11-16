@@ -10,6 +10,7 @@ import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
 import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
+import com.zaus.nullwave.feature.player.api.launch.PlaybackLaunchState
 
 /** [query]/[body] belong to Songs; [selectedBody] exposes the active tab's loading/error status. */
 internal data class LibraryState(
@@ -20,16 +21,12 @@ internal data class LibraryState(
     val artistQuery: LibraryArtistQuery = LibraryArtistQuery(query.localeTag),
     val albums: LibraryBody<LibraryAlbum> = LibraryBody.Loading,
     val artists: LibraryBody<LibraryArtist> = LibraryBody.Loading,
-    /** Keeps error ownership separate from catalog errors; never persisted. */
-    val playbackNotice: LibraryPlaybackNotice? = null,
-    /** Access-only observation starts with the first accepted play attempt, before acknowledgement. */
-    val monitorPlayback: Boolean = false,
-    /** Denial already handled or present at the most recent grant, identified by session and problem ID. */
-    val lastPlaybackDenial: LibraryPlaybackProblemKey? = null,
+    /** Song starts from this screen; Player presents engine problems. Never persisted. */
+    val playbackLaunch: PlaybackLaunchState = PlaybackLaunchState(),
     /** Track of the current queue entry, kept through reconnection; display only, never persisted. */
     val playingTrackId: TrackId? = null,
 ) : UiState {
-    val playbackError: UiText? get() = playbackNotice?.message
+    val playbackError: UiText? get() = playbackLaunch.notice
 
     val selectedBody: LibraryBody<*>
         get() = when (selectedTab) {
