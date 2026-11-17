@@ -91,16 +91,8 @@ internal class AlbumDetailsViewModel(
         on<AlbumDetailsIntent.AccessChecked> { intent ->
             when (val access = intent.access) {
                 LibraryAccess.Granted -> {
-                    // A Play sent before access was lost can still have a pending service reply.
-                    if (state.body is AlbumDetailsBody.AccessRequired) cancel(play.operation)
-                    // The service can already have published a denial while the screen was unbound.
-                    val existingDenial = play.publishedDenial()
-                    refresh(album) {
-                        copy(
-                            platformGranted = true,
-                            body = AlbumDetailsBody.Loading(body.details),
-                            playbackLaunch = playbackLaunch.accessGranted(existingDenial),
-                        )
+                    play.restoreAccess(this, intent.checkedThroughDenial, album) {
+                        copy(platformGranted = true, body = AlbumDetailsBody.Loading(body.details))
                     }
                 }
                 is LibraryAccess.Required -> {

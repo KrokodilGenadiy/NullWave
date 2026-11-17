@@ -1,6 +1,7 @@
 package com.zaus.nullwave.feature.search.presentation
 
 import com.zaus.nullwave.core.mvi.UiIntent
+import com.zaus.nullwave.core.playback.api.model.PlaybackFailureOccurrence
 import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.core.media.model.track.TrackId
 
@@ -13,5 +14,8 @@ internal sealed interface SearchIntent : UiIntent {
     data object DismissPlaybackError : SearchIntent
     data class LocaleChanged(val localeTag: String) : SearchIntent
     /** Fresh OS observation from Root on resume/result; this does not request permission. */
-    data class AccessChecked(val granted: Boolean) : SearchIntent
+    data class AccessChecked(
+        val granted: Boolean,
+        val checkedThroughDenial: Long = PlaybackFailureOccurrence.latestSequence,
+    ) : SearchIntent
 }

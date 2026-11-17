@@ -41,6 +41,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -53,7 +54,7 @@ class AlbumDetailsViewModelTest {
     private val mvi = MviTestMain()
     private val playback = ControlledLibraryPlaybackController()
     private val albumId = AlbumId("external_primary:folder/Download")
-    private val grant = AlbumDetailsIntent.AccessChecked(LibraryAccess.Granted)
+    private val grant get() = AlbumDetailsIntent.AccessChecked(LibraryAccess.Granted)
     private val reads = mutableListOf<Read>()
     private val repository = object : LibraryAlbumDetailsRepository {
         override fun observeAlbumDetails(albumId: AlbumId, localeTag: String): Flow<AlbumResult> {
@@ -64,7 +65,7 @@ class AlbumDetailsViewModelTest {
     }
     private val first = details("First")
     private val updated = details("Updated")
-    private val playDenied = AppResult.Failure(
+    private fun playDenied() = AppResult.Failure(
         PlaybackCommandError.SourceFailure(first.tracks.single().id, PlaybackSourceError.AccessDenied()),
     )
 
@@ -222,7 +223,7 @@ class AlbumDetailsViewModelTest {
         assertTrue(playback.calls.isEmpty())
         reply(AppResult.Success(first))
         send(vm, play)
-        playback.calls.single().reply.complete(playDenied)
+        playback.calls.single().reply.complete(playDenied())
         runCurrent()
         assertEquals(AlbumDetailsBody.AccessRequired(AccessAction.CheckAgain), vm.body)
         assertTrue(vm.snapshot.value.state.playbackError != null)
@@ -250,13 +251,14 @@ class AlbumDetailsViewModelTest {
         reply(AppResult.Success(first))
         send(vm, AlbumDetailsIntent.Play(first, AlbumPlaybackStart.At(0)))
         val oldPlay = playback.calls.single()
+        val deniedBeforeGrant = playDenied()
 
         reply(AppResult.Failure(DataError.AccessDenied))
         assertEquals(AlbumDetailsBody.AccessRequired(AccessAction.CheckAgain), vm.body)
         send(vm, grant)
         reply(AppResult.Success(updated))
 
-        assertTrue(oldPlay.reply.complete(playDenied))
+        assertTrue(oldPlay.reply.complete(deniedBeforeGrant))
         runCurrent()
         assertEquals(AlbumDetailsBody.Ready(updated), vm.body)
         assertEquals(null, vm.snapshot.value.state.playbackError)
@@ -278,7 +280,7 @@ class AlbumDetailsViewModelTest {
         send(vm, grant)
         reply(AppResult.Success(updated))
         assertEquals(AlbumDetailsBody.Ready(updated), vm.body)
-        assertTrue(newPlay.reply.complete(playDenied))
+        assertTrue(newPlay.reply.complete(playDenied()))
         runCurrent()
 
         assertEquals(AlbumDetailsBody.AccessRequired(AccessAction.CheckAgain), vm.body)

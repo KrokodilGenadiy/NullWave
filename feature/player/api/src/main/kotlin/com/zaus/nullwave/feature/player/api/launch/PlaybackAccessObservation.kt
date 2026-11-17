@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.mapNotNull
 
 internal data class PlaybackAccessUpdate(
     val denial: PlaybackProblemKey,
-    val initialDenial: PlaybackProblemKey?,
+    val sequence: Long,
 )
 
 /**
@@ -27,24 +27,22 @@ internal data class PlaybackAccessUpdate(
 internal class PlaybackAccessObservation(private val controller: PlaybackController) {
     private val initialDenial = CompletableDeferred<PlaybackProblemKey?>()
 
-    fun publishedDenial(): PlaybackProblemKey? = controller.publishedSnapshot?.accessDenial()
-
     suspend fun execute(request: PlaybackQueueRequest): EmptyResult<PlaybackCommandError> =
         controller.execute(PlaybackCommand.ReplaceQueue(request)) { snapshot ->
-            initialDenial.complete(snapshot?.accessDenial())
+            initialDenial.complete(snapshot?.accessDenial()?.denial)
         }
 
     fun observe(): Flow<PlaybackAccessUpdate> = flow {
         val baseline = initialDenial.await()
         emitAll(controller.observeState().mapNotNull { connection ->
-            val denial = (connection as? PlaybackConnection.Connected)?.snapshot?.accessDenial() ?: return@mapNotNull null
+            val observed = (connection as? PlaybackConnection.Connected)?.snapshot?.accessDenial() ?: return@mapNotNull null
             // A delayed client snapshot may describe a problem the service already cleared or replaced.
-            if (denial == publishedDenial()) PlaybackAccessUpdate(denial, baseline) else null
+            controller.publishedSnapshot?.accessDenial()?.takeIf { it.denial == observed.denial && it.denial != baseline }
         })
     }
 }
 
-private fun PlaybackSnapshot.accessDenial(): PlaybackProblemKey? =
+private fun PlaybackSnapshot.accessDenial(): PlaybackAccessUpdate? =
     transport.problem?.takeIf { it.code == PlaybackProblemCode.AccessDenied }?.let {
-        PlaybackProblemKey(sessionId, it.id)
+        PlaybackAccessUpdate(PlaybackProblemKey(sessionId, it.id), it.occurrence.sequence)
     }

@@ -88,10 +88,7 @@ internal class LibraryViewModel(
         on<LibraryIntent.AccessChecked> { intent ->
             when (val access = intent.access) {
                 LibraryAccess.Granted -> {
-                    // A Play sent before access was lost can still have a pending service reply.
-                    if (state.body is LibraryBody.AccessRequired) cancel(playSong.operation)
-                    val denialAtCheck = playSong.publishedDenial()
-                    refresh(catalog) { copy(playbackLaunch = playbackLaunch.accessGranted(denialAtCheck)).startReadingSelected() }
+                    playSong.restoreAccess(this, intent.checkedThroughDenial, catalog) { startReadingSelected() }
                 }
                 is LibraryAccess.Required -> {
                     cancel(playSong.operation)

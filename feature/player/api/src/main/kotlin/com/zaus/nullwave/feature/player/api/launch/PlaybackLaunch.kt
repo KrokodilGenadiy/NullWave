@@ -3,8 +3,10 @@ package com.zaus.nullwave.feature.player.api.launch
 import com.zaus.nullwave.core.mvi.UiEffect
 import com.zaus.nullwave.core.mvi.UiIntent
 import com.zaus.nullwave.core.mvi.UiState
+import com.zaus.nullwave.core.mvi.dsl.IntentScope
 import com.zaus.nullwave.core.mvi.dsl.MviDefinition
 import com.zaus.nullwave.core.mvi.dsl.Operation
+import com.zaus.nullwave.core.mvi.dsl.Source
 import com.zaus.nullwave.core.mvi.ui.UiText
 import com.zaus.nullwave.core.playback.api.PlaybackController
 import com.zaus.nullwave.core.playback.api.command.PlaybackCommandError
@@ -31,32 +33,43 @@ data class PlaybackLaunchState(
     val notice: UiText? = null,
     /** Access observation starts with the first accepted start, before acknowledgement. */
     val monitoring: Boolean = false,
-    /** Denial already handled or present at the most recent grant, identified by session and problem ID. */
+    /** Last observed engine denial, identified by session and problem ID across snapshot updates. */
     val handledDenial: PlaybackProblemKey? = null,
+    /** Failures up to this point are covered by a successful Android check. */
+    internal val checkedThroughDenial: Long = 0,
+    /** An older queued grant must not reopen a gate already closed by this failure. */
+    internal val lastAppliedDenial: Long = 0,
 ) {
     fun dismissed(): PlaybackLaunchState = copy(notice = null)
-
-    /** Pass [PlaybackLaunch.publishedDenial], read in the handler: a denial older than the grant stays handled. */
-    fun accessGranted(denialAtGrant: PlaybackProblemKey?): PlaybackLaunchState = copy(handledDenial = denialAtGrant)
 }
 
 /** Declared by [playbackLaunch]. Submit or cancel [operation] from intent handlers like any operation. */
-class PlaybackLaunch internal constructor(
+class PlaybackLaunch<S : UiState> internal constructor(
     val operation: Operation<PlaybackQueueRequest>,
-    private val observation: PlaybackAccessObservation,
+    private val launchState: S.() -> PlaybackLaunchState,
+    private val withLaunchState: S.(PlaybackLaunchState) -> S,
 ) {
-    /** Denial the service publishes right now. Read it in a handler, not in a reducer, which must stay pure. */
-    fun publishedDenial(): PlaybackProblemKey? = observation.publishedDenial()
+    /** Refresh only if the grant covers the most recent denial that closed this screen. */
+    fun restoreAccess(scope: IntentScope<S, *>, checkedThroughDenial: Long, source: Source<S>, reopen: S.() -> S) {
+        val current = scope.state.launchState()
+        if (checkedThroughDenial < current.checkedThroughDenial) return
+        val checked = current.copy(checkedThroughDenial = checkedThroughDenial)
+        if (current.lastAppliedDenial > checkedThroughDenial) {
+            // Remember the check for older replies still in flight. Keep the gate and source intact.
+            scope.reduce { withLaunchState(checked) }
+        } else {
+            scope.refresh(source) { reopen().withLaunchState(checked) }
+        }
+    }
 }
 
 /**
  * Declares how a screen starts a queue: a `latest` operation called [name] and the source
  * "[name].access" that watches for engine access denials once the first start is accepted.
  *
- * A failed start sets [PlaybackLaunchState.notice]. A confirmed access denial, from the command
- * reply or from a later engine snapshot, applies [closeAccess] once; a denial that existed before
- * the first start, or before the latest grant, does not. The screen still handles its own intents:
- * submit and cancel [PlaybackLaunch.operation], dismiss the notice and record grants in its reducers.
+ * A failed start can set [PlaybackLaunchState.notice]. A current access denial from the command
+ * reply or engine snapshot applies [closeAccess]. On a successful permission check the screen
+ * applies [PlaybackLaunch.restoreAccess] to account for denials that predate the grant.
  *
  * @param launchState reads the screen's [PlaybackLaunchState].
  * @param withLaunchState returns the screen state with an updated [PlaybackLaunchState].
@@ -71,7 +84,7 @@ fun <S : UiState, I : UiIntent, E : UiEffect> MviDefinition<S, I, E>.playbackLau
     withLaunchState: S.(PlaybackLaunchState) -> S,
     closeAccess: S.() -> S,
     message: (PlaybackCommandError) -> UiText?,
-): PlaybackLaunch {
+): PlaybackLaunch<S> {
     val observation = PlaybackAccessObservation(controller)
     fun S.updateLaunch(change: PlaybackLaunchState.() -> PlaybackLaunchState): S = withLaunchState(launchState().change())
 
@@ -79,11 +92,14 @@ fun <S : UiState, I : UiIntent, E : UiEffect> MviDefinition<S, I, E>.playbackLau
         execute(observation::execute)
         onAccepted { updateLaunch { copy(notice = null, monitoring = true) } }
         onResult { _, result ->
-            // The access source may already have closed the screen before this acknowledgement.
             val error = (result as? AppResult.Failure)?.error ?: return@onResult this
-            val denied = error is PlaybackCommandError.SourceFailure && error.error is PlaybackSourceError.AccessDenied
+            val denial = (error as? PlaybackCommandError.SourceFailure)?.error as? PlaybackSourceError.AccessDenied
+            val sequence = denial?.occurrence?.sequence
+            if (sequence != null && sequence <= launchState().checkedThroughDenial) return@onResult this
             // A confirmed denial closes access even when the screen shows no text for it.
-            val next = if (denied) closeAccess() else this
+            val next = if (sequence == null) this else closeAccess().updateLaunch {
+                copy(lastAppliedDenial = maxOf(lastAppliedDenial, sequence))
+            }
             val text = message(error) ?: return@onResult next
             next.updateLaunch { copy(notice = text) }
         }
@@ -94,8 +110,13 @@ fun <S : UiState, I : UiIntent, E : UiEffect> MviDefinition<S, I, E>.playbackLau
         input = { launchState().monitoring },
         flow = { monitoring -> if (monitoring) observation.observe() else emptyFlow() },
     ) { _, update ->
-        if (update.denial == update.initialDenial || update.denial == launchState().handledDenial) this
-        else closeAccess().updateLaunch { copy(handledDenial = update.denial) }
+        when {
+            update.denial == launchState().handledDenial -> this
+            update.sequence <= launchState().checkedThroughDenial -> updateLaunch { copy(handledDenial = update.denial) }
+            else -> closeAccess().updateLaunch {
+                copy(handledDenial = update.denial, lastAppliedDenial = maxOf(lastAppliedDenial, update.sequence))
+            }
+        }
     }
-    return PlaybackLaunch(operation, observation)
+    return PlaybackLaunch(operation, launchState, withLaunchState)
 }

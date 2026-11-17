@@ -549,27 +549,13 @@ class SearchPlaybackObservationTest {
     @Test
     fun `Back keeps refreshed results when a Play denied while Search was unbound replies late`() = with(fixture) {
         runTest(dispatcher) {
-            val vm = createVm()
-            val binding = bind(vm)
-            send(vm, SearchIntent.AccessChecked(true))
-            send(vm, SearchIntent.QueryChanged("m4a"))
-            settle()
-            reply(AppResult.Success(results(songs)))
-            send(vm, SearchIntent.PlayTrack(beta.id, songs))
-            val oldPlay = playback.calls.single()
-            binding.cancel()
-            runCurrent()
-            assertEquals(0, playback.activeStateCollectors)
-
+            val vm = leaveSearchWithPlayPending()
+            val deniedBeforeBack = playDenied()
             playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "before-back")
-            send(vm, SearchIntent.AccessChecked(true))
-            bind(vm)
-            settle()
-            reply(AppResult.Success(results(songs)))
+            restoreSearch(vm, SearchIntent.AccessChecked(true))
             val refreshed = ready(vm)
 
-            assertTrue(oldPlay.reply.complete(playDenied()))
-            runCurrent()
+            respond(deniedBeforeBack)
 
             assertSame(refreshed, vm.snapshot.value.state.body)
             assertNull(vm.snapshot.value.state.playbackError)
@@ -619,6 +605,29 @@ class SearchPlaybackObservationTest {
         }
     }
 
+    private suspend fun TestScope.leaveSearchWithPlayPending() = with(fixture) {
+        val vm = createVm()
+        val binding = bind(vm)
+        send(vm, SearchIntent.AccessChecked(true))
+        send(vm, SearchIntent.QueryChanged("m4a"))
+        settle()
+        reply(AppResult.Success(results(songs)))
+        send(vm, SearchIntent.PlayTrack(beta.id, songs))
+        binding.cancel()
+        runCurrent()
+        assertEquals(1, playback.calls.size)
+        assertEquals(0, playback.activeStateCollectors)
+        vm
+    }
+
+    private suspend fun TestScope.restoreSearch(vm: SearchViewModel, check: SearchIntent.AccessChecked) = with(fixture) {
+        send(vm, check)
+        bind(vm)
+        settle()
+        reply(AppResult.Success(results(songs)))
+        assertEquals(SearchBody.Ready(results(songs)), vm.snapshot.value.state.body)
+    }
+
     private suspend fun TestScope.returnToSearchBeforePlaybackReconnects(reconnect: CompletableDeferred<Unit>) = with(fixture) {
         val vm = createVm()
         val binding = bind(vm)
@@ -649,13 +658,14 @@ class SearchPlaybackObservationTest {
             send(vm, SearchIntent.PlayTrack(beta.id, songs))
             val oldPlay = playback.calls.single()
             reply(AppResult.Failure(DataError.AccessDenied))
+            val deniedBeforeGrant = playDenied()
             assertSame(SearchBody.AccessRequired, vm.snapshot.value.state.body)
 
             send(vm, SearchIntent.AccessChecked(true))
             settle()
             reply(AppResult.Success(results(songs)))
-            assertTrue(oldPlay.waiterCancelled)
-            oldPlay.reply.complete(playDenied())
+            assertFalse(oldPlay.waiterCancelled)
+            oldPlay.reply.complete(deniedBeforeGrant)
             runCurrent()
 
             assertEquals(SearchBody.Ready(results(songs)), vm.snapshot.value.state.body)
@@ -672,6 +682,7 @@ class SearchPlaybackObservationTest {
             reply(AppResult.Failure(DataError.AccessDenied))
             assertSame(SearchBody.AccessRequired, vm.snapshot.value.state.body)
 
+            val deniedBeforeGrant = playDenied()
             send(vm, SearchIntent.ClearQuery)
             assertSame(SearchBody.Idle, vm.snapshot.value.state.body)
             send(vm, SearchIntent.AccessChecked(true))
@@ -681,7 +692,7 @@ class SearchPlaybackObservationTest {
             reply(AppResult.Success(newResults))
             assertEquals(SearchBody.Ready(newResults), vm.snapshot.value.state.body)
 
-            assertTrue(oldPlay.reply.complete(playDenied()))
+            assertTrue(oldPlay.reply.complete(deniedBeforeGrant))
             runCurrent()
             assertEquals(SearchBody.Ready(newResults), vm.snapshot.value.state.body)
             assertNull(vm.snapshot.value.state.playbackError)
