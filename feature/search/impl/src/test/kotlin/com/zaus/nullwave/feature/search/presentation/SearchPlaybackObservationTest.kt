@@ -547,6 +547,54 @@ class SearchPlaybackObservationTest {
     }
 
     @Test
+    fun `grant during reconnect keeps Play pending and its later denial is current`() = with(fixture) {
+        runTest(dispatcher) {
+            val vm = readyVm(songs)
+            val handshake = CompletableDeferred<Unit>()
+            playback.states.value = PlaybackConnection.Connecting
+            playback.beforeCommandDispatch = { handshake.await() }
+            send(vm, SearchIntent.PlayTrack(alpha.id, songs))
+            playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "previous-queue")
+            send(vm, SearchIntent.AccessChecked(true))
+            assertTrue(playback.calls.isEmpty())
+
+            handshake.complete(Unit)
+            runCurrent()
+            assertEquals(1, playback.calls.size)
+            val dispatched = request()
+            assertEquals(alpha.id, dispatched.trackIds[dispatched.startIndex])
+            respond(AppResult.Failure(PlaybackCommandError.SourceFailure(alpha.id, PlaybackSourceError.AccessDenied())))
+            assertSame(SearchBody.AccessRequired, vm.snapshot.value.state.body)
+        }
+    }
+
+    @Test
+    fun `Back keeps a NotFound reply when the playing track was denied while Search was away`() = with(fixture) {
+        runTest(dispatcher) {
+            val vm = createVm()
+            val binding = bind(vm)
+            send(vm, SearchIntent.AccessChecked(true))
+            send(vm, SearchIntent.QueryChanged("m4a"))
+            settle()
+            reply(AppResult.Success(results(listOf(alpha))))
+            send(vm, SearchIntent.PlayTrack(alpha.id, listOf(alpha)))
+            binding.cancel()
+            runCurrent()
+
+            playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "playing-beta")
+            send(vm, SearchIntent.AccessChecked(true))
+            bind(vm)
+            settle()
+            reply(AppResult.Success(results(listOf(alpha))))
+            val displayed = ready(vm)
+
+            respond(AppResult.Failure(PlaybackCommandError.SourceFailure(alpha.id, PlaybackSourceError.NotFound)))
+            assertEquals(UiText.Resource(R.string.search_playback_not_found), vm.snapshot.value.state.playbackError)
+            assertSame(displayed, vm.snapshot.value.state.body)
+        }
+    }
+
+    @Test
     fun `Back keeps refreshed results when a Play denied while Search was unbound replies late`() = with(fixture) {
         runTest(dispatcher) {
             val vm = leaveSearchWithPlayPending()
@@ -602,6 +650,36 @@ class SearchPlaybackObservationTest {
             runCurrent()
 
             assertSame(displayed, vm.snapshot.value.state.body)
+        }
+    }
+
+    @Test
+    fun `Back ignores a resolver denial that predates the recheck even with a healthy engine`() = with(fixture) {
+        runTest(dispatcher) {
+            val vm = leaveSearchWithPlayPending()
+            val deniedBeforeBack = PlaybackSourceError.AccessDenied()
+            assertNull(playback.publishedSnapshot?.transport?.problem)
+            restoreSearch(vm, SearchIntent.AccessChecked(true))
+            val refreshed = ready(vm)
+
+            respond(AppResult.Failure(PlaybackCommandError.SourceFailure(beta.id, deniedBeforeBack)))
+            assertSame(refreshed, vm.snapshot.value.state.body)
+            assertNull(vm.snapshot.value.state.playbackError)
+        }
+    }
+
+    @Test
+    fun `Back still handles a resolver denial occurring after the recheck for the same pending Play`() = with(fixture) {
+        runTest(dispatcher) {
+            val vm = leaveSearchWithPlayPending()
+            playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "previous-queue")
+            val checkedOnBack = SearchIntent.AccessChecked(true)
+            val deniedAfterBack = playDenied()
+            restoreSearch(vm, checkedOnBack)
+
+            respond(deniedAfterBack)
+            assertSame(SearchBody.AccessRequired, vm.snapshot.value.state.body)
+            assertEquals(UiText.Resource(R.string.search_playback_access_denied), vm.snapshot.value.state.playbackError)
         }
     }
 

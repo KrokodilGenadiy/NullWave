@@ -913,6 +913,31 @@ class LibraryPlaybackViewModelTest {
     }
 
     @Test
+    fun `Back keeps the catalog when a Play denied after the stop grace replies late`() = runTest(dispatcher) {
+        val vm = createVm()
+        val binding = bind(vm)
+        reply(AppResult.Success(songs))
+        send(vm, LibraryIntent.PlaySong(beta.id, songs))
+        val oldPlay = playback.calls.single()
+        val deniedBeforeGrant = playDenied()
+        binding.cancel()
+        advanceTimeBy(5_001)
+        runCurrent()
+
+        playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "while-away")
+        send(vm, LibraryIntent.AccessChecked(LibraryAccess.Granted))
+        bind(vm)
+        reply(AppResult.Success(songs))
+        assertEquals(LibraryBody.Ready(songs), vm.snapshot.value.state.body)
+        assertFalse(oldPlay.waiterCancelled)
+
+        oldPlay.reply.complete(deniedBeforeGrant)
+        runCurrent()
+        assertEquals(LibraryBody.Ready(songs), vm.snapshot.value.state.body)
+        assertNull(vm.snapshot.value.state.playbackError)
+    }
+
+    @Test
     fun `late Play denial after access is restored leaves the refreshed catalog open`() = runTest(dispatcher) {
         val vm = readyVm(songs)
         send(vm, LibraryIntent.PlaySong(beta.id, songs))

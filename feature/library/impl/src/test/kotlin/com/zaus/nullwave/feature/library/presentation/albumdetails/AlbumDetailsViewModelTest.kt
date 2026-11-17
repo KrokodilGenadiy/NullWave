@@ -370,6 +370,31 @@ class AlbumDetailsViewModelTest {
     }
 
     @Test
+    fun `Back keeps the album when a Play denied while unbound replies late`() = runTest(mvi.dispatcher) {
+        val vm = createVm()
+        val binding = bind(vm)
+        send(vm, grant)
+        reply(AppResult.Success(first))
+        send(vm, AlbumDetailsIntent.Play(first, AlbumPlaybackStart.At(0)))
+        val oldPlay = playback.calls.single()
+        binding.cancel()
+        runCurrent()
+        val deniedBeforeGrant = playDenied()
+
+        publishEngineDenial("while-away")
+        send(vm, grant)
+        bind(vm)
+        reply(AppResult.Success(updated))
+        assertEquals(AlbumDetailsBody.Ready(updated), vm.body)
+        assertFalse(oldPlay.waiterCancelled)
+
+        oldPlay.reply.complete(deniedBeforeGrant)
+        runCurrent()
+        assertEquals(AlbumDetailsBody.Ready(updated), vm.body)
+        assertEquals(null, vm.snapshot.value.state.playbackError)
+    }
+
+    @Test
     fun `an engine denial keeps the permission action supplied by Android`() = runTest(mvi.dispatcher) {
         val vm = openAlbum()
         reply(AppResult.Success(first))
