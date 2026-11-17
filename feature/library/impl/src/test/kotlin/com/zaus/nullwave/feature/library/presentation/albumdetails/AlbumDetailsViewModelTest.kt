@@ -367,6 +367,22 @@ class AlbumDetailsViewModelTest {
         assertEquals(AlbumDetailsBody.Ready(updated), vm.body)
     }
 
+    @Test
+    fun `an engine denial keeps the permission action supplied by Android`() = runTest(mvi.dispatcher) {
+        val vm = openAlbum()
+        reply(AppResult.Success(first))
+        send(vm, AlbumDetailsIntent.Play(first, AlbumPlaybackStart.At(0)))
+        assertTrue(playback.calls.single().reply.complete(AppResult.Success(Unit)))
+        runCurrent()
+        send(vm, AlbumDetailsIntent.AccessChecked(LibraryAccess.Required(AccessAction.SettingsSuggested)))
+
+        publishEngineDenial("after-settings-suggested")
+        runCurrent()
+
+        assertEquals(AlbumDetailsBody.AccessRequired(AccessAction.SettingsSuggested), vm.body)
+        assertEquals(PlaybackProblemId("after-settings-suggested"), vm.snapshot.value.state.playbackLaunch.handledDenial?.problemId)
+    }
+
     private val AlbumDetailsViewModel.body get() = snapshot.value.state.body
     private fun createVm() = mvi.own(AlbumDetailsViewModel(albumId, repository, "en", playback))
 

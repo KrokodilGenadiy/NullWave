@@ -26,7 +26,10 @@ internal fun LibraryState.startReadingSelected(): LibraryState = when (selectedT
     LibraryTab.Artists -> copy(artists = artists.startReading())
 }
 
-/** Audio access is shared across the catalog; no protected snapshot survives revocation. */
+/**
+ * Audio access is shared across the catalog; no protected snapshot survives revocation.
+ * By default an existing gate keeps the action Android supplied, such as SettingsSuggested.
+ */
 internal fun LibraryState.requireAccess(
     action: AccessAction = (selectedBody as? LibraryBody.AccessRequired)?.action ?: AccessAction.CheckAgain,
 ): LibraryState {

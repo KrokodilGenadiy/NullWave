@@ -68,7 +68,10 @@ internal class AlbumDetailsViewModel(
             controller = playback,
             launchState = { playbackLaunch },
             withLaunchState = { copy(playbackLaunch = it) },
-            closeAccess = { copy(body = AlbumDetailsBody.AccessRequired(AccessAction.CheckAgain)) },
+            // Keep the action Android supplied, such as SettingsSuggested, if the album is already closed.
+            closeAccess = {
+                copy(body = body as? AlbumDetailsBody.AccessRequired ?: AlbumDetailsBody.AccessRequired(AccessAction.CheckAgain))
+            },
             message = { it.toLibraryPlaybackMessage() },
         )
         on<AlbumDetailsIntent.Play> { intent ->
