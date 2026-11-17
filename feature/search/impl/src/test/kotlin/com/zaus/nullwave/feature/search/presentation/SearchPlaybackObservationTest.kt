@@ -683,6 +683,73 @@ class SearchPlaybackObservationTest {
         }
     }
 
+    @Test
+    fun `resolver denial delivered before the queued Back grant keeps the gate closed`() = with(fixture) {
+        runTest(dispatcher) {
+            val vm = leaveSearchWithPlayPending()
+            val ui = vm.uiApi()
+            val checkedOnBack = SearchIntent.AccessChecked(true)
+            // The failure occurs after Android checked. Its waiting continuation runs before the intent.
+            assertTrue(playback.calls.single().reply.complete(playDenied()))
+            ui.onIntent(checkedOnBack)
+            runCurrent()
+            assertEquals(UiText.Resource(R.string.search_playback_access_denied), vm.snapshot.value.state.playbackError)
+
+            bind(vm)
+            settle()
+            reply(AppResult.Success(results(songs)))
+            assertSame(SearchBody.AccessRequired, vm.snapshot.value.state.body)
+
+            send(vm, SearchIntent.AccessChecked(true))
+            settle()
+            reply(AppResult.Success(results(songs)))
+            assertEquals(SearchBody.Ready(results(songs)), vm.snapshot.value.state.body)
+        }
+    }
+
+    @Test
+    fun `engine denial published after Back checks but before its intent runs closes the results`() = with(fixture) {
+        runTest(dispatcher) {
+            val vm = leaveSearchWithPlayPending()
+            vm.uiApi().onIntent(SearchIntent.AccessChecked(true))
+            playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "after-back-check")
+            runCurrent()
+
+            bind(vm)
+            settle()
+            reply(AppResult.Success(results(songs)))
+            assertSame(SearchBody.AccessRequired, vm.snapshot.value.state.body)
+            assertNull(vm.snapshot.value.state.playbackError)
+
+            send(vm, SearchIntent.AccessChecked(true))
+            settle()
+            reply(AppResult.Success(results(songs)))
+            assertEquals(SearchBody.Ready(results(songs)), vm.snapshot.value.state.body)
+        }
+    }
+
+    @Test
+    fun `a grant overtaken by an engine denial still covers an earlier outstanding resolver reply`() = with(fixture) {
+        runTest(dispatcher) {
+            val vm = readyVm(songs)
+            send(vm, SearchIntent.PlayTrack(beta.id, songs))
+            val olderReply = playDenied()
+            val check = SearchIntent.AccessChecked(true)
+            playback.states.value = problemSnapshot(PlaybackProblemCode.AccessDenied, "newer-than-check")
+            runCurrent()
+            assertSame(SearchBody.AccessRequired, vm.snapshot.value.state.body)
+            val reads = repository.calls.size
+
+            send(vm, check)
+            settle()
+            respond(olderReply)
+
+            assertSame(SearchBody.AccessRequired, vm.snapshot.value.state.body)
+            assertNull(vm.snapshot.value.state.playbackError)
+            assertEquals(reads, repository.calls.size)
+        }
+    }
+
     private suspend fun TestScope.leaveSearchWithPlayPending() = with(fixture) {
         val vm = createVm()
         val binding = bind(vm)
