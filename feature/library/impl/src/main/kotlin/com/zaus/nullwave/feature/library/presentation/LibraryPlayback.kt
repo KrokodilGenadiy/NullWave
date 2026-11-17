@@ -13,7 +13,7 @@ internal fun PlaybackCommandError.toLibraryPlaybackMessage(): UiText? = when (th
     PlaybackCommandError.InvalidRequest -> UiText.Resource(R.string.library_playback_invalid_request)
     PlaybackCommandError.Superseded -> null
     is PlaybackCommandError.SourceFailure -> UiText.Resource(when (error) {
-        PlaybackSourceError.AccessDenied -> R.string.library_playback_access_denied
+        is PlaybackSourceError.AccessDenied -> R.string.library_playback_access_denied
         PlaybackSourceError.NotFound -> R.string.library_playback_not_found
         PlaybackSourceError.Io -> R.string.library_playback_read_failed
     })

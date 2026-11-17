@@ -227,7 +227,7 @@ class PlayerCommandTest {
                 PlaybackCommandError.CommandUnavailable,
                 PlaybackCommandError.StaleTarget,
                 PlaybackCommandError.InvalidRequest,
-            ) + PlaybackSourceError.entries.map { PlaybackCommandError.SourceFailure(track.id, it) }
+            ) + listOf(PlaybackSourceError.AccessDenied(), PlaybackSourceError.NotFound, PlaybackSourceError.Io).map { PlaybackCommandError.SourceFailure(track.id, it) }
             for (error in errors) {
                 send(vm, PlayerIntent.Next)
                 respond(AppResult.Failure(error, IllegalStateException("private diagnostic")))

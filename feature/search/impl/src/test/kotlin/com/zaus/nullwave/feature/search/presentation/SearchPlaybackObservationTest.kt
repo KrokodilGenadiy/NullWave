@@ -713,7 +713,7 @@ class SearchPlaybackObservationTest {
     }
 
     private fun SearchPlaybackFixture.playDenied() =
-        AppResult.Failure(PlaybackCommandError.SourceFailure(beta.id, PlaybackSourceError.AccessDenied))
+        AppResult.Failure(PlaybackCommandError.SourceFailure(beta.id, PlaybackSourceError.AccessDenied()))
 
     @Test
     fun `delayed state collection compares against dispatch baseline instead of missing a new denial`() = with(fixture) {

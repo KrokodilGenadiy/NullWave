@@ -1,6 +1,7 @@
 package com.zaus.nullwave.core.playback.api
 
 import com.zaus.nullwave.core.playback.api.command.PlaybackCapability
+import com.zaus.nullwave.core.playback.api.model.PlaybackFailureOccurrence
 import com.zaus.nullwave.core.playback.api.model.PlaybackItemToken
 import com.zaus.nullwave.core.playback.api.model.PlaybackPhase
 import com.zaus.nullwave.core.playback.api.model.PlaybackProblem
@@ -10,13 +11,26 @@ import com.zaus.nullwave.core.playback.api.model.PlaybackSessionId
 import com.zaus.nullwave.core.playback.api.model.PlaybackSnapshot
 import com.zaus.nullwave.core.playback.api.model.PlaybackSuppression
 import com.zaus.nullwave.core.playback.api.model.PlaybackTransport
+import com.zaus.nullwave.core.playback.api.source.PlaybackSourceError
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PlaybackSnapshotTest {
+    @Test fun replayedEngineProblemKeepsItsPlaceRelativeToResolverDenialsAndPermissionChecks() {
+        val problem = PlaybackProblem(PlaybackProblemId("denied"), PlaybackProblemCode.AccessDenied)
+        val checkedThrough = PlaybackFailureOccurrence.latestSequence
+        val reply = PlaybackSourceError.AccessDenied()
+        val replay = problem.copy()
+
+        assertSame(problem.occurrence, replay.occurrence)
+        assertTrue(replay.occurrence.sequence <= checkedThrough)
+        assertTrue(reply.occurrence.sequence > checkedThrough)
+    }
+
     @Test fun playingRequiresReadyRequestedAndUnsuppressedTransport() {
         for (phase in PlaybackPhase.entries) {
             for (requested in listOf(false, true)) {

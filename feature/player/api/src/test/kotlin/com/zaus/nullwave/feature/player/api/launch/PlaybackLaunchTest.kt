@@ -83,7 +83,7 @@ class PlaybackLaunchTest {
     ) = ScreenViewModel(ReplyingController(reply), message).also { mvi.own(it) }
 
     private val denied: EmptyResult<PlaybackCommandError> =
-        AppResult.Failure(PlaybackCommandError.SourceFailure(TrackId("primary:1"), PlaybackSourceError.AccessDenied))
+        AppResult.Failure(PlaybackCommandError.SourceFailure(TrackId("primary:1"), PlaybackSourceError.AccessDenied()))
 }
 
 private data class ScreenState(

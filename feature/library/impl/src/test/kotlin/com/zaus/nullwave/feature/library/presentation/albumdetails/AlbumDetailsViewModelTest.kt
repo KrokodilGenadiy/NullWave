@@ -65,7 +65,7 @@ class AlbumDetailsViewModelTest {
     private val first = details("First")
     private val updated = details("Updated")
     private val playDenied = AppResult.Failure(
-        PlaybackCommandError.SourceFailure(first.tracks.single().id, PlaybackSourceError.AccessDenied),
+        PlaybackCommandError.SourceFailure(first.tracks.single().id, PlaybackSourceError.AccessDenied()),
     )
 
     @Before fun setUp() = mvi.setUp()

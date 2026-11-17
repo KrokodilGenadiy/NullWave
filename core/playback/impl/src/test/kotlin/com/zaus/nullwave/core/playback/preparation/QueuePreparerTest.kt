@@ -66,7 +66,7 @@ class QueuePreparerTest {
 
     @Test
     fun `any source failure rejects the complete request and prevents later reads`() = runTest(dispatcher) {
-        for (error in PlaybackSourceError.entries) {
+        for (error in listOf(PlaybackSourceError.AccessDenied(), PlaybackSourceError.NotFound, PlaybackSourceError.Io)) {
             val source = FakeResolver().apply {
                 read = { track ->
                     if (track == id("b")) AppResult.Failure(error)

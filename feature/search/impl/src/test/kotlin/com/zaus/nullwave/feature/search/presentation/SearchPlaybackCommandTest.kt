@@ -209,7 +209,7 @@ class SearchPlaybackCommandTest {
 
             assertTrue(accepted.waiterCancelled)
             assertFalse(accepted.reply.isCancelled)
-            accepted.reply.complete(AppResult.Failure(PlaybackCommandError.SourceFailure(beta.id, PlaybackSourceError.AccessDenied)))
+            accepted.reply.complete(AppResult.Failure(PlaybackCommandError.SourceFailure(beta.id, PlaybackSourceError.AccessDenied())))
             runCurrent()
             assertEquals(beforeClear, vm.snapshot.value.state)
             assertTrue(playback.calls.single().command is PlaybackCommand.ReplaceQueue)
@@ -278,7 +278,7 @@ class SearchPlaybackCommandTest {
         runTest(dispatcher) {
             val vm = readyVm(songs)
             send(vm, SearchIntent.PlayTrack(beta.id, songs))
-            respond(AppResult.Failure(PlaybackCommandError.SourceFailure(beta.id, PlaybackSourceError.AccessDenied)))
+            respond(AppResult.Failure(PlaybackCommandError.SourceFailure(beta.id, PlaybackSourceError.AccessDenied())))
 
             assertEquals(SearchBody.AccessRequired, vm.snapshot.value.state.body)
             assertEquals(UiText.Resource(R.string.search_playback_access_denied), vm.snapshot.value.state.playbackError)

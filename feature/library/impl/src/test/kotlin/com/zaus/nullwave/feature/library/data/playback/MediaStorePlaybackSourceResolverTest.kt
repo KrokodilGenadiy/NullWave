@@ -2,6 +2,7 @@ package com.zaus.nullwave.feature.library.data.playback
 
 import com.zaus.nullwave.core.media.model.track.TrackId
 import com.zaus.nullwave.core.playback.api.source.PlaybackSourceError
+import com.zaus.nullwave.core.playback.api.model.PlaybackFailureOccurrence
 import com.zaus.nullwave.core.playback.api.source.ResolvedPlaybackTrack
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.feature.library.data.mapping.artworkReferences
@@ -86,8 +87,11 @@ class MediaStorePlaybackSourceResolverTest {
     @Test
     fun `denied access takes precedence over parsing and prevents the provider read`() = runTest(dispatcher) {
         source.granted = false
-        assertEquals(PlaybackSourceError.AccessDenied, failure(resolver.resolveTrack(TrackId("foreign"))).error)
-        assertEquals(PlaybackSourceError.AccessDenied, failure(resolver.resolveTrack(id)).error)
+        val first = failure(resolver.resolveTrack(TrackId("foreign"))).error as PlaybackSourceError.AccessDenied
+        val checkedThrough = PlaybackFailureOccurrence.latestSequence
+        val second = failure(resolver.resolveTrack(id)).error as PlaybackSourceError.AccessDenied
+        assertTrue(first.occurrence.sequence <= checkedThrough)
+        assertTrue(second.occurrence.sequence > checkedThrough)
         assertTrue(source.addresses.isEmpty())
     }
 
@@ -101,20 +105,20 @@ class MediaStorePlaybackSourceResolverTest {
     @Test
     fun `access revoked during successful reading hides the returned resource`() = runTest(dispatcher) {
         source.read = { source.granted = false; playbackData() }
-        assertEquals(PlaybackSourceError.AccessDenied, failure(resolver.resolveTrack(id)).error)
+        assertTrue(failure(resolver.resolveTrack(id)).error is PlaybackSourceError.AccessDenied)
     }
 
     @Test
     fun `access revoked while an empty query completes is access denied rather than not found`() = runTest(dispatcher) {
         source.read = { source.granted = false; null }
-        assertEquals(PlaybackSourceError.AccessDenied, failure(resolver.resolveTrack(id)).error)
+        assertTrue(failure(resolver.resolveTrack(id)).error is PlaybackSourceError.AccessDenied)
     }
 
     @Test
     fun `access lost only at the final publication check cannot expose mapped metadata`() = runTest(dispatcher) {
         // Initial access and post-query access succeed; the publication check sees the revocation.
         source.accessCheck = { source.accessChecks < 3 }
-        assertEquals(PlaybackSourceError.AccessDenied, failure(resolver.resolveTrack(id)).error)
+        assertTrue(failure(resolver.resolveTrack(id)).error is PlaybackSourceError.AccessDenied)
         assertEquals(1, source.addresses.size)
         assertEquals(3, source.accessChecks)
     }
@@ -134,7 +138,7 @@ class MediaStorePlaybackSourceResolverTest {
         val problem = IOException("storage failed while access changed")
         source.read = { source.granted = false; throw problem }
         val failure = failure(resolver.resolveTrack(id))
-        assertEquals(PlaybackSourceError.AccessDenied, failure.error)
+        assertTrue(failure.error is PlaybackSourceError.AccessDenied)
         assertSame(problem, failure.cause)
         assertEquals(problem.message, failure.originalMessage)
     }
@@ -145,7 +149,7 @@ class MediaStorePlaybackSourceResolverTest {
         source.read = { throw problem }
         val failure = failure(resolver.resolveTrack(id))
         assertTrue(source.granted)
-        assertEquals(PlaybackSourceError.AccessDenied, failure.error)
+        assertTrue(failure.error is PlaybackSourceError.AccessDenied)
         assertSame(problem, failure.cause)
         assertEquals(problem.message, failure.originalMessage)
     }
@@ -177,7 +181,7 @@ class MediaStorePlaybackSourceResolverTest {
         assertEquals("Reading 1", success(resolver.resolveTrack(id)).track.title)
         assertEquals("Reading 2", success(resolver.resolveTrack(id)).track.title)
         source.granted = false
-        assertEquals(PlaybackSourceError.AccessDenied, failure(resolver.resolveTrack(id)).error)
+        assertTrue(failure(resolver.resolveTrack(id)).error is PlaybackSourceError.AccessDenied)
         assertEquals(2, source.addresses.size)
     }
 

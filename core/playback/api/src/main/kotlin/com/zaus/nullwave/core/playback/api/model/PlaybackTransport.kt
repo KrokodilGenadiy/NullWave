@@ -13,6 +13,8 @@ data class PlaybackProblem(
     val id: PlaybackProblemId,
     val code: PlaybackProblemCode,
     val target: PlaybackItemToken? = null,
+    /** Created on first publication of this engine problem and retained across snapshot updates. */
+    val occurrence: PlaybackFailureOccurrence = PlaybackFailureOccurrence(),
 )
 
 /** Orthogonal engine facts; [isPlaying] is derived, never an independently writable flag. */

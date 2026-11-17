@@ -2,6 +2,7 @@ package com.zaus.nullwave.core.playback.api.source
 
 import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.core.media.model.track.TrackId
+import com.zaus.nullwave.core.playback.api.model.PlaybackFailureOccurrence
 import com.zaus.nullwave.core.result.AppResult
 
 /**
@@ -15,7 +16,15 @@ interface PlaybackSourceResolver {
     suspend fun resolveTrack(id: TrackId): AppResult<ResolvedPlaybackTrack, PlaybackSourceError>
 }
 
-enum class PlaybackSourceError { AccessDenied, NotFound, Io }
+sealed interface PlaybackSourceError {
+    /** Create at the failed permission check and pass the same occurrence through queue preparation and delivery. */
+    class AccessDenied : PlaybackSourceError {
+        val occurrence = PlaybackFailureOccurrence()
+    }
+
+    data object NotFound : PlaybackSourceError
+    data object Io : PlaybackSourceError
+}
 
 /**
  * Fresh metadata and a resource URI for the internal audio path, not a path or a parsed TrackId.

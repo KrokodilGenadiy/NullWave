@@ -15,7 +15,7 @@ internal fun PlaybackCommandError.toPlayerMessage(): UiText? = when (this) {
     PlaybackCommandError.InvalidRequest -> UiText.Resource(R.string.player_invalid_request)
     PlaybackCommandError.Superseded -> null
     is PlaybackCommandError.SourceFailure -> UiText.Resource(when (error) {
-        PlaybackSourceError.AccessDenied -> R.string.player_access_denied
+        is PlaybackSourceError.AccessDenied -> R.string.player_access_denied
         PlaybackSourceError.NotFound -> R.string.player_not_found
         PlaybackSourceError.Io -> R.string.player_read_failed
     })

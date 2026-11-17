@@ -52,11 +52,12 @@ class PlaybackQueueOwnerTest {
         val old = fixture.target.current
         val beforeFailure = fixture.allocations
         val cause = IOException("provider text")
+        val denied = PlaybackSourceError.AccessDenied()
         val release = CompletableDeferred<Unit>()
         fixture.resolver.read = { id ->
             if (id == trackId("bad")) {
                 release.await()
-                AppResult.Failure(PlaybackSourceError.AccessDenied, cause, "captured diagnostic")
+                AppResult.Failure(denied, cause, "captured diagnostic")
             } else AppResult.Success(resolved(id))
         }
         val reply = fixture.replace("good", "bad", "unvisited")
@@ -66,7 +67,7 @@ class PlaybackQueueOwnerTest {
         release.complete(Unit)
         runCurrent()
         val failure = reply.await() as AppResult.Failure
-        assertEquals(PlaybackCommandError.SourceFailure(trackId("bad"), PlaybackSourceError.AccessDenied), failure.error)
+        assertEquals(PlaybackCommandError.SourceFailure(trackId("bad"), denied), failure.error)
         assertSame(cause, failure.cause)
         assertEquals("captured diagnostic", failure.originalMessage)
         assertEquals(listOf(trackId("old"), trackId("good"), trackId("bad")), fixture.resolver.calls)

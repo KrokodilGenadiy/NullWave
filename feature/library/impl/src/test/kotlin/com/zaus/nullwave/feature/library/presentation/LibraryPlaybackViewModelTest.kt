@@ -207,7 +207,7 @@ class LibraryPlaybackViewModelTest {
     fun `source access rejection gates every tab until a fresh access result permits reading`() = runTest(dispatcher) {
         val vm = readyVm(songs)
         send(vm, LibraryIntent.PlaySong(beta.id, songs))
-        respond(AppResult.Failure(PlaybackCommandError.SourceFailure(beta.id, PlaybackSourceError.AccessDenied)))
+        respond(AppResult.Failure(PlaybackCommandError.SourceFailure(beta.id, PlaybackSourceError.AccessDenied())))
 
         val gate = LibraryBody.AccessRequired(AccessAction.CheckAgain)
         assertEquals(gate, vm.snapshot.value.state.body)
@@ -292,7 +292,7 @@ class LibraryPlaybackViewModelTest {
 
         assertTrue(accepted.waiterCancelled)
         assertFalse(accepted.reply.isCancelled)
-        accepted.reply.complete(AppResult.Failure(PlaybackCommandError.SourceFailure(beta.id, PlaybackSourceError.AccessDenied)))
+        accepted.reply.complete(AppResult.Failure(PlaybackCommandError.SourceFailure(beta.id, PlaybackSourceError.AccessDenied())))
         runCurrent()
         assertEquals(beforeClear, vm.snapshot.value.state)
         assertTrue(playback.calls.single().command is PlaybackCommand.ReplaceQueue)
@@ -947,7 +947,7 @@ class LibraryPlaybackViewModelTest {
         assertEquals(UiText.Resource(R.string.library_playback_access_denied), vm.snapshot.value.state.playbackError)
     }
 
-    private val playDenied get() = AppResult.Failure(PlaybackCommandError.SourceFailure(beta.id, PlaybackSourceError.AccessDenied))
+    private val playDenied get() = AppResult.Failure(PlaybackCommandError.SourceFailure(beta.id, PlaybackSourceError.AccessDenied()))
 
     private suspend fun TestScope.returnToAlbumsBeforePlaybackReconnects(reconnect: CompletableDeferred<Unit>): LibraryViewModel {
         val vm = createVm()

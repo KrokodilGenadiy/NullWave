@@ -108,7 +108,7 @@ class PlaybackCommandTicketsTest {
             val staged = store.stage(replace("failed"))!!
             val accepted = store.take(staged.id)!!
             val failure = AppResult.Failure(
-                PlaybackCommandError.SourceFailure(TrackId("failed"), PlaybackSourceError.AccessDenied),
+                PlaybackCommandError.SourceFailure(TrackId("failed"), PlaybackSourceError.AccessDenied()),
                 cause,
                 message,
             )

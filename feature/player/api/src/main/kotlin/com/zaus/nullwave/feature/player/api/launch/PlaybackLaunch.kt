@@ -81,7 +81,7 @@ fun <S : UiState, I : UiIntent, E : UiEffect> MviDefinition<S, I, E>.playbackLau
         onResult { _, result ->
             // The access source may already have closed the screen before this acknowledgement.
             val error = (result as? AppResult.Failure)?.error ?: return@onResult this
-            val denied = error is PlaybackCommandError.SourceFailure && error.error == PlaybackSourceError.AccessDenied
+            val denied = error is PlaybackCommandError.SourceFailure && error.error is PlaybackSourceError.AccessDenied
             // A confirmed denial closes access even when the screen shows no text for it.
             val next = if (denied) closeAccess() else this
             val text = message(error) ?: return@onResult next

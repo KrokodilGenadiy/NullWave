@@ -52,11 +52,8 @@ class MediaStorePlaybackSourceResolverInstrumentedTest {
             }
             val resolver = MediaStorePlaybackSourceResolver(source, StandardTestDispatcher(testScheduler))
             val failure = resolver.resolveTrack(TrackId("external_primary:1")) as AppResult.Failure
-            assertEquals(
-                problem.javaClass.name,
-                if (revoked) PlaybackSourceError.AccessDenied else PlaybackSourceError.Io,
-                failure.error,
-            )
+            if (revoked) assertTrue(problem.javaClass.name, failure.error is PlaybackSourceError.AccessDenied)
+            else assertEquals(problem.javaClass.name, PlaybackSourceError.Io, failure.error)
             assertSame(problem, failure.cause)
             assertEquals(problem.message, failure.originalMessage)
         }

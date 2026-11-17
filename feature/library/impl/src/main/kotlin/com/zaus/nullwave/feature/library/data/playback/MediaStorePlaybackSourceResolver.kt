@@ -26,23 +26,23 @@ internal class MediaStorePlaybackSourceResolver(
     override suspend fun resolveTrack(id: TrackId): AppResult<ResolvedPlaybackTrack, PlaybackSourceError> =
         withContext(io) {
             try {
-                if (!source.hasReadAccess()) return@withContext AppResult.Failure(PlaybackSourceError.AccessDenied)
+                if (!source.hasReadAccess()) return@withContext AppResult.Failure(PlaybackSourceError.AccessDenied())
                 val address = MediaStoreTrackAddress.from(id)
                     ?: return@withContext AppResult.Failure(PlaybackSourceError.NotFound)
                 val data = source.readTrack(address)
                 currentCoroutineContext().ensureActive()
-                if (!source.hasReadAccess()) return@withContext AppResult.Failure(PlaybackSourceError.AccessDenied)
+                if (!source.hasReadAccess()) return@withContext AppResult.Failure(PlaybackSourceError.AccessDenied())
                 if (data == null) return@withContext AppResult.Failure(PlaybackSourceError.NotFound)
 
                 val artwork = data.row.artworkKey()?.let { key -> data.albumRows.albumArtwork(key) }
                 val track = data.row.toTrack(artwork)
                 if (track.id != id) throw IOException("MediaStore resolved a different track identity")
                 currentCoroutineContext().ensureActive()
-                if (!source.hasReadAccess()) AppResult.Failure(PlaybackSourceError.AccessDenied)
+                if (!source.hasReadAccess()) AppResult.Failure(PlaybackSourceError.AccessDenied())
                 else AppResult.Success(ResolvedPlaybackTrack(track, data.resourceUri))
             } catch (failure: SecurityException) {
                 // A provider/resource can deny access even while the broad audio permission is granted.
-                AppResult.Failure(PlaybackSourceError.AccessDenied, failure)
+                AppResult.Failure(PlaybackSourceError.AccessDenied(), failure)
             } catch (failure: IOException) {
                 ioFailure(failure)
             } catch (failure: SQLiteException) {
@@ -56,7 +56,7 @@ internal class MediaStorePlaybackSourceResolver(
 
     private suspend fun ioFailure(failure: Exception): AppResult.Failure<PlaybackSourceError> {
         currentCoroutineContext().ensureActive()
-        val error = if (source.hasReadAccess()) PlaybackSourceError.Io else PlaybackSourceError.AccessDenied
+        val error = if (source.hasReadAccess()) PlaybackSourceError.Io else PlaybackSourceError.AccessDenied()
         return AppResult.Failure(error, failure)
     }
 }
