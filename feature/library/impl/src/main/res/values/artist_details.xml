@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="library_artist_details_back">Back</string>
+    <string name="library_artist_details_play">PLAY ALL</string>
+    <string name="library_artist_details_shuffle">SHUFFLE</string>
+    <string name="library_artist_details_albums">ALBUMS</string>
+    <string name="library_artist_details_tracks">ALL TRACKS</string>
+    <string name="library_artist_details_missing">Artist no longer available</string>
+    <string name="library_artist_details_missing_body">No tracks remain for this artist. Go back to choose another artist.</string>
+    <string name="library_artist_details_error">Couldn’t read artist</string>
+    <string name="library_artist_details_error_body">Try reading the artist’s albums and tracks again.</string>
+    <string name="library_artist_details_refresh_failed">Couldn’t refresh this artist. Showing the previous list.</string>
+</resources>

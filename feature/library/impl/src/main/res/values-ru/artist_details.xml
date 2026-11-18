@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="library_artist_details_back">Назад</string>
+    <string name="library_artist_details_play">ИГРАТЬ ВСЁ</string>
+    <string name="library_artist_details_shuffle">ПЕРЕМЕШАТЬ</string>
+    <string name="library_artist_details_albums">АЛЬБОМЫ</string>
+    <string name="library_artist_details_tracks">ВСЕ ТРЕКИ</string>
+    <string name="library_artist_details_missing">Исполнитель больше недоступен</string>
+    <string name="library_artist_details_missing_body">Треков этого исполнителя больше нет. Вернитесь и выберите другого исполнителя.</string>
+    <string name="library_artist_details_error">Не удалось прочитать исполнителя</string>
+    <string name="library_artist_details_error_body">Попробуйте снова прочитать альбомы и треки исполнителя.</string>
+    <string name="library_artist_details_refresh_failed">Не удалось обновить исполнителя. Показан предыдущий список.</string>
+</resources>
