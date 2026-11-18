@@ -10,7 +10,9 @@ import com.zaus.nullwave.feature.library.api.model.album.AlbumId
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumDetails
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumQuery
+import com.zaus.nullwave.feature.library.api.model.artist.ArtistId
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
+import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistDetails
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
 import com.zaus.nullwave.core.media.model.track.MediaTrack
 import com.zaus.nullwave.feature.library.api.model.track.LibraryTrackQuery
@@ -18,9 +20,11 @@ import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchQuery
 import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchResults
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
 import com.zaus.nullwave.feature.library.api.repository.LibraryAlbumDetailsRepository
+import com.zaus.nullwave.feature.library.api.repository.LibraryArtistDetailsRepository
 import com.zaus.nullwave.feature.library.api.repository.LibrarySearchRepository
 import com.zaus.nullwave.feature.library.data.mapping.toAlbums
 import com.zaus.nullwave.feature.library.data.mapping.toAlbumDetails
+import com.zaus.nullwave.feature.library.data.mapping.toArtistDetails
 import com.zaus.nullwave.feature.library.data.mapping.toArtists
 import com.zaus.nullwave.feature.library.data.mapping.toTracks
 import com.zaus.nullwave.feature.library.data.search.toSearchResults
@@ -42,7 +46,7 @@ internal class MediaStoreLibraryRepository(
     private val source: MediaStoreAudioSource,
     private val io: CoroutineDispatcher,
     private val waveformSync: WaveformCatalogSync = WaveformCatalogSync {},
-) : LibraryCatalogRepository, LibrarySearchRepository, LibraryAlbumDetailsRepository {
+) : LibraryCatalogRepository, LibrarySearchRepository, LibraryAlbumDetailsRepository, LibraryArtistDetailsRepository {
     override fun observeTracks(query: LibraryTrackQuery): Flow<AppResult<List<MediaTrack>, DataError>> =
         observe { it.toTracks(query) }
 
@@ -63,6 +67,18 @@ internal class MediaStoreLibraryRepository(
 
     override fun observeArtists(query: LibraryArtistQuery): Flow<AppResult<List<LibraryArtist>, DataError>> =
         observe { it.toArtists(query) }
+
+    override fun observeArtistDetails(artistId: ArtistId, localeTag: String): Flow<AppResult<LibraryArtistDetails, DataError>> {
+        require(localeTag.isNotBlank()) { "A locale tag is required for artist details sorting." }
+        return observe(prepareWaveforms = false) { it.toArtistDetails(artistId, localeTag) }
+            .map { result ->
+                when (result) {
+                    is AppResult.Failure -> result
+                    is AppResult.Success -> result.value?.let { AppResult.Success(it) }
+                        ?: AppResult.Failure(DataError.NotFound)
+                }
+            }
+    }
 
     override fun observeSearch(query: LibrarySearchQuery): Flow<AppResult<LibrarySearchResults, DataError>> =
         observe(prepareWaveforms = false) { it.toSearchResults(query) }

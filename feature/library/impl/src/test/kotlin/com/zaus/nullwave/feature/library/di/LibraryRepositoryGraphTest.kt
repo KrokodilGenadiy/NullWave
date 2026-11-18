@@ -4,8 +4,10 @@ import com.zaus.nullwave.core.di.dispatchers.CoroutineDispatcherBindings
 import com.zaus.nullwave.core.di.dispatchers.IoDispatcher
 import com.zaus.nullwave.core.result.AppResult
 import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchQuery
+import com.zaus.nullwave.feature.library.api.model.artist.ArtistId
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
 import com.zaus.nullwave.feature.library.api.repository.LibraryAlbumDetailsRepository
+import com.zaus.nullwave.feature.library.api.repository.LibraryArtistDetailsRepository
 import com.zaus.nullwave.feature.library.api.repository.LibraryRepository
 import com.zaus.nullwave.feature.library.api.repository.LibrarySearchRepository
 import com.zaus.nullwave.feature.library.data.source.audioRow
@@ -29,7 +31,7 @@ import org.junit.Test
 /** Real production repository bindings; only the Android source and dispatcher are replaced. */
 class LibraryRepositoryGraphTest {
     @Test
-    fun `catalog tracks search and album details share one lazy scoped implementation per graph`() = runTest {
+    fun `catalog tracks search and details share one lazy scoped implementation per graph`() = runTest {
         val source = FakeMediaStoreAudioSource().apply { read = { listOf(audioRow(title = "Needle")) } }
         val dispatcher = StandardTestDispatcher(testScheduler)
         val factory = createGraphFactory<LibraryRepositoryTestGraph.Factory>()
@@ -38,6 +40,7 @@ class LibraryRepositoryGraphTest {
         assertSame(first.catalog, first.tracks)
         assertSame(first.catalog, first.search)
         assertSame(first.catalog, first.albumDetails)
+        assertSame(first.catalog, first.artistDetails)
         assertSame(first.search, first.search)
         assertNotSame(first.search, second.search)
         assertEquals(0, source.reads)
@@ -46,6 +49,10 @@ class LibraryRepositoryGraphTest {
         assertEquals("Needle", (result as AppResult.Success).value.tracks.single().track.title)
         assertEquals(1, source.reads)
         assertEquals(1, source.closes)
+        val details = first.artistDetails.observeArtistDetails(ArtistId("external_primary:4"), "en").first()
+        assertEquals("Needle", (details as AppResult.Success).value.tracks.single().title)
+        assertEquals(2, source.reads)
+        assertEquals(2, source.closes)
     }
 }
 
@@ -64,6 +71,7 @@ internal interface LibraryRepositoryTestGraph {
 
     val catalog: LibraryCatalogRepository
     val albumDetails: LibraryAlbumDetailsRepository
+    val artistDetails: LibraryArtistDetailsRepository
     val tracks: LibraryRepository
     val search: LibrarySearchRepository
 

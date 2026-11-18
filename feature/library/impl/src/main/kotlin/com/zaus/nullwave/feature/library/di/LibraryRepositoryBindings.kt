@@ -2,6 +2,7 @@ package com.zaus.nullwave.feature.library.di
 
 import com.zaus.nullwave.core.di.dispatchers.IoDispatcher
 import com.zaus.nullwave.feature.library.api.repository.LibraryAlbumDetailsRepository
+import com.zaus.nullwave.feature.library.api.repository.LibraryArtistDetailsRepository
 import com.zaus.nullwave.feature.library.api.repository.LibraryCatalogRepository
 import com.zaus.nullwave.feature.library.api.repository.LibraryRepository
 import com.zaus.nullwave.feature.library.api.repository.LibrarySearchRepository
@@ -32,6 +33,9 @@ object LibraryRepositoryBindings {
 
     @Provides
     private fun albumDetails(repository: MediaStoreLibraryRepository): LibraryAlbumDetailsRepository = repository
+
+    @Provides
+    private fun artistDetails(repository: MediaStoreLibraryRepository): LibraryArtistDetailsRepository = repository
 
     @Provides
     private fun tracks(repository: MediaStoreLibraryRepository): LibraryRepository = repository
