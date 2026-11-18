@@ -2,7 +2,6 @@ package com.zaus.nullwave.feature.search.ui
 
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertCountEquals
@@ -22,6 +21,7 @@ import androidx.compose.ui.test.performTextReplacement
 import com.zaus.nullwave.core.mvi.ui.UiText
 import com.zaus.nullwave.feature.library.api.access.AccessAction
 import com.zaus.nullwave.feature.library.api.access.LibraryAccess
+import com.zaus.nullwave.feature.library.api.model.artist.ArtistId
 import com.zaus.nullwave.feature.library.api.ui.LibraryAccessUi
 import com.zaus.nullwave.feature.search.impl.R
 import com.zaus.nullwave.feature.search.presentation.SearchBody
@@ -38,6 +38,7 @@ class SearchScreenInstrumentedTest {
     private val state = mutableStateOf(SearchState("en"))
     private val intents = mutableListOf<SearchIntent>()
     private var back = 0
+    private val openedArtists = mutableListOf<ArtistId>()
 
     // TrackRow's caller modifier tags its bounds container; the inner Row owns the action.
     private fun trackAction(id: String) = compose.onNode(
@@ -59,7 +60,7 @@ class SearchScreenInstrumentedTest {
     }
 
     @Test
-    fun tracksCanPlayAndHideFilenamesAlbumsOpenAndArtistsRemainInformational() {
+    fun tracksCanPlayAndHideFilenamesAlbumsAndArtistsOpenByIdentity() {
         state.value = SearchState("en", "orbit", body = SearchBody.Ready(searchResults()))
         show()
         trackAction("track:0").assertIsDisplayed().assertHasClickAction()
@@ -68,7 +69,8 @@ class SearchScreenInstrumentedTest {
         compose.onNodeWithText("Matching artist: Guest Orbit").assertIsDisplayed()
         compose.onNodeWithTag("search_album:album:1").assertHasClickAction()
         compose.onNodeWithTag("search_results").performScrollToNode(hasTestTag("search_artist:artist:1"))
-        compose.onNodeWithTag("search_artist:artist:1").assertIsDisplayed().assertHasNoClickAction()
+        compose.onNodeWithTag("search_artist:artist:1").assertIsDisplayed().assertHasClickAction().performClick()
+        compose.runOnIdle { assertEquals(listOf(ArtistId("artist:1")), openedArtists) }
     }
 
     @Test
@@ -224,7 +226,7 @@ class SearchScreenInstrumentedTest {
                     SearchIntent.DismissPlaybackError -> state.value = state.value.copy(playbackLaunch = state.value.playbackLaunch.dismissed())
                     else -> Unit
                 }
-            }, { back++ }, access)
+            }, { back++ }, access, onArtistClick = { openedArtists += it })
         } }
     }
 }

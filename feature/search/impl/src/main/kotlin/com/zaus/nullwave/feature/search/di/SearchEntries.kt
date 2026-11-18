@@ -4,6 +4,7 @@ import com.zaus.nullwave.core.navigation.EntryProviderInstaller
 import com.zaus.nullwave.core.navigation.navigateBack
 import com.zaus.nullwave.core.navigation.navigateTo
 import com.zaus.nullwave.feature.library.api.AlbumDetailsKey
+import com.zaus.nullwave.feature.library.api.ArtistDetailsKey
 import com.zaus.nullwave.feature.library.api.ui.LibraryAccessHost
 import com.zaus.nullwave.feature.library.api.ui.LibraryArtworkRenderer
 import com.zaus.nullwave.feature.search.api.SearchKey
@@ -22,7 +23,7 @@ object SearchEntries {
     fun entries(accessHost: LibraryAccessHost, artwork: () -> LibraryArtworkRenderer): EntryProviderInstaller = {
         entry<SearchKey> {
             SearchRoot(onBack = { navigateBack(SearchKey) }, accessHost = accessHost, artwork = artwork(),
-                onAlbumClick = { navigateTo(SearchKey, AlbumDetailsKey(it)) })
+                onAlbumClick = { navigateTo(SearchKey, AlbumDetailsKey(it)) }, onArtistClick = { navigateTo(SearchKey, ArtistDetailsKey(it)) })
         }
     }
 }

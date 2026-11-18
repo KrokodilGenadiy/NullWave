@@ -8,6 +8,7 @@ import com.zaus.nullwave.core.navigation.SectionMenuButton
 import com.zaus.nullwave.core.mvi.ui.collectMviUiWithLifecycle
 import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
 import com.zaus.nullwave.feature.library.api.model.album.AlbumId
+import com.zaus.nullwave.feature.library.api.model.artist.ArtistId
 import com.zaus.nullwave.feature.library.api.ui.LibraryAccessHost
 import com.zaus.nullwave.core.mvi.ui.rememberMviUiApi
 import com.zaus.nullwave.feature.library.presentation.LibraryIntent
@@ -22,12 +23,13 @@ internal fun LibraryRoot(
     accessHost: LibraryAccessHost,
     onSearchClick: () -> Unit = {},
     onAlbumClick: (AlbumId) -> Unit = {},
+    onArtistClick: (ArtistId) -> Unit = {},
 ) {
     val api = rememberMviUiApi(viewModel)
     val localeTag = LocalConfiguration.current.locales[0].toLanguageTag()
     accessHost.Content({ api.onIntent(LibraryIntent.AccessChecked(it)) }) { accessUi ->
         val ui = viewModel.collectMviUiWithLifecycle(minActiveState = Lifecycle.State.RESUMED)
         LaunchedEffect(viewModel, localeTag) { ui.onIntent(LibraryIntent.LocaleChanged(localeTag)) }
-        LibraryScreen(ui.state, ui.onIntent, menuButton, accessUi, artworkLoader, onSearchClick, onAlbumClick)
+        LibraryScreen(ui.state, ui.onIntent, menuButton, accessUi, artworkLoader, onSearchClick, onAlbumClick, onArtistClick)
     }
 }

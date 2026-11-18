@@ -49,6 +49,7 @@ import com.zaus.nullwave.core.mvi.ui.asString
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
 import com.zaus.nullwave.feature.library.api.model.album.AlbumId
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
+import com.zaus.nullwave.feature.library.api.model.artist.ArtistId
 import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
 import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.core.designsystem.R as DesignR
@@ -68,6 +69,7 @@ internal fun LibraryReadyContent(
     insets: PaddingValues,
     listState: LazyGridState,
     onAlbumClick: (AlbumId) -> Unit,
+    onArtistClick: (ArtistId) -> Unit,
 ) {
     val ready = state.selectedBody as? LibraryBody.Ready<*> ?: return
     val spacing = NullWaveTheme.spacing
@@ -129,7 +131,7 @@ internal fun LibraryReadyContent(
                 val artists = state.artists
                 if (artists is LibraryBody.Ready) items(artists.items,
                     key = { "artist:${it.id.value}" }, contentType = { "artist" }) { artist ->
-                    LibraryArtistRow(artist)
+                    LibraryArtistRow(artist) { onArtistClick(artist.id) }
                 }
             }
         }
@@ -186,11 +188,12 @@ private fun LibraryAlbumCard(album: LibraryAlbum, loader: LibraryArtworkLoader?,
 }
 
 @Composable
-private fun LibraryArtistRow(artist: LibraryArtist) {
+private fun LibraryArtistRow(artist: LibraryArtist, onClick: () -> Unit) {
     val name = artist.name ?: stringResource(R.string.library_unknown_artist)
     val monogram = remember(name) { libraryMonogram(name) }
     NullWaveMediaListItem(
         title = name,
+        onClick = onClick,
         modifier = Modifier.padding(horizontal = NullWaveTheme.dimens.gutter, vertical = NullWaveTheme.spacing.xxs)
             .testTag("library_artist:${artist.id.value}"),
         supportingText = stringResource(R.string.library_summary,

@@ -4,6 +4,8 @@ import com.zaus.nullwave.core.navigation.EntryProviderInstaller
 import com.zaus.nullwave.core.navigation.navigateBack
 import com.zaus.nullwave.core.navigation.navigateTo
 import com.zaus.nullwave.feature.library.api.AlbumDetailsKey
+import com.zaus.nullwave.feature.library.api.ArtistDetailsKey
+import com.zaus.nullwave.feature.library.ui.artistdetails.ArtistDetailsRoot
 import com.zaus.nullwave.feature.library.api.ui.LibraryAccessHost
 import com.zaus.nullwave.feature.library.ui.albumdetails.AlbumDetailsRoot
 import com.zaus.nullwave.feature.search.api.SearchKey
@@ -24,10 +26,15 @@ object LibraryEntries {
     fun entries(accessHost: LibraryAccessHost, artworkLoader: () -> LibraryArtworkLoader): EntryProviderInstaller = { menuButton ->
         entry<LibraryKey> {
             LibraryRoot(menuButton = menuButton, artworkLoader = artworkLoader(), accessHost = accessHost,
-                onSearchClick = { navigateTo(LibraryKey, SearchKey) }, onAlbumClick = { navigateTo(LibraryKey, AlbumDetailsKey(it)) })
+                onSearchClick = { navigateTo(LibraryKey, SearchKey) }, onAlbumClick = { navigateTo(LibraryKey, AlbumDetailsKey(it)) },
+                onArtistClick = { navigateTo(LibraryKey, ArtistDetailsKey(it)) })
         }
         entry<AlbumDetailsKey> { key ->
             AlbumDetailsRoot(key.albumId, accessHost, artworkLoader(), onBack = { navigateBack(key) })
+        }
+        entry<ArtistDetailsKey> { key ->
+            ArtistDetailsRoot(key.artistId, accessHost, artworkLoader(), onBack = { navigateBack(key) },
+                onAlbumClick = { navigateTo(key, AlbumDetailsKey(it)) })
         }
     }
 }

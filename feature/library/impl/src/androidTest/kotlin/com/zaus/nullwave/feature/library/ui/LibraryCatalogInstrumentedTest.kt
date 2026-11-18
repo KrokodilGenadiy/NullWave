@@ -11,7 +11,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
-import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
@@ -61,6 +60,7 @@ class LibraryCatalogInstrumentedTest {
     @get:Rule val compose = createComposeRule()
     private val state = mutableStateOf(catalog())
     private val intents = mutableListOf<LibraryIntent>()
+    private val openedArtists = mutableListOf<ArtistId>()
     private val resources get() = InstrumentationRegistry.getInstrumentation().targetContext.resources
 
     @Test
@@ -99,10 +99,12 @@ class LibraryCatalogInstrumentedTest {
         show(catalog(LibraryTab.Artists).copy(artists = LibraryBody.Ready(listOf(
             LibraryArtist(ArtistId("unknown"), null, trackCount = 3, albumCount = 0),
         ))))
-        compose.onNodeWithTag("library_artist:unknown").assertHasNoClickAction()
+        compose.onNodeWithTag("library_artist:unknown").assertHasClickAction()
             .assertTextContains(text(R.string.library_unknown_artist))
             .assertTextContains(resources.getQuantityString(R.plurals.library_album_count, 0, 0), substring = true)
             .assertTextContains(resources.getQuantityString(R.plurals.library_track_count, 3, 3), substring = true)
+            .performClick()
+        compose.runOnIdle { assertEquals(listOf(ArtistId("unknown")), openedArtists) }
         compose.onNodeWithTag("library_summary").assertTextContains(resources.getQuantityString(R.plurals.library_artist_count, 1, 1))
     }
 
@@ -234,7 +236,7 @@ class LibraryCatalogInstrumentedTest {
                                     is LibraryIntent.ArtistSortChanged -> state.value.copy(artistQuery = state.value.artistQuery.copy(direction = intent.direction))
                                     else -> state.value
                                 }
-                            }, menuButton = {})
+                            }, menuButton = {}, onArtistClick = { openedArtists += it })
                         }
                     }
                 }

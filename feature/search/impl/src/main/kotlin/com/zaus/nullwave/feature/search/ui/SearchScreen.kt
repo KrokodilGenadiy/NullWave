@@ -43,6 +43,7 @@ import com.zaus.nullwave.core.mvi.ui.asString
 import com.zaus.nullwave.feature.library.api.access.AccessAction
 import com.zaus.nullwave.feature.library.api.access.LibraryAccess
 import com.zaus.nullwave.feature.library.api.model.album.AlbumId
+import com.zaus.nullwave.feature.library.api.model.artist.ArtistId
 import com.zaus.nullwave.feature.library.api.ui.LibraryAccessUi
 import com.zaus.nullwave.feature.library.api.ui.LibraryArtworkRenderer
 import com.zaus.nullwave.feature.search.impl.R
@@ -60,6 +61,7 @@ internal fun SearchScreen(
     accessUi: LibraryAccessUi = LibraryAccessUi(),
     artwork: LibraryArtworkRenderer? = null,
     onAlbumClick: (AlbumId) -> Unit = {},
+    onArtistClick: (ArtistId) -> Unit = {},
 ) {
     val resultsScroll = rememberSearchScrollState(state.query?.text, state.localeTag)
     val inputFocus = rememberSearchInputFocus()
@@ -129,12 +131,14 @@ internal fun SearchScreen(
     ) { padding ->
         val body = state.body
         if (body is SearchBody.Ready) {
-            SearchResults(body, state.rawQuery, state.playingTrackId, onIntent, artwork, padding, resultsScroll) { id ->
+            fun stopEditing() {
                 focusManager.clearFocus()
                 inputFocus.restoreEditing = false
                 keyboard?.hide()
-                onAlbumClick(id)
             }
+            SearchResults(body, state.rawQuery, state.playingTrackId, onIntent, artwork, padding, resultsScroll,
+                onAlbumClick = { stopEditing(); onAlbumClick(it) },
+                onArtistClick = { stopEditing(); onArtistClick(it) })
         } else LazyColumn(Modifier.fillMaxSize().consumeWindowInsets(padding), contentPadding = padding) {
             item("state") {
                 when (body) {

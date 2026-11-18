@@ -49,6 +49,7 @@ import com.zaus.nullwave.feature.library.impl.R
 import com.zaus.nullwave.feature.library.artwork.LibraryArtworkLoader
 import com.zaus.nullwave.feature.library.api.access.AccessAction
 import com.zaus.nullwave.feature.library.api.model.album.AlbumId
+import com.zaus.nullwave.feature.library.api.model.artist.ArtistId
 import com.zaus.nullwave.feature.library.api.ui.LibraryAccessUi
 import com.zaus.nullwave.feature.library.presentation.LibraryBody
 import com.zaus.nullwave.feature.library.presentation.LibraryIntent
@@ -66,6 +67,7 @@ internal fun LibraryScreen(
     artworkLoader: LibraryArtworkLoader? = null,
     onSearchClick: () -> Unit = {},
     onAlbumClick: (AlbumId) -> Unit = {},
+    onArtistClick: (ArtistId) -> Unit = {},
 ) {
     // Keep each position alive while another tab or a Loading/Failed branch is composed.
     // Feeding a temporary one-item loading grid into these states would clamp their positions.
@@ -120,7 +122,7 @@ internal fun LibraryScreen(
         },
     ) { padding ->
         if (ready != null) {
-            LibraryReadyContent(state, onIntent, { filtersVisible = true }, artworkLoader, padding, listState, onAlbumClick)
+            LibraryReadyContent(state, onIntent, { filtersVisible = true }, artworkLoader, padding, listState, onAlbumClick, onArtistClick)
             return@NullWaveScaffold
         }
         LazyColumn(
