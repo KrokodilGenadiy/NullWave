@@ -13,7 +13,7 @@ import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTextReplacement
 import com.zaus.nullwave.core.designsystem.theme.NullWaveTheme
-import com.zaus.nullwave.di.AlbumNavigationGraph
+import com.zaus.nullwave.di.LibraryDetailsNavigationGraph
 import dev.zacsweers.metro.createGraph
 import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 import org.junit.Assert.assertEquals
@@ -77,7 +77,7 @@ class AlbumNavigationInstrumentedTest {
     }
 
     private fun show() {
-        val graph = createGraph<AlbumNavigationGraph>()
+        val graph = createGraph<LibraryDetailsNavigationGraph>()
         compose.setContent {
             NullWaveTheme {
                 CompositionLocalProvider(LocalMetroViewModelFactory provides graph.metroViewModelFactory) {

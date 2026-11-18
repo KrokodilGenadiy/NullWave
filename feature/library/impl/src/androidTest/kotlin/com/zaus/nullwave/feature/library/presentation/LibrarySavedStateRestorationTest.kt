@@ -37,6 +37,7 @@ import com.zaus.nullwave.feature.library.di.LibraryInitialLocale
 import com.zaus.nullwave.feature.library.di.LibraryPlatformBindings
 import com.zaus.nullwave.feature.library.di.LibraryRepositoryBindings
 import com.zaus.nullwave.feature.library.presentation.albumdetails.AlbumDetailsViewModel
+import com.zaus.nullwave.feature.library.presentation.artistdetails.ArtistDetailsViewModel
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
@@ -156,6 +157,7 @@ class LibrarySavedStateRestorationTest {
 
 @DependencyGraph(AppScope::class, excludes = [
     LibraryPlatformBindings::class, LibraryRepositoryBindings::class, LibraryEntries::class, AlbumDetailsViewModel.Factory::class,
+    ArtistDetailsViewModel.Factory::class,
 ])
 internal interface LibraryRestorationGraph : ViewModelGraph {
     @Provides

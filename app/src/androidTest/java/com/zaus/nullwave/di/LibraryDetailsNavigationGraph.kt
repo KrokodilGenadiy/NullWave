@@ -19,6 +19,9 @@ import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbum
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumDetails
 import com.zaus.nullwave.feature.library.api.model.album.LibraryAlbumQuery
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtist
+import com.zaus.nullwave.feature.library.api.model.artist.ArtistId
+import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistDetails
+import com.zaus.nullwave.feature.library.api.repository.LibraryArtistDetailsRepository
 import com.zaus.nullwave.feature.library.api.model.artist.LibraryArtistQuery
 import com.zaus.nullwave.feature.library.api.model.search.LibraryAlbumSearchHit
 import com.zaus.nullwave.feature.library.api.model.search.LibrarySearchQuery
@@ -42,7 +45,7 @@ import kotlinx.coroutines.flow.flowOf
 
 /** Keep production entries and VM factories, but give both origins the same deterministic catalog. */
 @DependencyGraph(AppScope::class, excludes = [LibraryRepositoryBindings::class, LibraryUiBindings::class])
-internal interface AlbumNavigationGraph : ViewModelGraph {
+internal interface LibraryDetailsNavigationGraph : ViewModelGraph {
     val entries: Set<EntryProviderInstaller>
 
     @Provides @ForScope(AppScope::class)
@@ -51,6 +54,7 @@ internal interface AlbumNavigationGraph : ViewModelGraph {
     @Provides fun catalog(): LibraryCatalogRepository = Albums
     @Provides fun search(): LibrarySearchRepository = Albums
     @Provides fun details(): LibraryAlbumDetailsRepository = Albums
+    @Provides fun artistDetails(): LibraryArtistDetailsRepository = Albums
     @Provides fun access(): LibraryAccessHost = object : LibraryAccessHost {
         @Composable override fun Content(onAccessChecked: (LibraryAccess) -> Unit, content: @Composable (LibraryAccessUi) -> Unit) {
             LaunchedEffect(Unit) { onAccessChecked(LibraryAccess.Granted) }
@@ -64,16 +68,24 @@ internal interface AlbumNavigationGraph : ViewModelGraph {
     }
 }
 
-private object Albums : LibraryCatalogRepository, LibrarySearchRepository, LibraryAlbumDetailsRepository {
+private object Albums : LibraryCatalogRepository, LibrarySearchRepository, LibraryAlbumDetailsRepository, LibraryArtistDetailsRepository {
     private val albums = (1..60).map { LibraryAlbum(AlbumId("fixture:$it"), "Record $it", AlbumArtistCredit.Named("Artist"), 1) }
+    private val artists = (1..60).map {
+        LibraryArtist(ArtistId("fixture:artist$it"), if (it in 35..36) "Artist" else "Artist $it", 60, 12)
+    }
     override fun observeTracks(query: LibraryTrackQuery) = flowOf(AppResult.Success(emptyList<MediaTrack>()))
-    override fun observeArtists(query: LibraryArtistQuery) = flowOf(AppResult.Success(emptyList<LibraryArtist>()))
+    override fun observeArtists(query: LibraryArtistQuery) = flowOf(AppResult.Success(artists))
     override fun observeAlbums(query: LibraryAlbumQuery) = flowOf(AppResult.Success(albums))
     override fun observeSearch(query: LibrarySearchQuery) = flowOf(AppResult.Success(LibrarySearchResults(
         emptyList(),
         albums.filter { it.title?.contains(query.text, ignoreCase = true) == true }.map { LibraryAlbumSearchHit(it, emptyList()) },
-        emptyList(),
+        artists.filter { it.name?.contains(query.text, ignoreCase = true) == true },
     )))
+    override fun observeArtistDetails(artistId: ArtistId, localeTag: String) = flowOf(AppResult.Success(
+        LibraryArtistDetails.create(artists.single { it.id == artistId }, albums.take(12), (1..60).map {
+            MediaTrack(TrackId("${artistId.value}:track$it"), "Track $it from ${artistId.value}", "Artist", "Record 1", 120_000)
+        }),
+    ))
     override fun observeAlbumDetails(albumId: AlbumId, localeTag: String) = albums.single { it.id == albumId }.let { album ->
         flowOf(AppResult.Success(LibraryAlbumDetails.create(album, listOf(
             MediaTrack(TrackId(albumId.value), "Track from ${album.title}", "Artist", album.title, 120_000),
