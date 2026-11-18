@@ -8,10 +8,10 @@ interface NavigationScope {
     val backStack: NavBackStack<NavKey>
 }
 
-/** Ignore a second tap on the destination already on top. */
+/** Only the current entry can open a destination; ignore late callbacks and self-navigation. */
 context(nav: NavigationScope)
-fun navigateTo(key: NavKey) {
-    if (nav.backStack.lastOrNull() != key) nav.backStack.add(key)
+fun navigateTo(from: NavKey, key: NavKey) {
+    if (nav.backStack.lastOrNull() == from && from != key) nav.backStack.add(key)
 }
 
 /** A callback from an outgoing screen can only pop its own destination. The Activity owns Back at the root. */

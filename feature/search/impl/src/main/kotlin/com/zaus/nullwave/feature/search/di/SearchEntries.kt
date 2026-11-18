@@ -22,7 +22,7 @@ object SearchEntries {
     fun entries(accessHost: LibraryAccessHost, artwork: () -> LibraryArtworkRenderer): EntryProviderInstaller = {
         entry<SearchKey> {
             SearchRoot(onBack = { navigateBack(SearchKey) }, accessHost = accessHost, artwork = artwork(),
-                onAlbumClick = { navigateTo(AlbumDetailsKey(it)) })
+                onAlbumClick = { navigateTo(SearchKey, AlbumDetailsKey(it)) })
         }
     }
 }

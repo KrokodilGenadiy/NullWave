@@ -24,7 +24,7 @@ object LibraryEntries {
     fun entries(accessHost: LibraryAccessHost, artworkLoader: () -> LibraryArtworkLoader): EntryProviderInstaller = { menuButton ->
         entry<LibraryKey> {
             LibraryRoot(menuButton = menuButton, artworkLoader = artworkLoader(), accessHost = accessHost,
-                onSearchClick = { navigateTo(SearchKey) }, onAlbumClick = { navigateTo(AlbumDetailsKey(it)) })
+                onSearchClick = { navigateTo(LibraryKey, SearchKey) }, onAlbumClick = { navigateTo(LibraryKey, AlbumDetailsKey(it)) })
         }
         entry<AlbumDetailsKey> { key ->
             AlbumDetailsRoot(key.albumId, accessHost, artworkLoader(), onBack = { navigateBack(key) })

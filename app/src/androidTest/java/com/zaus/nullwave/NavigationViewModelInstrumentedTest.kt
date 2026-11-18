@@ -96,7 +96,7 @@ class NavigationViewModelInstrumentedTest {
                 val vm = metroViewModel<RestorationVm>()
                 val ui = vm.collectMviUiWithLifecycle()
                 SideEffect { root = vm }
-                ProbeScreen("root", ui.state, ui.onIntent, "Open detail") { navigateTo(SearchKey) }
+                ProbeScreen("root", ui.state, ui.onIntent, "Open detail") { navigateTo(LibraryKey, SearchKey) }
             }
             entry<SearchKey> {
                 val vm = metroViewModel<RestorationVm>()
