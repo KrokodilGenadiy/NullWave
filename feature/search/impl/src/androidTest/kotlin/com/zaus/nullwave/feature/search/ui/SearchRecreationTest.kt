@@ -84,7 +84,7 @@ class SearchRecreationTest {
     fun permissionRevokedWhileStoppedRemovesRetainedResultsAfterRecreation() {
         fixture.access.access = LibraryAccess.Granted
         val activity = launch()
-        compose.onNodeWithTag("search_input").performTextReplacement("Orbit")
+        enterQueryWithIme(activity, "Orbit")
         awaitResults(activity)
         activity.moveToState(Lifecycle.State.CREATED)
         compose.waitUntil { fixture.repository.active == 0 }
